@@ -872,6 +872,22 @@
             <label for="syncUrl">同期URL</label>
             <input id="syncUrl" name="syncUrl" type="url" placeholder="/.netlify/functions/sync">
           </div>
+          <div class="field wide">
+            <label for="branchesText">支店</label>
+            <textarea id="branchesText" name="branchesText"></textarea>
+          </div>
+          <div class="field wide">
+            <label for="channelsText">チャネル</label>
+            <textarea id="channelsText" name="channelsText"></textarea>
+          </div>
+          <div class="field wide">
+            <label for="staffText">担当</label>
+            <textarea id="staffText" name="staffText"></textarea>
+          </div>
+          <div class="field wide">
+            <label for="categoriesText">品目</label>
+            <textarea id="categoriesText" name="categoriesText"></textarea>
+          </div>
         </div>
       </div>
       <div class="dialog-actions">
@@ -1038,6 +1054,7 @@
         META.branches = saved.branches || META.branches;
         META.channels = saved.channels || META.channels;
         META.staff = saved.staff || META.staff;
+        META.categories = saved.categories || META.categories;
       }
     }
 
@@ -1046,9 +1063,10 @@
         id: "meta",
         staff: META.staff,
         branches: META.branches,
-        channels: META.channels
+        channels: META.channels,
+        categories: META.categories
       }));
-      await syncSet("meta", { staff: META.staff, branches: META.branches, channels: META.channels });
+      await syncSet("meta", { staff: META.staff, branches: META.branches, channels: META.channels, categories: META.categories });
     }
 
     function syncEnabled() {
@@ -1113,6 +1131,7 @@
         META.staff = meta.value.staff || META.staff;
         META.branches = meta.value.branches || META.branches;
         META.channels = meta.value.channels || META.channels;
+        META.categories = meta.value.categories || META.categories;
         initMeta();
         await saveMeta();
       }
@@ -1162,6 +1181,18 @@
       ["aiMode", "proxyUrl", "model", "syncMode", "syncUrl", "syncSecret"].forEach((key) => {
         if ($(key)) $(key).value = settings[key] || "";
       });
+      $("branchesText").value = META.branches.join("\n");
+      $("channelsText").value = META.channels.join("\n");
+      $("staffText").value = META.staff.join("\n");
+      $("categoriesText").value = META.categories.join("\n");
+    }
+
+    function listFromTextarea(key, fallback) {
+      const values = String($(key).value || "")
+        .split(/\r?\n/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+      return [...new Set(values)].length ? [...new Set(values)] : fallback;
     }
 
     function readSettingsForm() {
@@ -1175,6 +1206,10 @@
         syncUrl: String(data.get("syncUrl") || ""),
         syncSecret: String(data.get("syncSecret") || "")
       };
+      META.branches = listFromTextarea("branchesText", META.branches);
+      META.channels = listFromTextarea("channelsText", META.channels);
+      META.staff = listFromTextarea("staffText", META.staff);
+      META.categories = listFromTextarea("categoriesText", META.categories);
     }
 
     function today() {
@@ -1185,12 +1220,12 @@
       return {
         id: "",
         date: today(),
-        channel: "ヤフオク",
-        staff: "未設定",
+        channel: META.channels[0] || "その他",
+        staff: META.staff[0] || "未設定",
         name: "",
-        category: "時計",
+        category: META.categories[0] || "その他",
         qty: 1,
-        branch: "東京",
+        branch: META.branches[0] || "未設定",
         amount: 0,
         kind: "kobutsu",
         stock: "yes",
@@ -1859,7 +1894,7 @@
         exportedAt: new Date().toISOString(),
         records: state.records,
         images: [...state.images.values()],
-        meta: { staff: META.staff, branches: META.branches, channels: META.channels },
+        meta: { staff: META.staff, branches: META.branches, channels: META.channels, categories: META.categories },
         settings: safeSettings
       };
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
@@ -1883,6 +1918,7 @@
         META.staff = backup.meta.staff || META.staff;
         META.branches = backup.meta.branches || META.branches;
         META.channels = backup.meta.channels || META.channels;
+        META.categories = backup.meta.categories || META.categories;
         await saveMeta();
       }
       if (backup.settings) {
@@ -1921,6 +1957,8 @@
         event.preventDefault();
         readSettingsForm();
         await saveSettings();
+        await saveMeta();
+        initMeta();
         $("settingsDialog").close();
         $("ioStatus").textContent = "設定を保存しました";
       });
