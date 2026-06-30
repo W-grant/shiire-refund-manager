@@ -838,6 +838,8 @@
                 <div class="drop">
                   <h3>読み込み</h3>
                   <input id="importFile" type="file" accept=".csv,text/csv">
+                  <label for="importEvidenceFiles">証憑画像</label>
+                  <input id="importEvidenceFiles" type="file" accept="image/*" multiple>
                   <button id="downloadTemplateBtn" type="button">テンプレート</button>
                   <label for="restoreFile">バックアップ復元</label>
                   <input id="restoreFile" type="file" accept="application/json,.json">
@@ -1924,7 +1926,8 @@
         seller: get("相手方氏名"),
         address: get("相手方住所"),
         memo: get("メモ"),
-        hasImage: Boolean(get("証憑ファイル名"))
+        hasImage: Boolean(get("証憑ファイル名")),
+        evidenceFileName: get("証憑ファイル名")
       };
     }
 
@@ -1934,10 +1937,17 @@
       if (rows.length < 2) throw new Error("CSVに明細行がありません。");
       const headers = rows[0].map((header) => header.trim());
       const imported = rows.slice(1).map((row) => mapImportedRow(headers, row)).filter((record) => record.name && Number.isFinite(record.amount));
+      const evidenceFiles = new Map(Array.from($("importEvidenceFiles").files || []).map((item) => [item.name, item]));
+      let linkedImages = 0;
       for (const record of imported) {
-        await saveRecord(record);
+        const evidenceFile = record.evidenceFileName ? evidenceFiles.get(record.evidenceFileName) : null;
+        delete record.evidenceFileName;
+        const image = evidenceFile ? { id: record.id, ...(await fileToImageData(evidenceFile)) } : null;
+        record.hasImage = Boolean(image);
+        if (image) linkedImages += 1;
+        await saveRecord(record, image);
       }
-      $("ioStatus").textContent = `${imported.length}件を読み込みました`;
+      $("ioStatus").textContent = `${imported.length}件を読み込みました（証憑 ${linkedImages}件）`;
     }
 
     function currentExportRecords() {
@@ -2227,6 +2237,7 @@
           $("ioStatus").textContent = error.message;
         } finally {
           event.target.value = "";
+          $("importEvidenceFiles").value = "";
         }
       });
       $("restoreFile").addEventListener("change", async (event) => {
