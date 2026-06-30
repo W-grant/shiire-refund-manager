@@ -1112,6 +1112,15 @@
       return syncRequest({ op: "list", prefix });
     }
 
+    function nowIso() {
+      return new Date().toISOString();
+    }
+
+    function timeValue(value) {
+      const time = Date.parse(value || "");
+      return Number.isFinite(time) ? time : 0;
+    }
+
     async function pullCloud() {
       if (!syncEnabled()) return;
       $("ioStatus").textContent = "同期中...";
@@ -1127,12 +1136,37 @@
         const item = await syncGet(key);
         if (item && item.value) images.push(item.value);
       }
+      const delList = await syncList("del/");
+      const tombstones = [];
+      for (const key of delList.keys || []) {
+        const item = await syncGet(key);
+        if (item && item.value) tombstones.push(item.value);
+      }
+      const recordById = new Map(records.map((item) => [item.id, item]));
+      const tombstoneById = new Map(tombstones.map((item) => [item.id, item]));
       const meta = await syncGet("meta");
       for (const record of records) {
-        await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
+        const tombstone = tombstoneById.get(record.id);
+        if (tombstone && timeValue(tombstone.deletedAt) >= timeValue(record.updatedAt)) continue;
+        const local = state.records.find((item) => item.id === record.id);
+        if (!local || timeValue(record.updatedAt) >= timeValue(local.updatedAt)) {
+          await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
+        }
       }
       for (const image of images) {
+        const tombstone = tombstoneById.get(image.id);
+        const record = recordById.get(image.id);
+        if (tombstone && (!record || timeValue(tombstone.deletedAt) >= timeValue(record.updatedAt))) continue;
         await tx(STORE_IMAGES, "readwrite", (store) => store.put(image));
+      }
+      for (const tombstone of tombstones) {
+        const cloudRecord = recordById.get(tombstone.id);
+        if (cloudRecord && timeValue(cloudRecord.updatedAt) > timeValue(tombstone.deletedAt)) continue;
+        const local = state.records.find((item) => item.id === tombstone.id);
+        if (!local || timeValue(tombstone.deletedAt) >= timeValue(local.updatedAt)) {
+          await tx(STORE_RECORDS, "readwrite", (store) => store.delete(tombstone.id));
+          await tx(STORE_IMAGES, "readwrite", (store) => store.delete(tombstone.id));
+        }
       }
       if (meta && meta.value) {
         META.staff = meta.value.staff || META.staff;
@@ -1147,6 +1181,7 @@
     }
 
     async function saveRecord(record, image) {
+      record.updatedAt = nowIso();
       await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
       await syncSet(`rec/${record.id}`, record);
       if (image) {
@@ -1157,6 +1192,7 @@
     }
 
     async function deleteRecord(id) {
+      await syncSet(`del/${id}`, { id, deletedAt: nowIso() });
       await tx(STORE_RECORDS, "readwrite", (store) => store.delete(id));
       await tx(STORE_IMAGES, "readwrite", (store) => store.delete(id));
       await syncDel(`rec/${id}`);
