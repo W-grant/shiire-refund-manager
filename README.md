@@ -74,21 +74,80 @@ npm test
 
 AI 抽出やクラウド同期も確認する場合は、Netlify Functions が動く環境で開いてください。
 
-## Netlify 設定
+## Netlify デプロイ
 
-`netlify.toml` で Functions ディレクトリを `netlify/functions` に設定しています。
+このリポジトリは Netlify にそのままデプロイできます。静的な `index.html` を公開し、AI 抽出とクラウド同期は Netlify Functions で動かします。
 
-本番運用では、Netlify の環境変数に次を設定してください。
+### デプロイ構成
+
+- 公開ディレクトリ: `.`
+- ビルドコマンド: `npm run build`
+- Functions ディレクトリ: `netlify/functions`
+- Node.js: `20`
+- Functions bundler: `esbuild`
+- Blobs ストア名: `shiire`
+
+`npm run build` は構文チェックとテストを実行します。失敗した場合は Netlify のデプロイも止まります。
+
+### Functions
+
+- `/.netlify/functions/extract`
+  - Anthropic API への中継 Function です。
+  - ブラウザに API キーを持たせず、サーバー側の `ANTHROPIC_API_KEY` を使います。
+  - `SHARED_SECRET` または `SYNC_SECRET` が設定されている場合、`X-App-Secret` ヘッダーで認証します。
+- `/.netlify/functions/sync`
+  - Netlify Blobs を使った同期 Function です。
+  - `list` / `get` / `set` / `del` 操作に対応しています。
+  - `SYNC_SECRET` または `SHARED_SECRET` が設定されている場合、`X-App-Secret` ヘッダーで認証します。
+
+### Blobs
+
+同期データは Netlify Blobs の `shiire` ストアに保存されます。
+
+保存キーの種類:
+
+- `rec/{id}`: 仕入明細
+- `img/{id}`: 証憑画像データ
+- `del/{id}`: 削除マーカー
+- `meta`: 支店・担当・チャネル・品目マスタ
+
+追加のデータベース作成は不要です。Netlify 上で Function が動くと、`@netlify/blobs` 経由でストアを利用します。
+
+### 環境変数
+
+Netlify の Site configuration から、必要に応じて次を設定してください。
 
 - `ANTHROPIC_API_KEY`: AI 抽出で使う Anthropic API キー
-- `SHARED_SECRET` または `SYNC_SECRET`: アプリから Functions を呼ぶための共有シークレット
-- `ALLOWED_ORIGIN`: 許可する画面の Origin
+- `SHARED_SECRET`: AI 抽出と同期で共通利用できる共有シークレット
+- `SYNC_SECRET`: 同期専用の共有シークレット。未設定なら `SHARED_SECRET` を使います
+- `ALLOWED_ORIGIN`: 許可する画面の Origin。例: `https://your-site-name.netlify.app`
+
+本番運用では `SHARED_SECRET` または `SYNC_SECRET` を必ず設定してください。未設定の場合、Functions は認証なしで呼び出せます。
+
+### デプロイ手順
+
+1. GitHub にこのリポジトリを push します。
+2. Netlify で `Add new site` → `Import an existing project` を選びます。
+3. GitHub リポジトリ `W-grant/shiire-refund-manager` を選びます。
+4. Build settings は `netlify.toml` の内容を使います。
+5. Environment variables に必要な値を設定します。
+6. Deploy を実行します。
+7. デプロイ完了後、発行された URL を開いて画面が表示されることを確認します。
+8. アプリの設定画面で AI 中継 URL、同期 URL、合言葉を設定します。
 
 アプリ側の設定画面では、必要に応じて次を設定します。
 
 - AI 中継 URL: `/.netlify/functions/extract`
 - 同期 URL: `/.netlify/functions/sync`
 - 合言葉: Netlify 側の `SHARED_SECRET` または `SYNC_SECRET` と同じ値
+
+### デプロイ後の確認
+
+- 仕入明細を1件保存できること
+- 証憑画像を添付して保存できること
+- 同期を使う場合、設定画面で同期を `クラウド` にして更新ボタンを押し、エラーが出ないこと
+- AI 抽出を使う場合、AI 接続を `中継` にして画像またはテキストを読み取れること
+- Netlify の Function logs に `missing_anthropic_api_key` や `unauthorized` が出る場合は環境変数と合言葉を見直すこと
 
 ## 主なファイル
 
