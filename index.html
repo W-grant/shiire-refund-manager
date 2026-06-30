@@ -1,0 +1,2097 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>仕入れ還付管理</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f4;
+      --panel: #ffffff;
+      --line: #d8ddd2;
+      --line-strong: #b7c0ad;
+      --text: #20251f;
+      --muted: #687166;
+      --green: #197044;
+      --green-soft: #e5f4ea;
+      --blue: #155e96;
+      --blue-soft: #e4f0fb;
+      --orange: #9b5a00;
+      --orange-soft: #fff0d9;
+      --red: #b3261e;
+      --red-soft: #fde7e4;
+      --ink-soft: #edf0ea;
+      --focus: #1c6f8f;
+      --shadow: 0 10px 28px rgba(29, 40, 24, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line-strong);
+      background: #fff;
+      color: var(--text);
+      border-radius: 6px;
+      min-height: 36px;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: #7f8b77;
+      background: #f9faf7;
+    }
+
+    button.primary {
+      background: #1f6a4b;
+      border-color: #1f6a4b;
+      color: #fff;
+    }
+
+    button.danger {
+      border-color: #d8aaa4;
+      color: var(--red);
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      padding: 8px 10px;
+    }
+
+    textarea {
+      min-height: 74px;
+      resize: vertical;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus,
+    button:focus {
+      outline: 2px solid rgba(28, 111, 143, 0.22);
+      outline-offset: 1px;
+      border-color: var(--focus);
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(246, 247, 244, 0.95);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(10px);
+    }
+
+    .header-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      margin: 0;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 750;
+    }
+
+    h2 {
+      font-size: 16px;
+    }
+
+    h3 {
+      font-size: 14px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    main {
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 18px 20px 28px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .notice {
+      border: 1px solid #d7c27b;
+      background: #fff8df;
+      color: #5b4513;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-weight: 600;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .left-stack,
+    .right-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field.wide {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .prediction {
+      margin-top: 14px;
+      display: grid;
+      gap: 8px;
+      background: var(--ink-soft);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .prediction-main {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .money {
+      font-variant-numeric: tabular-nums;
+      font-weight: 760;
+      white-space: nowrap;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .small {
+      font-size: 12px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    .tabs,
+    .filters,
+    .summary-grid {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tabs {
+      padding: 2px;
+    }
+
+    .tab {
+      min-height: 32px;
+      background: transparent;
+      border-color: transparent;
+      color: var(--muted);
+    }
+
+    .tab.active {
+      background: #fff;
+      border-color: var(--line-strong);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      margin-bottom: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+      min-height: 82px;
+      display: grid;
+      align-content: space-between;
+      gap: 4px;
+    }
+
+    .metric strong {
+      font-size: 20px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .composition {
+      height: 12px;
+      display: flex;
+      overflow: hidden;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      margin: 8px 0 12px;
+      background: #eef0ed;
+    }
+
+    .composition span {
+      min-width: 2px;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(130px, 1fr));
+      margin-bottom: 12px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1000px;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #f9faf7;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 2px 9px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .badge.green {
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .badge.blue {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .badge.orange {
+      background: var(--orange-soft);
+      color: var(--orange);
+    }
+
+    .badge.red {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    .thumb {
+      width: 46px;
+      height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      object-fit: cover;
+      background: #eef0ed;
+      display: block;
+    }
+
+    .empty-thumb {
+      width: 46px;
+      height: 46px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      background: #f7f8f5;
+      font-size: 12px;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
+    .row-actions button {
+      min-width: 36px;
+      padding: 0;
+    }
+
+    .io-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px;
+    }
+
+    .review-table {
+      max-height: 290px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .review-table table {
+      min-width: 760px;
+    }
+
+    .thumb-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .thumb-tile {
+      width: 70px;
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .thumb-tile img {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }
+
+    .drop {
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcf9;
+      display: grid;
+      gap: 10px;
+    }
+
+    .status {
+      min-height: 20px;
+      color: var(--muted);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    dialog {
+      width: min(780px, calc(100vw - 24px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0;
+      box-shadow: 0 24px 80px rgba(26, 32, 23, 0.25);
+    }
+
+    dialog::backdrop {
+      background: rgba(18, 22, 18, 0.36);
+    }
+
+    .dialog-body {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid var(--line);
+    }
+
+    .evidence-full {
+      max-width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      border-radius: 6px;
+      background: #f7f8f5;
+    }
+
+    @media (max-width: 1100px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .header-inner,
+      main {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .header-inner {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .form-grid,
+      .filters,
+      .io-grid,
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-body {
+        padding: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="header-inner">
+        <div>
+          <h1>仕入れ還付管理</h1>
+          <div class="muted small">中古品リユース事業者向け 仕入管理・控除見える化</div>
+        </div>
+        <div class="header-actions">
+          <button id="refreshBtn" type="button">更新</button>
+          <button id="settingsBtn" type="button">設定</button>
+          <button id="sampleBtn" type="button">サンプル</button>
+          <button id="clearBtn" class="danger" type="button">全削除</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="notice">最終処理は税理士に確認してください。</div>
+
+      <div class="layout">
+        <div class="left-stack">
+        <section class="panel" aria-labelledby="formTitle">
+          <div class="panel-head">
+            <h2 id="formTitle">仕入登録</h2>
+            <span id="editingLabel" class="muted small">新規</span>
+          </div>
+          <div class="panel-body">
+            <form id="recordForm">
+              <input id="recordId" type="hidden">
+              <div class="form-grid">
+                <div class="field">
+                  <label for="date">仕入日</label>
+                  <input id="date" name="date" type="date" required>
+                </div>
+                <div class="field">
+                  <label for="branch">支店</label>
+                  <select id="branch" name="branch"></select>
+                </div>
+                <div class="field">
+                  <label for="channel">チャネル</label>
+                  <select id="channel" name="channel"></select>
+                </div>
+                <div class="field">
+                  <label for="staff">担当</label>
+                  <select id="staff" name="staff"></select>
+                </div>
+                <div class="field wide">
+                  <label for="name">商品名</label>
+                  <input id="name" name="name" type="text" required autocomplete="off">
+                </div>
+                <div class="field">
+                  <label for="category">品目</label>
+                  <select id="category" name="category"></select>
+                </div>
+                <div class="field">
+                  <label for="qty">数量</label>
+                  <input id="qty" name="qty" type="number" min="1" step="1" value="1" required>
+                </div>
+                <div class="field">
+                  <label for="amount">金額（税込）</label>
+                  <input id="amount" name="amount" type="number" min="0" step="1" required>
+                </div>
+                <div class="field">
+                  <label for="rate">税率</label>
+                  <select id="rate" name="rate">
+                    <option value="10">10%</option>
+                    <option value="8">8%</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="kind">古物区分</label>
+                  <select id="kind" name="kind">
+                    <option value="kobutsu">古物</option>
+                    <option value="jun">準古物</option>
+                    <option value="other">古物以外</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="stock">棚卸資産</label>
+                  <select id="stock" name="stock">
+                    <option value="yes">はい</option>
+                    <option value="no">いいえ</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="qualified">適格事業者</label>
+                  <select id="qualified" name="qualified">
+                    <option value="no">登録なし</option>
+                    <option value="yes">登録あり</option>
+                    <option value="unknown">不明</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="anon">取引形態</label>
+                  <select id="anon" name="anon">
+                    <option value="anon">匿名</option>
+                    <option value="named">本名判明</option>
+                  </select>
+                </div>
+                <div class="field wide">
+                  <label for="seller">相手方氏名</label>
+                  <input id="seller" name="seller" type="text" autocomplete="off">
+                </div>
+                <div class="field wide">
+                  <label for="address">相手方住所</label>
+                  <input id="address" name="address" type="text" autocomplete="off">
+                </div>
+                <div class="field wide">
+                  <label for="proof">証憑画像</label>
+                  <input id="proof" name="proof" type="file" accept="image/*">
+                </div>
+                <div id="proofPreview" class="field wide hidden"></div>
+                <div class="field wide">
+                  <label for="memo">メモ</label>
+                  <textarea id="memo" name="memo"></textarea>
+                </div>
+              </div>
+
+              <div class="prediction" aria-live="polite">
+                <div class="prediction-main">
+                  <span id="liveBadge" class="badge green">古物商特例</span>
+                  <span id="liveTax" class="money">0円</span>
+                </div>
+                <div id="liveNote" class="small muted"></div>
+                <div id="liveFlags" class="small"></div>
+              </div>
+
+              <div class="actions">
+                <button class="primary" type="submit">保存</button>
+                <button id="resetBtn" type="button">新規</button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="extractTitle">
+          <div class="panel-head">
+            <h2 id="extractTitle">AI抽出</h2>
+            <span id="extractStatus" class="status small"></span>
+          </div>
+          <div class="panel-body">
+            <div class="form-grid">
+              <div class="field wide">
+                <label for="extractImages">スクショ/明細画像</label>
+                <input id="extractImages" type="file" accept="image/*" multiple>
+              </div>
+              <div id="extractThumbs" class="field wide thumb-list"></div>
+              <div class="field wide">
+                <label for="extractText">テキスト/データ</label>
+                <textarea id="extractText" placeholder="明細テキストやCSVの断片を貼り付け"></textarea>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="runExtractBtn" class="primary" type="button">AIで読み取る</button>
+              <button id="clearExtractBtn" type="button">抽出欄をクリア</button>
+            </div>
+            <div id="reviewWrap" class="review-table hidden">
+              <table>
+                <thead>
+                  <tr>
+                    <th>仕入日</th>
+                    <th>商品</th>
+                    <th>品目</th>
+                    <th>金額</th>
+                    <th>相手方</th>
+                    <th>証憑</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="reviewRows"></tbody>
+              </table>
+            </div>
+            <div class="actions">
+              <button id="addExtractedBtn" type="button">まとめて追加</button>
+            </div>
+          </div>
+        </section>
+        </div>
+
+        <div class="right-stack">
+          <section class="panel" aria-labelledby="summaryTitle">
+            <div class="panel-head">
+              <h2 id="summaryTitle">一覧・集計</h2>
+              <div id="monthTabs" class="tabs"></div>
+            </div>
+            <div class="panel-body">
+              <div class="summary-grid">
+                <div class="metric">
+                  <span class="muted small">件数</span>
+                  <strong id="metricCount">0</strong>
+                </div>
+                <div class="metric">
+                  <span class="muted small">仕入総額（税込）</span>
+                  <strong id="metricAmount">0円</strong>
+                </div>
+                <div class="metric">
+                  <span class="muted small">控除対象仕入税額</span>
+                  <strong id="metricTax">0円</strong>
+                </div>
+                <div class="metric">
+                  <span class="muted small">うち古物商特例100%</span>
+                  <strong id="metricKobutsu">0円</strong>
+                </div>
+              </div>
+              <div id="composition" class="composition"></div>
+              <div id="staffBreakdown" class="small muted"></div>
+
+              <div class="filters">
+                <select id="filterStaff" aria-label="担当フィルタ"></select>
+                <select id="filterChannel" aria-label="チャネルフィルタ"></select>
+                <select id="filterBranch" aria-label="支店フィルタ"></select>
+                <select id="filterKind" aria-label="控除区分フィルタ"></select>
+                <input id="filterText" type="search" placeholder="商品名・相手方・日付・金額" aria-label="検索">
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>証憑</th>
+                      <th>仕入日</th>
+                      <th>チャネル</th>
+                      <th>商品</th>
+                      <th>相手方</th>
+                      <th>金額</th>
+                      <th>控除区分</th>
+                      <th>控除税額</th>
+                      <th>担当</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recordRows"></tbody>
+                </table>
+              </div>
+              <div id="emptyState" class="status small"></div>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="ioTitle">
+            <div class="panel-head">
+              <h2 id="ioTitle">CSV入出力</h2>
+              <span id="ioStatus" class="status small"></span>
+            </div>
+            <div class="panel-body">
+              <div class="io-grid">
+                <div class="drop">
+                  <h3>書き出し</h3>
+                  <div class="inline">
+                    <button id="exportListBtn" type="button">仕入一覧CSV</button>
+                    <button id="exportBookBtn" type="button">古物商帳簿CSV</button>
+                    <button id="exportIndexBtn" type="button">索引簿CSV</button>
+                    <button id="exportExcelBtn" type="button">Excel</button>
+                    <button id="printPdfBtn" type="button">PDF印刷</button>
+                    <button id="backupBtn" type="button">バックアップ</button>
+                  </div>
+                </div>
+                <div class="drop">
+                  <h3>読み込み</h3>
+                  <input id="importFile" type="file" accept=".csv,text/csv">
+                  <button id="downloadTemplateBtn" type="button">テンプレート</button>
+                  <label for="restoreFile">バックアップ復元</label>
+                  <input id="restoreFile" type="file" accept="application/json,.json">
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="settingsDialog">
+    <form id="settingsForm" method="dialog">
+      <div class="panel-head">
+        <h2>設定</h2>
+        <button id="closeSettingsBtn" type="button">閉じる</button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <div class="field">
+            <label for="aiMode">AI接続</label>
+            <select id="aiMode" name="aiMode">
+              <option value="proxy">中継</option>
+              <option value="none">使わない</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="model">モデル</label>
+            <input id="model" name="model" type="text">
+          </div>
+          <div class="field wide">
+            <label for="proxyUrl">中継URL</label>
+            <input id="proxyUrl" name="proxyUrl" type="url" placeholder="/.netlify/functions/extract">
+          </div>
+          <div class="field">
+            <label for="syncMode">同期</label>
+            <select id="syncMode" name="syncMode">
+              <option value="none">使わない</option>
+              <option value="cloud">クラウド</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="syncSecret">合言葉</label>
+            <input id="syncSecret" name="syncSecret" type="password" autocomplete="off">
+          </div>
+          <div class="field wide">
+            <label for="syncUrl">同期URL</label>
+            <input id="syncUrl" name="syncUrl" type="url" placeholder="/.netlify/functions/sync">
+          </div>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button id="saveSettingsBtn" class="primary" type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="evidenceDialog">
+    <div class="panel-head">
+      <h2>証憑</h2>
+      <button id="closeEvidenceBtn" type="button">閉じる</button>
+    </div>
+    <div class="dialog-body">
+      <img id="evidenceFull" class="evidence-full" alt="証憑画像">
+    </div>
+    <div class="dialog-actions">
+      <button id="downloadEvidenceBtn" type="button">ダウンロード</button>
+    </div>
+  </dialog>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="src/classify.js"></script>
+  <script src="src/csv.js"></script>
+  <script>
+    const { classify } = window.ShiireClassify;
+    const Csv = window.ShiireCsv;
+
+    const EXTRACT_PROMPT = `あなたは中古品リユース事業者の仕入記録アシスタントです。提供された画像（ヤフオク/メルカリ/ラクマの取引画面、または古物市場・業者オークション・買取の明細書）から、仕入れた商品を1点ずつ抽出してください。市場の明細書は複数行（複数商品）あり得るので、各商品を1要素にします。
+
+次のJSONのみを出力してください（前後の説明やコードフェンスは禁止）:
+{"items":[{
+"仕入日":"YYYY-MM-DD または null",
+"チャネル":"ヤフオク|メルカリ|ラクマ|市場（古物市場）|業者オークション|店頭買取|その他",
+"商品名":"文字列",
+"品目":"時計|バッグ|貴金属・宝飾|カメラ|コイン・切手|美術品・骨董|道具類|衣類|その他",
+"数量":1,
+"金額税込":数値,
+"相手方氏名":"出品者名/店名 または null",
+"相手方住所":"判明すれば文字列 / 通常null",
+"適格請求書発行事業者":true/false/null,
+"匿名取引":true/false,
+"税率":10
+}]}
+
+判定ルール: メルカリ/ヤフオク/ラクマ等のフリマは通常 適格請求書発行事業者=false、匿名取引=true。市場・業者オークション・店頭買取は相手方氏名が分かれば記載し匿名取引=false。金額は必ず数値（カンマや円記号を除く）。読み取れない値はnull。`;
+
+    const DB_NAME = "shiire-refund-db";
+    const STORE_RECORDS = "records";
+    const STORE_IMAGES = "images";
+    const STORE_SETTINGS = "settings";
+    const STORE_META = "meta";
+
+    const BUILTIN = { proxyUrl: "", syncUrl: "", secret: "", model: "claude-haiku-4-5-20251001" };
+
+    const META = {
+      branches: ["札幌", "千葉", "東京", "福岡"],
+      channels: ["ヤフオク", "メルカリ", "ラクマ", "市場（古物市場）", "業者オークション", "店頭買取", "その他"],
+      staff: ["未設定"],
+      categories: ["時計", "バッグ", "貴金属・宝飾", "カメラ", "コイン・切手", "美術品・骨董", "道具類", "衣類", "その他"]
+    };
+
+    const state = {
+      records: [],
+      images: new Map(),
+      settings: null,
+      activeMonth: "all",
+      filters: { staff: "", channel: "", branch: "", kind: "", text: "" },
+      proofDraft: null,
+      aiImages: [],
+      aiItems: [],
+      currentEvidenceId: ""
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const form = $("recordForm");
+
+    function openDb() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 2);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(STORE_RECORDS)) db.createObjectStore(STORE_RECORDS, { keyPath: "id" });
+          if (!db.objectStoreNames.contains(STORE_IMAGES)) db.createObjectStore(STORE_IMAGES, { keyPath: "id" });
+          if (!db.objectStoreNames.contains(STORE_SETTINGS)) db.createObjectStore(STORE_SETTINGS, { keyPath: "id" });
+          if (!db.objectStoreNames.contains(STORE_META)) db.createObjectStore(STORE_META, { keyPath: "id" });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function tx(storeName, mode, work) {
+      const db = await openDb();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, mode);
+        const store = transaction.objectStore(storeName);
+        const result = work(store);
+        transaction.oncomplete = () => resolve(result);
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+      }).finally(() => db.close());
+    }
+
+    function requestToPromise(request) {
+      return new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function loadAll() {
+      const db = await openDb();
+      try {
+        state.records = await requestToPromise(db.transaction(STORE_RECORDS).objectStore(STORE_RECORDS).getAll());
+        const images = await requestToPromise(db.transaction(STORE_IMAGES).objectStore(STORE_IMAGES).getAll());
+        state.images = new Map(images.map((item) => [item.id, item]));
+      } finally {
+        db.close();
+      }
+      state.records.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+      render();
+    }
+
+    function defaultSettings() {
+      const settings = {
+        id: "settings",
+        aiMode: BUILTIN.proxyUrl ? "proxy" : "none",
+        proxyUrl: "",
+        model: "claude-haiku-4-5-20251001",
+        syncMode: "none",
+        syncUrl: "",
+        syncSecret: ""
+      };
+      if (BUILTIN.proxyUrl) {
+        settings.proxyUrl = BUILTIN.proxyUrl;
+        settings.aiMode = "proxy";
+      }
+      if (BUILTIN.syncUrl) {
+        settings.syncUrl = BUILTIN.syncUrl;
+        settings.syncMode = "cloud";
+      }
+      if (BUILTIN.secret) settings.syncSecret = BUILTIN.secret;
+      if (BUILTIN.model) settings.model = BUILTIN.model;
+      return settings;
+    }
+
+    async function loadSettings() {
+      const saved = await tx(STORE_SETTINGS, "readonly", (store) => requestToPromise(store.get("settings")));
+      state.settings = { ...defaultSettings(), ...(saved || {}) };
+      if (state.settings.aiMode === "key") state.settings.aiMode = state.settings.proxyUrl ? "proxy" : "none";
+      delete state.settings.apiKey;
+      await saveSettings();
+      return state.settings;
+    }
+
+    async function saveSettings() {
+      await tx(STORE_SETTINGS, "readwrite", (store) => store.put(state.settings));
+    }
+
+    async function loadMeta() {
+      const saved = await tx(STORE_META, "readonly", (store) => requestToPromise(store.get("meta")));
+      if (saved) {
+        META.branches = saved.branches || META.branches;
+        META.channels = saved.channels || META.channels;
+        META.staff = saved.staff || META.staff;
+      }
+    }
+
+    async function saveMeta() {
+      await tx(STORE_META, "readwrite", (store) => store.put({
+        id: "meta",
+        staff: META.staff,
+        branches: META.branches,
+        channels: META.channels
+      }));
+      await syncSet("meta", { staff: META.staff, branches: META.branches, channels: META.channels });
+    }
+
+    function syncEnabled() {
+      return state.settings && state.settings.syncMode === "cloud" && state.settings.syncUrl;
+    }
+
+    async function syncRequest(payload) {
+      if (!syncEnabled()) return null;
+      const response = await fetch(state.settings.syncUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Secret": state.settings.syncSecret || ""
+        },
+        body: JSON.stringify(payload)
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+      if (!response.ok) throw new Error(data.error || "同期に失敗しました");
+      return data;
+    }
+
+    async function syncSet(key, value) {
+      return syncRequest({ op: "set", key, value });
+    }
+
+    async function syncDel(key) {
+      return syncRequest({ op: "del", key });
+    }
+
+    async function syncGet(key) {
+      return syncRequest({ op: "get", key });
+    }
+
+    async function syncList(prefix) {
+      return syncRequest({ op: "list", prefix });
+    }
+
+    async function pullCloud() {
+      if (!syncEnabled()) return;
+      $("ioStatus").textContent = "同期中...";
+      const recList = await syncList("rec/");
+      const records = [];
+      for (const key of recList.keys || []) {
+        const item = await syncGet(key);
+        if (item && item.value) records.push(item.value);
+      }
+      const imgList = await syncList("img/");
+      const images = [];
+      for (const key of imgList.keys || []) {
+        const item = await syncGet(key);
+        if (item && item.value) images.push(item.value);
+      }
+      const meta = await syncGet("meta");
+      for (const record of records) {
+        await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
+      }
+      for (const image of images) {
+        await tx(STORE_IMAGES, "readwrite", (store) => store.put(image));
+      }
+      if (meta && meta.value) {
+        META.staff = meta.value.staff || META.staff;
+        META.branches = meta.value.branches || META.branches;
+        META.channels = meta.value.channels || META.channels;
+        initMeta();
+        await saveMeta();
+      }
+      await loadAll();
+      $("ioStatus").textContent = "同期しました";
+    }
+
+    async function saveRecord(record, image) {
+      await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
+      await syncSet(`rec/${record.id}`, record);
+      if (image) {
+        await tx(STORE_IMAGES, "readwrite", (store) => store.put(image));
+        await syncSet(`img/${record.id}`, image);
+      }
+      await loadAll();
+    }
+
+    async function deleteRecord(id) {
+      await tx(STORE_RECORDS, "readwrite", (store) => store.delete(id));
+      await tx(STORE_IMAGES, "readwrite", (store) => store.delete(id));
+      await syncDel(`rec/${id}`);
+      await syncDel(`img/${id}`);
+      await loadAll();
+    }
+
+    function populateSelect(select, items, allLabel) {
+      select.innerHTML = "";
+      if (allLabel !== undefined) {
+        select.append(new Option(allLabel, ""));
+      }
+      items.forEach((item) => select.append(new Option(item, item)));
+    }
+
+    function initMeta() {
+      populateSelect($("branch"), META.branches);
+      populateSelect($("channel"), META.channels);
+      populateSelect($("staff"), META.staff);
+      populateSelect($("category"), META.categories);
+      populateSelect($("filterStaff"), META.staff, "担当すべて");
+      populateSelect($("filterChannel"), META.channels, "チャネルすべて");
+      populateSelect($("filterBranch"), META.branches, "支店すべて");
+      populateSelect($("filterKind"), ["古物商特例", "古物商特例（準古物）", "要インボイス", "経過措置 80%", "経過措置 50%", "控除不可", "要確認"], "控除区分すべて");
+    }
+
+    function renderSettingsForm() {
+      const settings = state.settings || defaultSettings();
+      ["aiMode", "proxyUrl", "model", "syncMode", "syncUrl", "syncSecret"].forEach((key) => {
+        if ($(key)) $(key).value = settings[key] || "";
+      });
+    }
+
+    function readSettingsForm() {
+      const data = new FormData($("settingsForm"));
+      state.settings = {
+        id: "settings",
+        aiMode: data.get("aiMode"),
+        proxyUrl: String(data.get("proxyUrl") || ""),
+        model: String(data.get("model") || "claude-haiku-4-5-20251001"),
+        syncMode: data.get("syncMode"),
+        syncUrl: String(data.get("syncUrl") || ""),
+        syncSecret: String(data.get("syncSecret") || "")
+      };
+    }
+
+    function today() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function defaultRecord() {
+      return {
+        id: "",
+        date: today(),
+        channel: "ヤフオク",
+        staff: "未設定",
+        name: "",
+        category: "時計",
+        qty: 1,
+        branch: "東京",
+        amount: 0,
+        kind: "kobutsu",
+        stock: "yes",
+        qualified: "no",
+        rate: 10,
+        anon: "anon",
+        seller: "",
+        address: "",
+        memo: "",
+        hasImage: false
+      };
+    }
+
+    function setForm(record) {
+      const value = { ...defaultRecord(), ...record };
+      for (const key of Object.keys(value)) {
+        if (form.elements[key]) form.elements[key].value = value[key];
+      }
+      $("recordId").value = value.id || "";
+      $("editingLabel").textContent = value.id ? "編集中" : "新規";
+      state.proofDraft = null;
+      $("proof").value = "";
+      renderProofPreview(value.id ? state.images.get(value.id) : null);
+      updateLiveClassify();
+    }
+
+    function readForm() {
+      const data = new FormData(form);
+      return {
+        id: $("recordId").value || crypto.randomUUID(),
+        date: data.get("date"),
+        channel: data.get("channel"),
+        staff: data.get("staff"),
+        name: String(data.get("name") || "").trim(),
+        category: data.get("category"),
+        qty: Number(data.get("qty") || 1),
+        branch: data.get("branch"),
+        amount: Math.round(Number(data.get("amount") || 0)),
+        kind: data.get("kind"),
+        stock: data.get("stock"),
+        qualified: data.get("qualified"),
+        rate: Number(data.get("rate") || 10),
+        anon: data.get("anon"),
+        seller: String(data.get("seller") || "").trim(),
+        address: String(data.get("address") || "").trim(),
+        memo: String(data.get("memo") || ""),
+        hasImage: Boolean(state.proofDraft || state.images.has($("recordId").value))
+      };
+    }
+
+    function badgeClass(kind) {
+      if (kind === "要インボイス") return "blue";
+      if (kind.startsWith("経過措置")) return "orange";
+      if (kind === "控除不可" || kind === "要確認") return "red";
+      return "green";
+    }
+
+    function badge(kind) {
+      return `<span class="badge ${badgeClass(kind)}">${escapeHtml(kind)}</span>`;
+    }
+
+    function classified(record) {
+      return classify(record);
+    }
+
+    function updateLiveClassify() {
+      const record = readForm();
+      const c = classified(record);
+      $("liveBadge").className = "badge " + badgeClass(c.kind);
+      $("liveBadge").textContent = c.kind;
+      $("liveTax").textContent = yen(c.tax);
+      $("liveNote").textContent = c.note || "";
+      $("liveFlags").textContent = c.flags && c.flags.length ? c.flags.join(" / ") : "";
+    }
+
+    function monthKey(record) {
+      return record.date ? record.date.slice(0, 7) : "未日付";
+    }
+
+    function availableMonths() {
+      return [...new Set(state.records.map(monthKey))].sort().reverse();
+    }
+
+    function filteredRecords() {
+      const text = state.filters.text.trim().toLowerCase();
+      return state.records.filter((record) => {
+        const c = classified(record);
+        if (state.activeMonth !== "all" && monthKey(record) !== state.activeMonth) return false;
+        if (state.filters.staff && record.staff !== state.filters.staff) return false;
+        if (state.filters.channel && record.channel !== state.filters.channel) return false;
+        if (state.filters.branch && record.branch !== state.filters.branch) return false;
+        if (state.filters.kind && c.kind !== state.filters.kind) return false;
+        if (text) {
+          const haystack = [record.name, record.seller, record.date, record.amount, record.memo].join(" ").toLowerCase();
+          if (!haystack.includes(text)) return false;
+        }
+        return true;
+      });
+    }
+
+    function render() {
+      renderMonths();
+      const records = filteredRecords();
+      renderSummary(records);
+      renderRows(records);
+    }
+
+    function renderMonths() {
+      const months = availableMonths();
+      const tabs = $("monthTabs");
+      tabs.innerHTML = "";
+      tabs.append(tabButton("全期間", "all"));
+      months.forEach((month) => tabs.append(tabButton(month, month)));
+      if (state.activeMonth !== "all" && !months.includes(state.activeMonth)) state.activeMonth = "all";
+    }
+
+    function tabButton(label, value) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "tab" + (state.activeMonth === value ? " active" : "");
+      button.textContent = label;
+      button.addEventListener("click", () => {
+        state.activeMonth = value;
+        render();
+      });
+      return button;
+    }
+
+    function renderSummary(records) {
+      const summary = records.reduce((acc, record) => {
+        const c = classified(record);
+        acc.count += 1;
+        acc.amount += Number(record.amount || 0);
+        acc.tax += c.tax;
+        if (c.ratio === 1 && c.kind.startsWith("古物商特例")) acc.kobutsu += c.tax;
+        acc.byKind[c.kind] = (acc.byKind[c.kind] || 0) + 1;
+        acc.byStaff[record.staff || "未設定"] = (acc.byStaff[record.staff || "未設定"] || 0) + c.tax;
+        return acc;
+      }, { count: 0, amount: 0, tax: 0, kobutsu: 0, byKind: {}, byStaff: {} });
+
+      $("metricCount").textContent = summary.count;
+      $("metricAmount").textContent = yen(summary.amount);
+      $("metricTax").textContent = yen(summary.tax);
+      $("metricKobutsu").textContent = yen(summary.kobutsu);
+
+      const comp = $("composition");
+      comp.innerHTML = "";
+      if (!summary.count) {
+        comp.append(Object.assign(document.createElement("span"), { style: "width:100%;background:#eef0ed" }));
+      } else {
+        Object.entries(summary.byKind).forEach(([kind, count]) => {
+          const span = document.createElement("span");
+          span.style.width = (count / summary.count * 100) + "%";
+          span.style.background = colorForKind(kind);
+          span.title = kind + " " + count + "件";
+          comp.append(span);
+        });
+      }
+
+      $("staffBreakdown").textContent = Object.entries(summary.byStaff)
+        .map(([staff, tax]) => `${staff}: ${yen(tax)}`)
+        .join(" / ");
+    }
+
+    function colorForKind(kind) {
+      if (kind === "要インボイス") return "#4f8cc5";
+      if (kind.startsWith("経過措置")) return "#d88a1d";
+      if (kind === "控除不可" || kind === "要確認") return "#d65b52";
+      return "#3a9867";
+    }
+
+    function renderRows(records) {
+      const tbody = $("recordRows");
+      tbody.innerHTML = "";
+      $("emptyState").textContent = records.length ? "" : "該当する仕入はありません。";
+
+      records.forEach((record) => {
+        const c = classified(record);
+        const image = state.images.get(record.id);
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${image ? `<img class="thumb" src="${image.thumb}" alt="" data-evidence="${record.id}">` : `<span class="empty-thumb">なし</span>`}</td>
+          <td><strong>${escapeHtml(record.date || "")}</strong><br><span class="muted small">${escapeHtml(record.branch || "")}</span></td>
+          <td>${escapeHtml(record.channel || "")}</td>
+          <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
+          <td>${escapeHtml(record.seller || "")}<br><span class="muted small">${escapeHtml(flagText(c))}</span></td>
+          <td><span class="money">${yen(record.amount)}</span><br><span class="muted small">${record.rate || 10}%</span></td>
+          <td>${badge(c.kind)}<br><span class="muted small">${Math.round(c.ratio * 100)}%</span></td>
+          <td><span class="money">${yen(c.tax)}</span></td>
+          <td>${escapeHtml(record.staff || "")}</td>
+          <td><div class="row-actions"><button type="button" title="編集" data-edit="${record.id}">✎</button><button class="danger" type="button" title="削除" data-delete="${record.id}">×</button></div></td>
+        `;
+        tbody.append(tr);
+      });
+    }
+
+    function flagText(c) {
+      return c.flags && c.flags.length ? c.flags.join(" / ") : c.note || "";
+    }
+
+    function yen(value) {
+      return new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(Number(value || 0));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    async function fileToImageData(file) {
+      if (!file) return null;
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const full = await resizeImage(dataUrl, 1600, 0.72);
+      const thumb = await resizeImage(dataUrl, 160, 0.72);
+      return { full, thumb, fileName: file.name };
+    }
+
+    function resizeImage(src, maxSide, quality) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const ratio = Math.min(1, maxSide / Math.max(img.width, img.height));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(img.width * ratio));
+          canvas.height = Math.max(1, Math.round(img.height * ratio));
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    function renderProofPreview(image) {
+      const box = $("proofPreview");
+      box.innerHTML = "";
+      const current = state.proofDraft || image;
+      if (!current) {
+        box.classList.add("hidden");
+        return;
+      }
+      box.classList.remove("hidden");
+      box.innerHTML = `<div class="inline"><img class="thumb" src="${current.thumb}" alt=""><span class="muted small">${escapeHtml(current.fileName || "証憑画像")}</span><button id="removeProofBtn" class="danger" type="button">削除</button></div>`;
+      $("removeProofBtn").addEventListener("click", removeFormProof);
+    }
+
+    async function removeFormProof() {
+      state.proofDraft = null;
+      $("proof").value = "";
+      const id = $("recordId").value;
+      if (id) {
+        await tx(STORE_IMAGES, "readwrite", (store) => store.delete(id));
+        await syncDel(`img/${id}`);
+        const record = state.records.find((item) => item.id === id);
+        if (record) {
+          record.hasImage = false;
+          await saveRecord(record);
+        }
+      }
+      renderProofPreview(null);
+      updateLiveClassify();
+    }
+
+    async function prepareExtractImages(files) {
+      state.aiImages = [];
+      $("extractThumbs").innerHTML = "";
+      for (const file of Array.from(files).filter((item) => item.type.startsWith("image/"))) {
+        const image = await fileToImageData(file);
+        const source = await fileToAnthropicSource(file);
+        state.aiImages.push({ ...image, source });
+      }
+      renderExtractThumbs();
+    }
+
+    function renderExtractThumbs() {
+      $("extractThumbs").innerHTML = state.aiImages.map((image, index) => `
+        <span class="thumb-tile">
+          <img src="${image.thumb}" alt="">
+          <span>${index + 1}枚目</span>
+          <button class="danger" type="button" data-extract-image-delete="${index}">削除</button>
+        </span>
+      `).join("");
+    }
+
+    function fileToAnthropicSource(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = String(reader.result);
+          const comma = dataUrl.indexOf(",");
+          const meta = dataUrl.slice(0, comma);
+          resolve({
+            type: "base64",
+            media_type: meta.includes("png") ? "image/png" : meta.includes("webp") ? "image/webp" : "image/jpeg",
+            data: dataUrl.slice(comma + 1)
+          });
+        };
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function buildExtractMessages() {
+      const text = $("extractText").value.trim();
+      const content = [];
+      state.aiImages.forEach((image) => {
+        content.push({ type: "image", source: image.source });
+      });
+      content.push({ type: "text", text: text ? `${EXTRACT_PROMPT}\n\n貼付テキスト:\n${text}` : EXTRACT_PROMPT });
+      return [{ role: "user", content }];
+    }
+
+    async function callExtract(messages) {
+      const settings = state.settings || defaultSettings();
+      if (settings.aiMode !== "proxy") {
+        throw new Error("AI抽出は中継設定を有効にしてください。");
+      }
+      if (!settings.proxyUrl) throw new Error("中継URLが未設定です。");
+
+      const response = await fetch(settings.proxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Secret": settings.syncSecret || ""
+        },
+        body: JSON.stringify({
+          model: settings.model || "claude-haiku-4-5-20251001",
+          max_tokens: 4096,
+          messages
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "AI抽出に失敗しました。");
+      return parseExtractResponse(payload);
+    }
+
+    function parseExtractResponse(payload) {
+      const text = (payload.content || [])
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+        .join("\n")
+        .replace(/```json|```/g, "");
+      const start = text.indexOf("{");
+      const end = text.lastIndexOf("}");
+      if (start < 0 || end < start) throw new Error("AI応答からJSONを取得できませんでした。");
+      const parsed = JSON.parse(text.slice(start, end + 1));
+      return Array.isArray(parsed.items) ? parsed.items : [];
+    }
+
+    function extractedToRecord(item) {
+      const channel = item["チャネル"] || "その他";
+      const qualifiedRaw = item["適格請求書発行事業者"];
+      const anonRaw = item["匿名取引"];
+      return {
+        id: crypto.randomUUID(),
+        date: item["仕入日"] || today(),
+        channel,
+        staff: "未設定",
+        name: item["商品名"] || "",
+        category: item["品目"] || "その他",
+        qty: Number(item["数量"] || 1),
+        branch: "東京",
+        amount: Number(item["金額税込"] || 0),
+        kind: "kobutsu",
+        stock: "yes",
+        qualified: qualifiedRaw === true ? "yes" : qualifiedRaw === null ? "unknown" : "no",
+        rate: Number(item["税率"] || 10),
+        anon: anonRaw === false ? "named" : "anon",
+        seller: item["相手方氏名"] || "",
+        address: item["相手方住所"] || "",
+        memo: "AI抽出",
+        hasImage: state.aiImages.length > 0,
+        imageIndex: state.aiImages.length ? 0 : -1
+      };
+    }
+
+    function renderReview() {
+      $("reviewWrap").classList.toggle("hidden", state.aiItems.length === 0);
+      const imageOptions = (selected) => [
+        `<option value="-1">なし</option>`,
+        ...state.aiImages.map((_, imageIndex) => `<option value="${imageIndex}" ${Number(selected) === imageIndex ? "selected" : ""}>${imageIndex + 1}枚目</option>`)
+      ].join("");
+      $("reviewRows").innerHTML = state.aiItems.map((record, index) => `
+        <tr>
+          <td><input data-review="${index}" data-field="date" type="date" value="${escapeHtml(record.date)}"></td>
+          <td><input data-review="${index}" data-field="name" type="text" value="${escapeHtml(record.name)}"></td>
+          <td><input data-review="${index}" data-field="category" type="text" value="${escapeHtml(record.category)}"></td>
+          <td><input data-review="${index}" data-field="amount" type="number" value="${escapeHtml(record.amount)}"></td>
+          <td><input data-review="${index}" data-field="seller" type="text" value="${escapeHtml(record.seller)}"></td>
+          <td><select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select></td>
+          <td><button class="danger" type="button" data-review-delete="${index}">×</button></td>
+        </tr>
+      `).join("");
+    }
+
+    async function runExtract() {
+      if (!state.aiImages.length && !$("extractText").value.trim()) {
+        $("extractStatus").textContent = "画像またはテキストを指定してください";
+        return;
+      }
+      $("extractStatus").textContent = "読み取り中...";
+      const items = await callExtract(buildExtractMessages());
+      state.aiItems = items.map(extractedToRecord);
+      renderReview();
+      $("extractStatus").textContent = `${state.aiItems.length}件を抽出しました`;
+    }
+
+    function clearExtract() {
+      state.aiImages = [];
+      state.aiItems = [];
+      $("extractImages").value = "";
+      $("extractText").value = "";
+      $("extractThumbs").innerHTML = "";
+      renderReview();
+      $("extractStatus").textContent = "";
+    }
+
+    async function addExtracted() {
+      for (let index = 0; index < state.aiItems.length; index += 1) {
+        const sourceRecord = state.aiItems[index];
+        const { imageIndex, ...record } = sourceRecord;
+        const imageSource = state.aiImages[Number(imageIndex)];
+        const image = imageSource ? { id: record.id, ...imageSource } : null;
+        record.hasImage = Boolean(image);
+        await saveRecord(record, image);
+      }
+      const count = state.aiItems.length;
+      clearExtract();
+      $("extractStatus").textContent = `${count}件を追加しました`;
+    }
+
+    function exportRows(records, type) {
+      if (type === "book") {
+        return [
+          ["取引年月日", "相手方の氏名又は名称", "相手方の住所又は所在地", "取引内容（古物の品目）", "取引金額(税込)", "控除対象消費税額", "該当する旨"],
+          ...records.map((record) => {
+            const c = classified(record);
+            return [record.date, record.seller, record.address, record.category, record.amount, c.tax, c.kind === "要インボイス" ? "適格請求書あり" : c.kind];
+          })
+        ];
+      }
+      if (type === "index") {
+        return [
+          ["連番", "取引年月日", "取引金額(税込)", "取引先", "商品名", "証憑ファイル名", "控除区分"],
+          ...records.map((record, index) => {
+            const c = classified(record);
+            const image = state.images.get(record.id);
+            return [index + 1, record.date, record.amount, record.seller, record.name, evidenceName(record, image), c.kind];
+          })
+        ];
+      }
+      return [
+        ["仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
+        ...records.map((record) => {
+          const c = classified(record);
+          const image = state.images.get(record.id);
+          return [
+            record.date,
+            record.channel,
+            record.branch,
+            record.staff,
+            record.name,
+            record.category,
+            record.qty,
+            record.amount,
+            record.rate,
+            c.kind,
+            c.ratio,
+            c.tax,
+            record.seller,
+            record.address,
+            record.anon === "anon" ? "匿名" : "本名判明",
+            record.qualified === "yes" ? "登録あり" : record.qualified === "unknown" ? "不明" : "登録なし",
+            evidenceName(record, image),
+            record.memo,
+            kindLabel(record.kind),
+            record.stock === "yes" ? "はい" : "いいえ"
+          ];
+        })
+      ];
+    }
+
+    function evidenceName(record, image) {
+      if (!record.hasImage && !image) return "";
+      const seller = (record.seller || "取引先").replace(/[\\/:*?"<>|]/g, "");
+      return `証憑_${record.date || "未日付"}_${seller}_${record.amount || 0}.jpg`;
+    }
+
+    function openEvidence(id) {
+      const image = state.images.get(id);
+      if (!image) return;
+      state.currentEvidenceId = id;
+      $("evidenceFull").src = image.full;
+      $("evidenceDialog").showModal();
+    }
+
+    function downloadEvidence() {
+      const id = state.currentEvidenceId;
+      const image = state.images.get(id);
+      const record = state.records.find((item) => item.id === id);
+      if (!image || !record) return;
+      const a = document.createElement("a");
+      a.href = image.full;
+      a.download = evidenceName(record, image) || "証憑.jpg";
+      a.click();
+    }
+
+    function kindLabel(kind) {
+      return kind === "jun" ? "準古物" : kind === "other" ? "古物以外" : "古物";
+    }
+
+    function toCsv(rows) {
+      return Csv.toCsv(rows);
+    }
+
+    function csvCell(value) {
+      return Csv.csvCell(value);
+    }
+
+    function downloadCsv(rows, name) {
+      const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function parseCsv(text) {
+      return Csv.parseCsv(text);
+    }
+
+    function mapImportedRow(headers, row) {
+      const get = (...names) => {
+        const index = headers.findIndex((header) => names.includes(header));
+        return index >= 0 ? row[index] : "";
+      };
+      const kind = get("古物区分");
+      const stock = get("棚卸資産");
+      const qualified = get("適格事業者");
+      const anon = get("取引形態");
+      return {
+        id: crypto.randomUUID(),
+        date: get("仕入日") || today(),
+        channel: get("チャネル") || "その他",
+        branch: get("支店") || "東京",
+        staff: get("担当") || "未設定",
+        name: get("商品名"),
+        category: get("品目") || "その他",
+        qty: Number(get("数量") || 1),
+        amount: Number(String(get("金額(税込)", "金額")).replace(/[,円]/g, "")),
+        rate: Number(get("税率") || 10),
+        kind: kind.includes("準") ? "jun" : kind.includes("以外") ? "other" : "kobutsu",
+        stock: stock === "いいえ" ? "no" : "yes",
+        qualified: qualified.includes("登録あり") ? "yes" : qualified.includes("不明") ? "unknown" : "no",
+        anon: anon.includes("匿名") ? "anon" : "named",
+        seller: get("相手方氏名"),
+        address: get("相手方住所"),
+        memo: get("メモ"),
+        hasImage: Boolean(get("証憑ファイル名"))
+      };
+    }
+
+    async function importCsv(file) {
+      const text = await file.text();
+      const rows = parseCsv(text);
+      if (rows.length < 2) throw new Error("CSVに明細行がありません。");
+      const headers = rows[0].map((header) => header.trim());
+      const imported = rows.slice(1).map((row) => mapImportedRow(headers, row)).filter((record) => record.name && Number.isFinite(record.amount));
+      for (const record of imported) {
+        await saveRecord(record);
+      }
+      $("ioStatus").textContent = `${imported.length}件を読み込みました`;
+    }
+
+    function currentExportRecords() {
+      return filteredRecords();
+    }
+
+    function summaryRows(records) {
+      const rows = [["区分", "値"]];
+      rows.push(["件数", records.length]);
+      rows.push(["仕入総額(税込)", records.reduce((sum, record) => sum + Number(record.amount || 0), 0)]);
+      rows.push(["控除対象税額", records.reduce((sum, record) => sum + classified(record).tax, 0)]);
+      const byKind = {};
+      const byRate = {};
+      const byBranch = {};
+      const byStaff = {};
+      const byMonth = {};
+      records.forEach((record) => {
+        const c = classified(record);
+        byKind[c.kind] = (byKind[c.kind] || 0) + c.tax;
+        byRate[`${record.rate || 10}%`] = (byRate[`${record.rate || 10}%`] || 0) + c.tax;
+        byBranch[record.branch || "未設定"] = (byBranch[record.branch || "未設定"] || 0) + c.tax;
+        byStaff[record.staff || "未設定"] = (byStaff[record.staff || "未設定"] || 0) + c.tax;
+        byMonth[monthKey(record)] = (byMonth[monthKey(record)] || 0) + c.tax;
+      });
+      rows.push([]);
+      rows.push(["控除区分別", "控除税額"]);
+      Object.entries(byKind).forEach((row) => rows.push(row));
+      rows.push([]);
+      rows.push(["税率別", "控除税額"]);
+      Object.entries(byRate).forEach((row) => rows.push(row));
+      rows.push([]);
+      rows.push(["支店別", "控除税額"]);
+      Object.entries(byBranch).forEach((row) => rows.push(row));
+      rows.push([]);
+      rows.push(["担当別", "控除税額"]);
+      Object.entries(byStaff).forEach((row) => rows.push(row));
+      rows.push([]);
+      rows.push(["月別", "控除税額"]);
+      Object.entries(byMonth).sort().forEach((row) => rows.push(row));
+      return rows;
+    }
+
+    function exportExcel() {
+      const records = currentExportRecords();
+      if (!window.XLSX) {
+        $("ioStatus").textContent = "Excelライブラリを読み込めませんでした。CSVを書き出してください。";
+        return;
+      }
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows(records)), "月次サマリー");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(exportRows(records, "list")), "仕入明細");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(exportRows(records, "book")), "古物商特例帳簿");
+      XLSX.writeFile(workbook, "仕入還付管理.xlsx");
+    }
+
+    function printPdf() {
+      const records = currentExportRecords();
+      const totalTax = records.reduce((sum, record) => sum + classified(record).tax, 0);
+      const totalAmount = records.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+      const rows = exportRows(records, "list").slice(1, 31).map((row) => `
+        <tr><td>${escapeHtml(row[0])}</td><td>${escapeHtml(row[4])}</td><td>${escapeHtml(row[9])}</td><td>${escapeHtml(yen(row[11]))}</td></tr>
+      `).join("");
+      const win = window.open("", "_blank");
+      if (!win) return;
+      win.document.write(`<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>仕入還付レポート</title><style>
+        body{font-family:system-ui,sans-serif;margin:32px;color:#20251f} h1{font-size:22px} table{width:100%;border-collapse:collapse;margin-top:16px} td,th{border:1px solid #ccc;padding:8px;text-align:left}.metric{display:inline-block;margin-right:24px;font-weight:700}
+      </style></head><body>
+        <h1>仕入還付レポート</h1>
+        <p>対象期間: ${escapeHtml(state.activeMonth === "all" ? "全期間" : state.activeMonth)} / 出力日: ${today()}</p>
+        <p><span class="metric">件数 ${records.length}</span><span class="metric">仕入総額 ${yen(totalAmount)}</span><span class="metric">控除対象税額 ${yen(totalTax)}</span></p>
+        <table><thead><tr><th>日付</th><th>商品</th><th>控除区分</th><th>控除税額</th></tr></thead><tbody>${rows}</tbody></table>
+        <script>window.print();<\/script>
+      </body></html>`);
+      win.document.close();
+    }
+
+    function exportBackup() {
+      const safeSettings = { ...(state.settings || defaultSettings()) };
+      delete safeSettings.syncSecret;
+      delete safeSettings.apiKey;
+      const backup = {
+        exportedAt: new Date().toISOString(),
+        records: state.records,
+        images: [...state.images.values()],
+        meta: { staff: META.staff, branches: META.branches, channels: META.channels },
+        settings: safeSettings
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "仕入還付管理バックアップ.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function restoreBackup(file) {
+      const backup = JSON.parse(await file.text());
+      for (const record of backup.records || []) {
+        await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
+      }
+      for (const image of backup.images || []) {
+        await tx(STORE_IMAGES, "readwrite", (store) => store.put(image));
+      }
+      if (backup.meta) {
+        META.staff = backup.meta.staff || META.staff;
+        META.branches = backup.meta.branches || META.branches;
+        META.channels = backup.meta.channels || META.channels;
+        await saveMeta();
+      }
+      if (backup.settings) {
+        const current = state.settings || defaultSettings();
+        state.settings = { ...current, ...backup.settings, syncSecret: current.syncSecret };
+        delete state.settings.apiKey;
+        await saveSettings();
+      }
+      initMeta();
+      renderSettingsForm();
+      await loadAll();
+      $("ioStatus").textContent = "バックアップを復元しました";
+    }
+
+    function addSampleRecords() {
+      const samples = [
+        { date: "2026-06-21", channel: "メルカリ", branch: "東京", staff: "未設定", name: "腕時計", category: "時計", qty: 1, amount: 8000, kind: "kobutsu", stock: "yes", qualified: "no", rate: 10, anon: "anon", seller: "", address: "", memo: "第13章サンプル", hasImage: false },
+        { date: "2026-06-21", channel: "ヤフオク", branch: "千葉", staff: "未設定", name: "バッグ", category: "バッグ", qty: 1, amount: 32500, kind: "kobutsu", stock: "yes", qualified: "no", rate: 10, anon: "anon", seller: "Homeworker", address: "", memo: "第13章サンプル", hasImage: false },
+        { date: "2026-06-21", channel: "市場（古物市場）", branch: "札幌", staff: "未設定", name: "市場仕入", category: "道具類", qty: 1, amount: 50000, kind: "kobutsu", stock: "yes", qualified: "no", rate: 10, anon: "named", seller: "山田", address: "", memo: "第13章サンプル", hasImage: false }
+      ];
+      return samples.reduce(
+        (chain, record) => chain.then(() => saveRecord({ id: crypto.randomUUID(), ...record })),
+        Promise.resolve()
+      );
+    }
+
+    function bindEvents() {
+      form.addEventListener("input", updateLiveClassify);
+      form.addEventListener("change", updateLiveClassify);
+      $("settingsBtn").addEventListener("click", () => {
+        renderSettingsForm();
+        $("settingsDialog").showModal();
+      });
+      $("closeSettingsBtn").addEventListener("click", () => $("settingsDialog").close());
+      $("settingsForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        readSettingsForm();
+        await saveSettings();
+        $("settingsDialog").close();
+        $("ioStatus").textContent = "設定を保存しました";
+      });
+      $("refreshBtn").addEventListener("click", async () => {
+        try {
+          await pullCloud();
+        } catch (error) {
+          $("ioStatus").textContent = error.message;
+        }
+      });
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const record = readForm();
+        const image = state.proofDraft ? { id: record.id, ...state.proofDraft } : null;
+        record.hasImage = Boolean(image || state.images.has(record.id));
+        await saveRecord(record, image);
+        setForm(defaultRecord());
+      });
+      $("resetBtn").addEventListener("click", () => setForm(defaultRecord()));
+      $("proof").addEventListener("change", async (event) => {
+        state.proofDraft = await fileToImageData(event.target.files[0]);
+        renderProofPreview();
+        updateLiveClassify();
+      });
+      $("extractImages").addEventListener("change", async (event) => {
+        try {
+          await prepareExtractImages(event.target.files);
+          $("extractStatus").textContent = `${state.aiImages.length}枚を選択しました`;
+        } catch (error) {
+          $("extractStatus").textContent = error.message;
+        }
+      });
+      ["extractThumbs", "extractText"].forEach((id) => {
+        $(id).addEventListener("dragover", (event) => event.preventDefault());
+        $(id).addEventListener("drop", async (event) => {
+          event.preventDefault();
+          try {
+            await prepareExtractImages(event.dataTransfer.files);
+            $("extractStatus").textContent = `${state.aiImages.length}枚を選択しました`;
+          } catch (error) {
+            $("extractStatus").textContent = error.message;
+          }
+        });
+      });
+      $("extractThumbs").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-extract-image-delete]");
+        if (!button) return;
+        const index = Number(button.dataset.extractImageDelete);
+        state.aiImages.splice(index, 1);
+        state.aiItems.forEach((record) => {
+          if (record.imageIndex === index) record.imageIndex = state.aiImages.length ? 0 : -1;
+          if (record.imageIndex > index) record.imageIndex -= 1;
+        });
+        renderExtractThumbs();
+        renderReview();
+      });
+      $("runExtractBtn").addEventListener("click", async () => {
+        try {
+          await runExtract();
+        } catch (error) {
+          $("extractStatus").textContent = error.message;
+        }
+      });
+      $("clearExtractBtn").addEventListener("click", clearExtract);
+      $("addExtractedBtn").addEventListener("click", async () => {
+        try {
+          await addExtracted();
+        } catch (error) {
+          $("extractStatus").textContent = error.message;
+        }
+      });
+      $("reviewRows").addEventListener("input", (event) => {
+        const target = event.target.closest("[data-review]");
+        if (!target) return;
+        const index = Number(target.dataset.review);
+        const field = target.dataset.field;
+        state.aiItems[index][field] = field === "amount" || field === "imageIndex" ? Number(target.value || 0) : target.value;
+      });
+      $("reviewRows").addEventListener("change", (event) => {
+        const target = event.target.closest("[data-review]");
+        if (!target) return;
+        const index = Number(target.dataset.review);
+        const field = target.dataset.field;
+        state.aiItems[index][field] = field === "amount" || field === "imageIndex" ? Number(target.value || 0) : target.value;
+      });
+      $("reviewRows").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-review-delete]");
+        if (!button) return;
+        state.aiItems.splice(Number(button.dataset.reviewDelete), 1);
+        renderReview();
+      });
+      $("recordRows").addEventListener("click", async (event) => {
+        const evidenceId = event.target.closest("[data-evidence]")?.dataset.evidence;
+        const editId = event.target.closest("[data-edit]")?.dataset.edit;
+        const deleteId = event.target.closest("[data-delete]")?.dataset.delete;
+        if (evidenceId) openEvidence(evidenceId);
+        if (editId) {
+          const record = state.records.find((item) => item.id === editId);
+          if (record) setForm(record);
+        }
+        if (deleteId && confirm("削除しますか？")) {
+          await deleteRecord(deleteId);
+        }
+      });
+      ["filterStaff", "filterChannel", "filterBranch", "filterKind"].forEach((id) => {
+        $(id).addEventListener("change", () => {
+          const key = id.replace("filter", "").toLowerCase();
+          state.filters[key] = $(id).value;
+          render();
+        });
+      });
+      $("filterText").addEventListener("input", () => {
+        state.filters.text = $("filterText").value;
+        render();
+      });
+      $("exportListBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "list"), "仕入一覧.csv"));
+      $("exportBookBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "book"), "古物商特例帳簿.csv"));
+      $("exportIndexBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "index"), "電帳法索引簿.csv"));
+      $("exportExcelBtn").addEventListener("click", exportExcel);
+      $("printPdfBtn").addEventListener("click", printPdf);
+      $("backupBtn").addEventListener("click", exportBackup);
+      $("downloadTemplateBtn").addEventListener("click", () => downloadCsv(exportRows([], "list"), "仕入一覧テンプレート.csv"));
+      $("importFile").addEventListener("change", async (event) => {
+        try {
+          await importCsv(event.target.files[0]);
+          await loadAll();
+        } catch (error) {
+          $("ioStatus").textContent = error.message;
+        } finally {
+          event.target.value = "";
+        }
+      });
+      $("restoreFile").addEventListener("change", async (event) => {
+        try {
+          await restoreBackup(event.target.files[0]);
+        } catch (error) {
+          $("ioStatus").textContent = error.message;
+        } finally {
+          event.target.value = "";
+        }
+      });
+      $("closeEvidenceBtn").addEventListener("click", () => $("evidenceDialog").close());
+      $("downloadEvidenceBtn").addEventListener("click", downloadEvidence);
+      $("sampleBtn").addEventListener("click", async () => {
+        await addSampleRecords();
+      });
+      $("clearBtn").addEventListener("click", async () => {
+        if (!confirm("すべて削除しますか？")) return;
+        for (const record of [...state.records]) await deleteRecord(record.id);
+        setForm(defaultRecord());
+      });
+    }
+
+    async function initApp() {
+      await loadSettings();
+      await loadMeta();
+      initMeta();
+      bindEvents();
+      renderSettingsForm();
+      setForm(defaultRecord());
+      await loadAll();
+      if (syncEnabled()) {
+        try {
+          await pullCloud();
+        } catch (error) {
+          $("ioStatus").textContent = error.message;
+        }
+      }
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
