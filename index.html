@@ -846,6 +846,12 @@
                   </div>
                 </div>
                 <div class="drop">
+                  <h3>税理士提出</h3>
+                  <label for="taxPackageMonth">対象月</label>
+                  <select id="taxPackageMonth"></select>
+                  <button id="taxPackageBtn" type="button">提出ZIP</button>
+                </div>
+                <div class="drop">
                   <h3>読み込み</h3>
                   <input id="importFile" type="file" accept=".csv,text/csv">
                   <label for="importEvidenceFiles">証憑画像</label>
@@ -1483,6 +1489,16 @@
       tabs.append(tabButton("全期間", "all"));
       months.forEach((month) => tabs.append(tabButton(month, month)));
       if (state.activeMonth !== "all" && !months.includes(state.activeMonth)) state.activeMonth = "all";
+      renderPackageMonths(months);
+    }
+
+    function renderPackageMonths(months) {
+      const select = $("taxPackageMonth");
+      if (!select) return;
+      const current = select.value || months[0] || "";
+      select.innerHTML = "";
+      months.forEach((month) => select.append(new Option(month, month)));
+      select.value = months.includes(current) ? current : months[0] || "";
     }
 
     function tabButton(label, value) {
@@ -1993,6 +2009,26 @@
       return unique;
     }
 
+    function uniqueZipPath(path, used) {
+      const parts = String(path || "file").split("/").map((part) => sanitizeFilePart(part, "file"));
+      const safe = parts.join("/");
+      if (!used.has(safe)) {
+        used.add(safe);
+        return safe;
+      }
+      const slash = safe.lastIndexOf("/");
+      const dir = slash >= 0 ? safe.slice(0, slash + 1) : "";
+      const file = slash >= 0 ? safe.slice(slash + 1) : safe;
+      const dot = file.lastIndexOf(".");
+      const base = dot > 0 ? file.slice(0, dot) : file;
+      const ext = dot > 0 ? file.slice(dot) : "";
+      let index = 2;
+      while (used.has(`${dir}${base}_${index}${ext}`)) index += 1;
+      const unique = `${dir}${base}_${index}${ext}`;
+      used.add(unique);
+      return unique;
+    }
+
     function createZip(files) {
       const encoder = new TextEncoder();
       const chunks = [];
@@ -2203,11 +2239,79 @@
         $("ioStatus").textContent = "Excelライブラリを読み込めませんでした。CSVを書き出してください。";
         return;
       }
+      const workbook = createWorkbook(records);
+      XLSX.writeFile(workbook, "仕入還付管理.xlsx");
+    }
+
+    function createWorkbook(records) {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(summaryRows(records)), "月次サマリー");
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(exportRows(records, "list")), "仕入明細");
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(exportRows(records, "book")), "古物商特例帳簿");
-      XLSX.writeFile(workbook, "仕入還付管理.xlsx");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(exportRows(records, "index")), "電帳法索引簿");
+      return workbook;
+    }
+
+    async function workbookBytes(records) {
+      if (window.XLSX) {
+        const output = XLSX.write(createWorkbook(records), { bookType: "xlsx", type: "array" });
+        return new Uint8Array(output);
+      }
+      const blob = createMinimalXlsx(records);
+      return new Uint8Array(await blob.arrayBuffer());
+    }
+
+    function xmlEscape(value) {
+      return String(value ?? "").replace(/[<>&"']/g, (char) => ({
+        "<": "&lt;",
+        ">": "&gt;",
+        "&": "&amp;",
+        "\"": "&quot;",
+        "'": "&apos;"
+      }[char]));
+    }
+
+    function columnName(index) {
+      let name = "";
+      let value = index + 1;
+      while (value > 0) {
+        const mod = (value - 1) % 26;
+        name = String.fromCharCode(65 + mod) + name;
+        value = Math.floor((value - mod) / 26);
+      }
+      return name;
+    }
+
+    function sheetXml(rows) {
+      const body = rows.map((row, rowIndex) => {
+        const cells = row.map((cell, colIndex) => {
+          const ref = columnName(colIndex) + (rowIndex + 1);
+          if (typeof cell === "number" && Number.isFinite(cell)) return `<c r="${ref}"><v>${cell}</v></c>`;
+          return `<c r="${ref}" t="inlineStr"><is><t>${xmlEscape(cell)}</t></is></c>`;
+        }).join("");
+        return `<row r="${rowIndex + 1}">${cells}</row>`;
+      }).join("");
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${body}</sheetData></worksheet>`;
+    }
+
+    function createMinimalXlsx(records) {
+      const sheets = [
+        ["月次サマリー", summaryRows(records)],
+        ["仕入明細", exportRows(records, "list")],
+        ["古物商特例帳簿", exportRows(records, "book")],
+        ["電帳法索引簿", exportRows(records, "index")]
+      ];
+      const sheetDefs = sheets.map(([name], index) => `<sheet name="${xmlEscape(name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join("");
+      const workbookRels = sheets.map((_, index) => `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`).join("");
+      const sheetOverrides = sheets.map((_, index) => `<Override PartName="/xl/worksheets/sheet${index + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("");
+      const files = [
+        { name: "[Content_Types].xml", bytes: bytesFromText(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${sheetOverrides}</Types>`) },
+        { name: "_rels/.rels", bytes: bytesFromText(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`) },
+        { name: "xl/workbook.xml", bytes: bytesFromText(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetDefs}</sheets></workbook>`) },
+        { name: "xl/_rels/workbook.xml.rels", bytes: bytesFromText(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${workbookRels}</Relationships>`) },
+        ...sheets.map(([, rows], index) => ({ name: `xl/worksheets/sheet${index + 1}.xml`, bytes: bytesFromText(sheetXml(rows)) }))
+      ];
+      return createZip(files);
     }
 
     function printPdf() {
@@ -2229,6 +2333,124 @@
         <script>window.print();<\/script>
       </body></html>`);
       win.document.close();
+    }
+
+    function pdfEscape(value) {
+      return String(value ?? "").replace(/[\\()]/g, "\\$&").replace(/[^\x20-\x7e]/g, "?");
+    }
+
+    function createMonthlyPdfBytes(records, month) {
+      const totalTax = records.reduce((sum, record) => sum + classified(record).tax, 0);
+      const totalAmount = records.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+      const lines = [
+        "Monthly Purchase Report",
+        "Month: " + month,
+        "Created: " + today(),
+        "Count: " + records.length,
+        "Total Amount: " + totalAmount,
+        "Deductible Tax: " + totalTax,
+        "",
+        "Date        Item                         Kind                 Tax"
+      ];
+      records.slice(0, 34).forEach((record) => {
+        const c = classified(record);
+        lines.push(`${String(record.date || "").padEnd(11)} ${String(record.name || "").slice(0, 24).padEnd(28)} ${String(c.kind || "").slice(0, 18).padEnd(20)} ${c.tax}`);
+      });
+      if (records.length > 34) lines.push(`... ${records.length - 34} more rows`);
+
+      const content = [
+        "BT",
+        "/F1 12 Tf",
+        "50 790 Td",
+        "14 TL",
+        ...lines.map((line, index) => `${index ? "T*" : ""} (${pdfEscape(line)}) Tj`),
+        "ET"
+      ].join("\n");
+      const objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        `<< /Length ${content.length} >>\nstream\n${content}\nendstream`
+      ];
+      let pdf = "%PDF-1.4\n";
+      const offsets = [0];
+      objects.forEach((object, index) => {
+        offsets.push(pdf.length);
+        pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+      });
+      const xref = pdf.length;
+      pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+      offsets.slice(1).forEach((offset) => {
+        pdf += String(offset).padStart(10, "0") + " 00000 n \n";
+      });
+      pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+      return new TextEncoder().encode(pdf);
+    }
+
+    function sanitizeFilePart(value, fallback = "未設定") {
+      const text = String(value || fallback).trim().replace(/[\\/:*?"<>|]/g, "_");
+      return text || fallback;
+    }
+
+    function packageRecordsForMonth(month) {
+      return state.records.filter((record) => monthKey(record) === month);
+    }
+
+    function bytesFromText(text) {
+      return new TextEncoder().encode(text);
+    }
+
+    function taxPackageEvidenceName(record, image, recordIndex, imageIndex) {
+      const item = sanitizeFilePart(record.name || record.category || "商品").slice(0, 32);
+      const base = `${String(recordIndex + 1).padStart(3, "0")}_${record.date || "未日付"}_${item}_${record.amount || 0}`;
+      const label = sanitizeFilePart(image.fileName ? image.fileName.replace(/\.[^.]+$/, "") : (imageIndex === 0 ? "明細" : `証憑${imageIndex + 1}`)).slice(0, 24);
+      return `${base}_${label}.jpg`;
+    }
+
+    function addPackageFile(files, root, name, bytes) {
+      files.push({ name: `${root}/${name}`, bytes });
+    }
+
+    async function downloadTaxPackage() {
+      const month = $("taxPackageMonth").value;
+      if (!month) {
+        $("ioStatus").textContent = "対象月を選択してください";
+        return;
+      }
+      const records = packageRecordsForMonth(month);
+      if (!records.length) {
+        $("ioStatus").textContent = `${month} の仕入明細がありません`;
+        return;
+      }
+      try {
+        const root = `税理士提出_${month}`;
+        const files = [];
+        addPackageFile(files, root, "01_仕入一覧.csv", bytesFromText(toCsv(exportRows(records, "list"))));
+        addPackageFile(files, root, "02_古物商特例帳簿.csv", bytesFromText(toCsv(exportRows(records, "book"))));
+        addPackageFile(files, root, "03_電帳法索引簿.csv", bytesFromText(toCsv(exportRows(records, "index"))));
+        addPackageFile(files, root, "04_月次サマリー.xlsx", await workbookBytes(records));
+        addPackageFile(files, root, "05_月次レポート.pdf", createMonthlyPdfBytes(records, month));
+
+        const used = new Set(files.map((file) => file.name));
+        records.forEach((record, recordIndex) => {
+          getRecordImages(record.id).forEach((image, imageIndex) => {
+            const name = uniqueZipPath(`${root}/証憑/${taxPackageEvidenceName(record, image, recordIndex, imageIndex)}`, used);
+            files.push({ name, bytes: dataUrlBytes(image.full) });
+          });
+        });
+
+        const blob = createZip(files);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${root}.zip`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        $("ioStatus").textContent = `${month} の税理士提出ZIPを保存しました`;
+      } catch (error) {
+        $("ioStatus").textContent = error.message;
+      }
     }
 
     function exportBackup() {
@@ -2445,6 +2667,7 @@
       $("exportExcelBtn").addEventListener("click", exportExcel);
       $("printPdfBtn").addEventListener("click", printPdf);
       $("exportEvidenceBtn").addEventListener("click", downloadAllEvidence);
+      $("taxPackageBtn").addEventListener("click", downloadTaxPackage);
       $("backupBtn").addEventListener("click", exportBackup);
       $("downloadTemplateBtn").addEventListener("click", () => downloadCsv(exportRows([], "list"), "仕入一覧テンプレート.csv"));
       $("importFile").addEventListener("change", async (event) => {
