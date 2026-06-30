@@ -823,6 +823,7 @@
                     <button id="exportIndexBtn" type="button">索引簿CSV</button>
                     <button id="exportExcelBtn" type="button">Excel</button>
                     <button id="printPdfBtn" type="button">PDF印刷</button>
+                    <button id="exportEvidenceBtn" type="button">証憑一括保存</button>
                     <button id="backupBtn" type="button">バックアップ</button>
                   </div>
                 </div>
@@ -1826,6 +1827,25 @@
       a.click();
     }
 
+    function downloadAllEvidence() {
+      const targets = currentExportRecords()
+        .map((record) => ({ record, image: state.images.get(record.id) }))
+        .filter((item) => item.image);
+      if (!targets.length) {
+        $("ioStatus").textContent = "保存できる証憑画像がありません";
+        return;
+      }
+      targets.forEach(({ record, image }, index) => {
+        setTimeout(() => {
+          const a = document.createElement("a");
+          a.href = image.full;
+          a.download = evidenceName(record, image) || `証憑_${index + 1}.jpg`;
+          a.click();
+        }, index * 120);
+      });
+      $("ioStatus").textContent = `${targets.length}件の証憑保存を開始しました`;
+    }
+
     function kindLabel(kind) {
       return kind === "jun" ? "準古物" : kind === "other" ? "古物以外" : "古物";
     }
@@ -2167,6 +2187,7 @@
       $("exportIndexBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "index"), "電帳法索引簿.csv"));
       $("exportExcelBtn").addEventListener("click", exportExcel);
       $("printPdfBtn").addEventListener("click", printPdf);
+      $("exportEvidenceBtn").addEventListener("click", downloadAllEvidence);
       $("backupBtn").addEventListener("click", exportBackup);
       $("downloadTemplateBtn").addEventListener("click", () => downloadCsv(exportRows([], "list"), "仕入一覧テンプレート.csv"));
       $("importFile").addEventListener("change", async (event) => {
