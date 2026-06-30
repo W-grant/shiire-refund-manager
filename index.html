@@ -682,7 +682,7 @@
                 </div>
                 <div class="field wide">
                   <label for="proof">証憑画像</label>
-                  <input id="proof" name="proof" type="file" accept="image/*">
+                  <input id="proof" name="proof" type="file" accept="image/*" multiple>
                 </div>
                 <div id="proofPreview" class="field wide hidden"></div>
                 <div class="field wide">
@@ -931,8 +931,12 @@
     </div>
     <div class="dialog-body">
       <img id="evidenceFull" class="evidence-full" alt="証憑画像">
+      <div id="evidenceCounter" class="small muted"></div>
+      <div id="evidenceThumbs" class="thumb-list"></div>
     </div>
     <div class="dialog-actions">
+      <button id="prevEvidenceBtn" type="button">前へ</button>
+      <button id="nextEvidenceBtn" type="button">次へ</button>
       <button id="downloadEvidenceBtn" type="button">ダウンロード</button>
     </div>
   </dialog>
@@ -985,10 +989,11 @@
       activeMonth: "all",
       sortOrder: "dateDesc",
       filters: { staff: "", channel: "", branch: "", kind: "", text: "" },
-      proofDraft: null,
+      proofDraft: [],
       aiImages: [],
       aiItems: [],
-      currentEvidenceId: ""
+      currentEvidenceId: "",
+      currentEvidenceIndex: 0
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1028,12 +1033,44 @@
       });
     }
 
+    function normalizeImageBundle(item) {
+      if (!item) return null;
+      if (Array.isArray(item.images)) {
+        return {
+          id: item.id,
+          images: item.images.filter((image) => image && image.full && image.thumb)
+        };
+      }
+      if (item.full && item.thumb) {
+        const { id, ...image } = item;
+        return { id, images: [image] };
+      }
+      return { id: item.id, images: [] };
+    }
+
+    function imageBundleFor(id, images) {
+      return { id, images: (images || []).filter((image) => image && image.full && image.thumb) };
+    }
+
+    function getRecordImages(id) {
+      const bundle = normalizeImageBundle(state.images.get(id));
+      return bundle ? bundle.images : [];
+    }
+
+    function representativeImage(id) {
+      return getRecordImages(id)[0] || null;
+    }
+
+    function hasRecordImages(id) {
+      return getRecordImages(id).length > 0;
+    }
+
     async function loadAll() {
       const db = await openDb();
       try {
         state.records = await requestToPromise(db.transaction(STORE_RECORDS).objectStore(STORE_RECORDS).getAll());
         const images = await requestToPromise(db.transaction(STORE_IMAGES).objectStore(STORE_IMAGES).getAll());
-        state.images = new Map(images.map((item) => [item.id, item]));
+        state.images = new Map(images.map((item) => normalizeImageBundle(item)).filter((item) => item && item.images.length).map((item) => [item.id, item]));
       } finally {
         db.close();
       }
@@ -1176,10 +1213,12 @@
         }
       }
       for (const image of images) {
-        const tombstone = tombstoneById.get(image.id);
-        const record = recordById.get(image.id);
+        const bundle = normalizeImageBundle(image);
+        if (!bundle || !bundle.images.length) continue;
+        const tombstone = tombstoneById.get(bundle.id);
+        const record = recordById.get(bundle.id);
         if (tombstone && (!record || timeValue(tombstone.deletedAt) >= timeValue(record.updatedAt))) continue;
-        await tx(STORE_IMAGES, "readwrite", (store) => store.put(image));
+        await tx(STORE_IMAGES, "readwrite", (store) => store.put(bundle));
       }
       for (const tombstone of tombstones) {
         const cloudRecord = recordById.get(tombstone.id);
@@ -1202,13 +1241,19 @@
       $("ioStatus").textContent = "同期しました";
     }
 
-    async function saveRecord(record, image) {
+    async function saveRecord(record, imageBundle) {
       record.updatedAt = nowIso();
       await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
       await syncSet(`rec/${record.id}`, record);
-      if (image) {
-        await tx(STORE_IMAGES, "readwrite", (store) => store.put(image));
-        await syncSet(`img/${record.id}`, image);
+      if (imageBundle) {
+        const bundle = normalizeImageBundle(imageBundle);
+        if (bundle && bundle.images.length) {
+          await tx(STORE_IMAGES, "readwrite", (store) => store.put(bundle));
+          await syncSet(`img/${record.id}`, bundle);
+        } else {
+          await tx(STORE_IMAGES, "readwrite", (store) => store.delete(record.id));
+          await syncDel(`img/${record.id}`);
+        }
       }
       await loadAll();
     }
@@ -1311,9 +1356,9 @@
       }
       $("recordId").value = value.id || "";
       $("editingLabel").textContent = value.id ? "編集中" : "新規";
-      state.proofDraft = null;
+      state.proofDraft = [];
       $("proof").value = "";
-      renderProofPreview(value.id ? state.images.get(value.id) : null);
+      renderProofPreview(value.id ? getRecordImages(value.id) : []);
       updateLiveClassify();
     }
 
@@ -1338,7 +1383,7 @@
         seller: String(data.get("seller") || "").trim(),
         address: String(data.get("address") || "").trim(),
         memo: String(data.get("memo") || ""),
-        hasImage: Boolean(state.proofDraft || state.images.has($("recordId").value))
+        hasImage: Boolean(state.proofDraft.length || hasRecordImages($("recordId").value))
       };
     }
 
@@ -1502,10 +1547,11 @@
 
       records.forEach((record) => {
         const c = classified(record);
-        const image = state.images.get(record.id);
+        const image = representativeImage(record.id);
+        const imageCount = getRecordImages(record.id).length;
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${image ? `<img class="thumb" src="${image.thumb}" alt="" data-evidence="${record.id}">` : `<span class="empty-thumb">なし</span>`}</td>
+          <td>${image ? `<img class="thumb" src="${image.thumb}" alt="" data-evidence="${record.id}"><span class="muted small">${imageCount}枚</span>` : `<span class="empty-thumb">なし</span>`}</td>
           <td><strong>${escapeHtml(record.date || "")}</strong><br><span class="muted small">${escapeHtml(record.branch || "")}</span></td>
           <td>${escapeHtml(record.channel || "")}</td>
           <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
@@ -1567,33 +1613,45 @@
       });
     }
 
-    function renderProofPreview(image) {
+    function renderProofPreview(existingImages = []) {
       const box = $("proofPreview");
       box.innerHTML = "";
-      const current = state.proofDraft || image;
-      if (!current) {
+      const existing = Array.isArray(existingImages) ? existingImages : getRecordImages($("recordId").value);
+      const current = [
+        ...existing.map((image, index) => ({ image, index, source: "saved" })),
+        ...state.proofDraft.map((image, index) => ({ image, index, source: "draft" }))
+      ];
+      if (!current.length) {
         box.classList.add("hidden");
         return;
       }
       box.classList.remove("hidden");
-      box.innerHTML = `<div class="inline"><img class="thumb" src="${current.thumb}" alt=""><span class="muted small">${escapeHtml(current.fileName || "証憑画像")}</span><button id="removeProofBtn" class="danger" type="button">削除</button></div>`;
-      $("removeProofBtn").addEventListener("click", removeFormProof);
+      box.innerHTML = current.map(({ image, index, source }) => `
+        <div class="inline">
+          <img class="thumb" src="${image.thumb}" alt="">
+          <span class="muted small">${escapeHtml(image.fileName || "証憑画像")}</span>
+          <button class="danger" type="button" data-proof-remove="${source}:${index}">削除</button>
+        </div>
+      `).join("");
     }
 
-    async function removeFormProof() {
-      state.proofDraft = null;
-      $("proof").value = "";
+    async function removeFormProof(target) {
+      const [source, rawIndex] = String(target || "").split(":");
+      const index = Number(rawIndex);
       const id = $("recordId").value;
-      if (id) {
-        await tx(STORE_IMAGES, "readwrite", (store) => store.delete(id));
-        await syncDel(`img/${id}`);
+      if (source === "draft") {
+        state.proofDraft.splice(index, 1);
+        $("proof").value = "";
+      } else if (source === "saved" && id) {
+        const images = getRecordImages(id);
+        images.splice(index, 1);
         const record = state.records.find((item) => item.id === id);
         if (record) {
-          record.hasImage = false;
-          await saveRecord(record);
+          record.hasImage = images.length > 0;
+          await saveRecord(record, imageBundleFor(id, images));
         }
       }
-      renderProofPreview(null);
+      renderProofPreview(id ? getRecordImages(id) : []);
       updateLiveClassify();
     }
 
@@ -1706,7 +1764,7 @@
         address: item["相手方住所"] || "",
         memo: "AI抽出",
         hasImage: state.aiImages.length > 0,
-        imageIndex: state.aiImages.length ? 0 : -1
+        imageIndex: state.aiImages.length ? "all" : -1
       };
     }
 
@@ -1723,6 +1781,7 @@
     function renderReview() {
       $("reviewWrap").classList.toggle("hidden", state.aiItems.length === 0);
       const imageOptions = (selected) => [
+        `<option value="all" ${selected === "all" ? "selected" : ""}>すべて</option>`,
         `<option value="-1">なし</option>`,
         ...state.aiImages.map((_, imageIndex) => `<option value="${imageIndex}" ${Number(selected) === imageIndex ? "selected" : ""}>${imageIndex + 1}枚目</option>`)
       ].join("");
@@ -1778,10 +1837,10 @@
       for (let index = 0; index < state.aiItems.length; index += 1) {
         const sourceRecord = state.aiItems[index];
         const { imageIndex, ...record } = sourceRecord;
-        const imageSource = state.aiImages[Number(imageIndex)];
-        const image = imageSource ? { id: record.id, ...imageSource } : null;
-        record.hasImage = Boolean(image);
-        await saveRecord(record, image);
+        const selectedImages = imageIndex === "all" ? state.aiImages : [state.aiImages[Number(imageIndex)]].filter(Boolean);
+        const bundle = selectedImages.length ? imageBundleFor(record.id, selectedImages) : null;
+        record.hasImage = Boolean(bundle && bundle.images.length);
+        await saveRecord(record, bundle);
       }
       const count = state.aiItems.length;
       clearExtract();
@@ -1803,8 +1862,7 @@
           ["連番", "取引年月日", "取引金額(税込)", "取引先", "商品名", "証憑ファイル名", "控除区分"],
           ...records.map((record, index) => {
             const c = classified(record);
-            const image = state.images.get(record.id);
-            return [index + 1, record.date, record.amount, record.seller, record.name, evidenceName(record, image), c.kind];
+            return [index + 1, record.date, record.amount, record.seller, record.name, evidenceNames(record).join(" / "), c.kind];
           })
         ];
       }
@@ -1812,7 +1870,6 @@
         ["仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
         ...records.map((record) => {
           const c = classified(record);
-          const image = state.images.get(record.id);
           return [
             record.date,
             record.channel,
@@ -1830,7 +1887,7 @@
             record.address,
             record.anon === "anon" ? "匿名" : "本名判明",
             record.qualified === "yes" ? "登録あり" : record.qualified === "unknown" ? "不明" : "登録なし",
-            evidenceName(record, image),
+            evidenceNames(record).join(" / "),
             record.memo,
             kindLabel(record.kind),
             record.stock === "yes" ? "はい" : "いいえ"
@@ -1839,28 +1896,49 @@
       ];
     }
 
-    function evidenceName(record, image) {
+    function evidenceName(record, image, index = 0) {
       if (!record.hasImage && !image) return "";
       const seller = (record.seller || "取引先").replace(/[\\/:*?"<>|]/g, "");
-      return `証憑_${record.date || "未日付"}_${seller}_${record.amount || 0}.jpg`;
+      const suffix = index > 0 ? `_${index + 1}` : "";
+      return `証憑_${record.date || "未日付"}_${seller}_${record.amount || 0}${suffix}.jpg`;
+    }
+
+    function evidenceNames(record) {
+      return getRecordImages(record.id).map((image, index) => evidenceName(record, image, index));
+    }
+
+    function renderEvidenceDialog() {
+      const images = getRecordImages(state.currentEvidenceId);
+      const image = images[state.currentEvidenceIndex];
+      if (!image) return;
+      $("evidenceFull").src = image.full;
+      $("evidenceCounter").textContent = `${state.currentEvidenceIndex + 1} / ${images.length}枚 ${image.fileName || ""}`;
+      $("prevEvidenceBtn").disabled = images.length <= 1;
+      $("nextEvidenceBtn").disabled = images.length <= 1;
+      $("evidenceThumbs").innerHTML = images.map((item, index) => `
+        <button type="button" class="${index === state.currentEvidenceIndex ? "primary" : ""}" data-evidence-index="${index}">
+          <img class="thumb" src="${item.thumb}" alt="">
+        </button>
+      `).join("");
     }
 
     function openEvidence(id) {
-      const image = state.images.get(id);
-      if (!image) return;
+      const images = getRecordImages(id);
+      if (!images.length) return;
       state.currentEvidenceId = id;
-      $("evidenceFull").src = image.full;
+      state.currentEvidenceIndex = 0;
+      renderEvidenceDialog();
       $("evidenceDialog").showModal();
     }
 
     function downloadEvidence() {
       const id = state.currentEvidenceId;
-      const image = state.images.get(id);
+      const image = getRecordImages(id)[state.currentEvidenceIndex];
       const record = state.records.find((item) => item.id === id);
       if (!image || !record) return;
       const a = document.createElement("a");
       a.href = image.full;
-      a.download = evidenceName(record, image) || "証憑.jpg";
+      a.download = evidenceName(record, image, state.currentEvidenceIndex) || "証憑.jpg";
       a.click();
     }
 
@@ -1976,16 +2054,16 @@
     }
 
     function downloadAllEvidence() {
-      const targets = currentExportRecords()
-        .map((record) => ({ record, image: state.images.get(record.id) }))
-        .filter((item) => item.image);
+      const targets = currentExportRecords().flatMap((record) =>
+        getRecordImages(record.id).map((image, imageIndex) => ({ record, image, imageIndex }))
+      );
       if (!targets.length) {
         $("ioStatus").textContent = "保存できる証憑画像がありません";
         return;
       }
       const used = new Set();
-      const files = targets.map(({ record, image }, index) => ({
-        name: uniqueZipName(evidenceName(record, image) || `証憑_${index + 1}.jpg`, used),
+      const files = targets.map(({ record, image, imageIndex }, index) => ({
+        name: uniqueZipName(evidenceName(record, image, imageIndex) || `証憑_${index + 1}.jpg`, used),
         bytes: dataUrlBytes(image.full)
       }));
       const blob = createZip(files);
@@ -2052,7 +2130,7 @@
         address: get("相手方住所"),
         memo: get("メモ"),
         hasImage: Boolean(get("証憑ファイル名")),
-        evidenceFileName: get("証憑ファイル名")
+        evidenceFileNames: get("証憑ファイル名").split(/\s*\/\s*/).map((name) => name.trim()).filter(Boolean)
       };
     }
 
@@ -2065,12 +2143,16 @@
       const evidenceFiles = new Map(Array.from($("importEvidenceFiles").files || []).map((item) => [item.name, item]));
       let linkedImages = 0;
       for (const record of imported) {
-        const evidenceFile = record.evidenceFileName ? evidenceFiles.get(record.evidenceFileName) : null;
-        delete record.evidenceFileName;
-        const image = evidenceFile ? { id: record.id, ...(await fileToImageData(evidenceFile)) } : null;
-        record.hasImage = Boolean(image);
-        if (image) linkedImages += 1;
-        await saveRecord(record, image);
+        const matchedFiles = (record.evidenceFileNames || []).map((name) => evidenceFiles.get(name)).filter(Boolean);
+        delete record.evidenceFileNames;
+        const images = [];
+        for (const evidenceFile of matchedFiles) {
+          images.push(await fileToImageData(evidenceFile));
+        }
+        const bundle = images.length ? imageBundleFor(record.id, images) : null;
+        record.hasImage = Boolean(bundle && bundle.images.length);
+        if (bundle && bundle.images.length) linkedImages += bundle.images.length;
+        await saveRecord(record, bundle);
       }
       $("ioStatus").textContent = `${imported.length}件を読み込みました（証憑 ${linkedImages}件）`;
     }
@@ -2175,7 +2257,8 @@
         await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
       }
       for (const image of backup.images || []) {
-        await tx(STORE_IMAGES, "readwrite", (store) => store.put(image));
+        const bundle = normalizeImageBundle(image);
+        if (bundle && bundle.images.length) await tx(STORE_IMAGES, "readwrite", (store) => store.put(bundle));
       }
       if (backup.meta) {
         META.staff = backup.meta.staff || META.staff;
@@ -2240,15 +2323,25 @@
           $("liveFlags").textContent = validation.errors.join(" / ");
           return;
         }
-        const image = state.proofDraft ? { id: record.id, ...state.proofDraft } : null;
-        record.hasImage = Boolean(image || state.images.has(record.id));
-        await saveRecord(record, image);
+        const images = [...getRecordImages(record.id), ...state.proofDraft];
+        const bundle = imageBundleFor(record.id, images);
+        record.hasImage = bundle.images.length > 0;
+        await saveRecord(record, bundle);
         setForm(defaultRecord());
       });
       $("resetBtn").addEventListener("click", () => setForm(defaultRecord()));
+      $("proofPreview").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-proof-remove]");
+        if (!button) return;
+        await removeFormProof(button.dataset.proofRemove);
+      });
       $("proof").addEventListener("change", async (event) => {
-        state.proofDraft = await fileToImageData(event.target.files[0]);
-        renderProofPreview();
+        const images = [];
+        for (const file of Array.from(event.target.files || []).filter((item) => item.type.startsWith("image/"))) {
+          images.push(await fileToImageData(file));
+        }
+        state.proofDraft.push(...images);
+        renderProofPreview(getRecordImages($("recordId").value));
         updateLiveClassify();
       });
       $("extractImages").addEventListener("change", async (event) => {
@@ -2303,14 +2396,14 @@
         if (!target) return;
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
-        state.aiItems[index][field] = ["amount", "imageIndex", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        state.aiItems[index][field] = ["amount", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
       });
       $("reviewRows").addEventListener("change", (event) => {
         const target = event.target.closest("[data-review]");
         if (!target) return;
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
-        state.aiItems[index][field] = ["amount", "imageIndex", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        state.aiItems[index][field] = ["amount", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
       });
       $("reviewRows").addEventListener("click", (event) => {
         const button = event.target.closest("[data-review-delete]");
@@ -2376,6 +2469,24 @@
       });
       $("closeEvidenceBtn").addEventListener("click", () => $("evidenceDialog").close());
       $("downloadEvidenceBtn").addEventListener("click", downloadEvidence);
+      $("prevEvidenceBtn").addEventListener("click", () => {
+        const count = getRecordImages(state.currentEvidenceId).length;
+        if (!count) return;
+        state.currentEvidenceIndex = (state.currentEvidenceIndex + count - 1) % count;
+        renderEvidenceDialog();
+      });
+      $("nextEvidenceBtn").addEventListener("click", () => {
+        const count = getRecordImages(state.currentEvidenceId).length;
+        if (!count) return;
+        state.currentEvidenceIndex = (state.currentEvidenceIndex + 1) % count;
+        renderEvidenceDialog();
+      });
+      $("evidenceThumbs").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-evidence-index]");
+        if (!button) return;
+        state.currentEvidenceIndex = Number(button.dataset.evidenceIndex);
+        renderEvidenceDialog();
+      });
       $("sampleBtn").addEventListener("click", async () => {
         await addSampleRecords();
       });
