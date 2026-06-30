@@ -831,7 +831,7 @@
                     <button id="exportIndexBtn" type="button">索引簿CSV</button>
                     <button id="exportExcelBtn" type="button">Excel</button>
                     <button id="printPdfBtn" type="button">PDF印刷</button>
-                    <button id="exportEvidenceBtn" type="button">証憑一括保存</button>
+                    <button id="exportEvidenceBtn" type="button">証憑ZIP</button>
                     <button id="backupBtn" type="button">バックアップ</button>
                   </div>
                 </div>
@@ -1854,6 +1854,117 @@
       a.click();
     }
 
+    function crc32(bytes) {
+      let crc = 0xffffffff;
+      for (let i = 0; i < bytes.length; i += 1) {
+        crc ^= bytes[i];
+        for (let bit = 0; bit < 8; bit += 1) {
+          crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+        }
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    function writeUint16(output, value) {
+      output.push(value & 0xff, (value >>> 8) & 0xff);
+    }
+
+    function writeUint32(output, value) {
+      output.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+    }
+
+    function dosDateTime(date) {
+      const year = Math.max(1980, date.getFullYear());
+      return {
+        time: (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2),
+        date: ((year - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate()
+      };
+    }
+
+    function dataUrlBytes(dataUrl) {
+      const comma = dataUrl.indexOf(",");
+      const binary = atob(dataUrl.slice(comma + 1));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    }
+
+    function uniqueZipName(name, used) {
+      const safe = String(name || "evidence.jpg").replace(/[\\/:*?"<>|]/g, "_");
+      if (!used.has(safe)) {
+        used.add(safe);
+        return safe;
+      }
+      const dot = safe.lastIndexOf(".");
+      const base = dot > 0 ? safe.slice(0, dot) : safe;
+      const ext = dot > 0 ? safe.slice(dot) : "";
+      let index = 2;
+      while (used.has(`${base}_${index}${ext}`)) index += 1;
+      const unique = `${base}_${index}${ext}`;
+      used.add(unique);
+      return unique;
+    }
+
+    function createZip(files) {
+      const encoder = new TextEncoder();
+      const chunks = [];
+      const central = [];
+      let offset = 0;
+      const stamp = dosDateTime(new Date());
+
+      files.forEach((file) => {
+        const nameBytes = encoder.encode(file.name);
+        const data = file.bytes;
+        const checksum = crc32(data);
+        const local = [];
+        writeUint32(local, 0x04034b50);
+        writeUint16(local, 20);
+        writeUint16(local, 0x0800);
+        writeUint16(local, 0);
+        writeUint16(local, stamp.time);
+        writeUint16(local, stamp.date);
+        writeUint32(local, checksum);
+        writeUint32(local, data.length);
+        writeUint32(local, data.length);
+        writeUint16(local, nameBytes.length);
+        writeUint16(local, 0);
+        chunks.push(new Uint8Array(local), nameBytes, data);
+
+        const directory = [];
+        writeUint32(directory, 0x02014b50);
+        writeUint16(directory, 20);
+        writeUint16(directory, 20);
+        writeUint16(directory, 0x0800);
+        writeUint16(directory, 0);
+        writeUint16(directory, stamp.time);
+        writeUint16(directory, stamp.date);
+        writeUint32(directory, checksum);
+        writeUint32(directory, data.length);
+        writeUint32(directory, data.length);
+        writeUint16(directory, nameBytes.length);
+        writeUint16(directory, 0);
+        writeUint16(directory, 0);
+        writeUint16(directory, 0);
+        writeUint16(directory, 0);
+        writeUint32(directory, 0);
+        writeUint32(directory, offset);
+        central.push(new Uint8Array(directory), nameBytes);
+        offset += local.length + nameBytes.length + data.length;
+      });
+
+      const centralSize = central.reduce((sum, chunk) => sum + chunk.length, 0);
+      const end = [];
+      writeUint32(end, 0x06054b50);
+      writeUint16(end, 0);
+      writeUint16(end, 0);
+      writeUint16(end, files.length);
+      writeUint16(end, files.length);
+      writeUint32(end, centralSize);
+      writeUint32(end, offset);
+      writeUint16(end, 0);
+      return new Blob([...chunks, ...central, new Uint8Array(end)], { type: "application/zip" });
+    }
+
     function downloadAllEvidence() {
       const targets = currentExportRecords()
         .map((record) => ({ record, image: state.images.get(record.id) }))
@@ -1862,15 +1973,19 @@
         $("ioStatus").textContent = "保存できる証憑画像がありません";
         return;
       }
-      targets.forEach(({ record, image }, index) => {
-        setTimeout(() => {
-          const a = document.createElement("a");
-          a.href = image.full;
-          a.download = evidenceName(record, image) || `証憑_${index + 1}.jpg`;
-          a.click();
-        }, index * 120);
-      });
-      $("ioStatus").textContent = `${targets.length}件の証憑保存を開始しました`;
+      const used = new Set();
+      const files = targets.map(({ record, image }, index) => ({
+        name: uniqueZipName(evidenceName(record, image) || `証憑_${index + 1}.jpg`, used),
+        bytes: dataUrlBytes(image.full)
+      }));
+      const blob = createZip(files);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `証憑_${state.activeMonth === "all" ? "全期間" : state.activeMonth}.zip`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      $("ioStatus").textContent = `${targets.length}件の証憑ZIPを保存しました`;
     }
 
     function kindLabel(kind) {
