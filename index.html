@@ -1297,6 +1297,7 @@
 
     function readForm() {
       const data = new FormData(form);
+      const amount = Number(data.get("amount") || 0);
       return {
         id: $("recordId").value || crypto.randomUUID(),
         date: data.get("date"),
@@ -1306,7 +1307,7 @@
         category: data.get("category"),
         qty: Number(data.get("qty") || 1),
         branch: data.get("branch"),
-        amount: Math.round(Number(data.get("amount") || 0)),
+        amount: Number.isFinite(amount) ? Math.round(amount) : 0,
         kind: data.get("kind"),
         stock: data.get("stock"),
         qualified: data.get("qualified"),
@@ -1337,11 +1338,27 @@
     function updateLiveClassify() {
       const record = readForm();
       const c = classified(record);
+      const validation = validateRecord(record, c);
       $("liveBadge").className = "badge " + badgeClass(c.kind);
       $("liveBadge").textContent = c.kind;
       $("liveTax").textContent = yen(c.tax);
       $("liveNote").textContent = c.note || "";
-      $("liveFlags").textContent = c.flags && c.flags.length ? c.flags.join(" / ") : "";
+      $("liveFlags").textContent = [...validation.errors, ...validation.warnings, ...(c.flags || [])].join(" / ");
+    }
+
+    function validateRecord(record, c) {
+      const errors = [];
+      const warnings = [];
+      if (!record.date) errors.push("仕入日を入力してください");
+      if (!record.name) errors.push("商品名を入力してください");
+      if (!Number.isFinite(Number(record.amount)) || Number(record.amount) <= 0) errors.push("金額は1円以上で入力してください");
+      if ((record.kind === "kobutsu" || record.kind === "jun") && record.stock === "yes" && record.anon === "named" && Number(record.amount || 0) >= 10000) {
+        if (!record.seller) warnings.push("1万円以上は相手方氏名の確認が必要です");
+        if (!record.address) warnings.push("1万円以上は相手方住所の確認が必要です");
+      }
+      if (record.qualified === "yes" && !record.hasImage) warnings.push("適格請求書または確認済み仕入明細書の証憑保存を確認してください");
+      if (c.kind === "要確認") warnings.push("控除区分の判定に必要な情報を確認してください");
+      return { errors, warnings };
     }
 
     function monthKey(record) {
@@ -2038,6 +2055,11 @@
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const record = readForm();
+        const validation = validateRecord(record, classified(record));
+        if (validation.errors.length) {
+          $("liveFlags").textContent = validation.errors.join(" / ");
+          return;
+        }
         const image = state.proofDraft ? { id: record.id, ...state.proofDraft } : null;
         record.hasImage = Boolean(image || state.images.has(record.id));
         await saveRecord(record, image);
