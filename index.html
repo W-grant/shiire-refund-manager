@@ -724,10 +724,17 @@
                 <thead>
                   <tr>
                     <th>仕入日</th>
+                    <th>チャネル</th>
                     <th>商品</th>
                     <th>品目</th>
+                    <th>数量</th>
                     <th>金額</th>
+                    <th>税率</th>
                     <th>相手方</th>
+                    <th>古物</th>
+                    <th>棚卸</th>
+                    <th>適格</th>
+                    <th>取引</th>
                     <th>証憑</th>
                     <th>操作</th>
                   </tr>
@@ -1593,11 +1600,11 @@
         id: crypto.randomUUID(),
         date: item["仕入日"] || today(),
         channel,
-        staff: "未設定",
+        staff: META.staff[0] || "未設定",
         name: item["商品名"] || "",
         category: item["品目"] || "その他",
         qty: Number(item["数量"] || 1),
-        branch: "東京",
+        branch: META.branches[0] || "未設定",
         amount: Number(item["金額税込"] || 0),
         kind: "kobutsu",
         stock: "yes",
@@ -1612,19 +1619,42 @@
       };
     }
 
+    function optionHtml(value, label, selected) {
+      return `<option value="${escapeHtml(value)}" ${String(selected) === String(value) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }
+
+    function selectHtml(index, field, options, selected) {
+      const hasSelected = options.some(([value]) => String(value) === String(selected));
+      const normalized = hasSelected || selected === undefined || selected === null || selected === "" ? options : [[selected, selected], ...options];
+      return `<select data-review="${index}" data-field="${field}">${normalized.map(([value, label]) => optionHtml(value, label, selected)).join("")}</select>`;
+    }
+
     function renderReview() {
       $("reviewWrap").classList.toggle("hidden", state.aiItems.length === 0);
       const imageOptions = (selected) => [
         `<option value="-1">なし</option>`,
         ...state.aiImages.map((_, imageIndex) => `<option value="${imageIndex}" ${Number(selected) === imageIndex ? "selected" : ""}>${imageIndex + 1}枚目</option>`)
       ].join("");
+      const channelOptions = META.channels.map((item) => [item, item]);
+      const categoryOptions = META.categories.map((item) => [item, item]);
+      const kindOptions = [["kobutsu", "古物"], ["jun", "準古物"], ["other", "古物以外"]];
+      const stockOptions = [["yes", "はい"], ["no", "いいえ"]];
+      const qualifiedOptions = [["no", "登録なし"], ["yes", "登録あり"], ["unknown", "不明"]];
+      const anonOptions = [["anon", "匿名"], ["named", "本名判明"]];
       $("reviewRows").innerHTML = state.aiItems.map((record, index) => `
         <tr>
           <td><input data-review="${index}" data-field="date" type="date" value="${escapeHtml(record.date)}"></td>
+          <td>${selectHtml(index, "channel", channelOptions, record.channel)}</td>
           <td><input data-review="${index}" data-field="name" type="text" value="${escapeHtml(record.name)}"></td>
-          <td><input data-review="${index}" data-field="category" type="text" value="${escapeHtml(record.category)}"></td>
+          <td>${selectHtml(index, "category", categoryOptions, record.category)}</td>
+          <td><input data-review="${index}" data-field="qty" type="number" min="1" step="1" value="${escapeHtml(record.qty)}"></td>
           <td><input data-review="${index}" data-field="amount" type="number" value="${escapeHtml(record.amount)}"></td>
+          <td>${selectHtml(index, "rate", [["10", "10%"], ["8", "8%"]], record.rate)}</td>
           <td><input data-review="${index}" data-field="seller" type="text" value="${escapeHtml(record.seller)}"></td>
+          <td>${selectHtml(index, "kind", kindOptions, record.kind)}</td>
+          <td>${selectHtml(index, "stock", stockOptions, record.stock)}</td>
+          <td>${selectHtml(index, "qualified", qualifiedOptions, record.qualified)}</td>
+          <td>${selectHtml(index, "anon", anonOptions, record.anon)}</td>
           <td><select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select></td>
           <td><button class="danger" type="button" data-review-delete="${index}">×</button></td>
         </tr>
@@ -2035,14 +2065,14 @@
         if (!target) return;
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
-        state.aiItems[index][field] = field === "amount" || field === "imageIndex" ? Number(target.value || 0) : target.value;
+        state.aiItems[index][field] = ["amount", "imageIndex", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
       });
       $("reviewRows").addEventListener("change", (event) => {
         const target = event.target.closest("[data-review]");
         if (!target) return;
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
-        state.aiItems[index][field] = field === "amount" || field === "imageIndex" ? Number(target.value || 0) : target.value;
+        state.aiItems[index][field] = ["amount", "imageIndex", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
       });
       $("reviewRows").addEventListener("click", (event) => {
         const button = event.target.closest("[data-review-delete]");
