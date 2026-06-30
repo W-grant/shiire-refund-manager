@@ -782,6 +782,14 @@
                 <select id="filterChannel" aria-label="チャネルフィルタ"></select>
                 <select id="filterBranch" aria-label="支店フィルタ"></select>
                 <select id="filterKind" aria-label="控除区分フィルタ"></select>
+                <select id="sortOrder" aria-label="並び順">
+                  <option value="dateDesc">日付 新しい順</option>
+                  <option value="dateAsc">日付 古い順</option>
+                  <option value="amountDesc">金額 高い順</option>
+                  <option value="amountAsc">金額 低い順</option>
+                  <option value="taxDesc">控除税額 高い順</option>
+                  <option value="taxAsc">控除税額 低い順</option>
+                </select>
                 <input id="filterText" type="search" placeholder="商品名・相手方・日付・金額" aria-label="検索">
               </div>
 
@@ -963,6 +971,7 @@
       images: new Map(),
       settings: null,
       activeMonth: "all",
+      sortOrder: "dateDesc",
       filters: { staff: "", channel: "", branch: "", kind: "", text: "" },
       proofDraft: null,
       aiImages: [],
@@ -1372,7 +1381,7 @@
 
     function filteredRecords() {
       const text = state.filters.text.trim().toLowerCase();
-      return state.records.filter((record) => {
+      const records = state.records.filter((record) => {
         const c = classified(record);
         if (state.activeMonth !== "all" && monthKey(record) !== state.activeMonth) return false;
         if (state.filters.staff && record.staff !== state.filters.staff) return false;
@@ -1385,6 +1394,22 @@
         }
         return true;
       });
+      return sortRecords(records);
+    }
+
+    function sortRecords(records) {
+      const sorted = [...records];
+      const compareText = (a, b) => String(a || "").localeCompare(String(b || ""));
+      const compareNumber = (a, b) => Number(a || 0) - Number(b || 0);
+      sorted.sort((a, b) => {
+        if (state.sortOrder === "dateAsc") return compareText(a.date, b.date);
+        if (state.sortOrder === "amountDesc") return compareNumber(b.amount, a.amount);
+        if (state.sortOrder === "amountAsc") return compareNumber(a.amount, b.amount);
+        if (state.sortOrder === "taxDesc") return compareNumber(classified(b).tax, classified(a).tax);
+        if (state.sortOrder === "taxAsc") return compareNumber(classified(a).tax, classified(b).tax);
+        return compareText(b.date, a.date);
+      });
+      return sorted;
     }
 
     function render() {
@@ -2180,6 +2205,10 @@
       });
       $("filterText").addEventListener("input", () => {
         state.filters.text = $("filterText").value;
+        render();
+      });
+      $("sortOrder").addEventListener("change", () => {
+        state.sortOrder = $("sortOrder").value;
         render();
       });
       $("exportListBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "list"), "仕入一覧.csv"));
