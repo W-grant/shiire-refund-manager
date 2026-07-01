@@ -165,34 +165,6 @@ as $$
     and p.is_active = true
 $$;
 
-create or replace function public.prevent_profile_privilege_escalation()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if public.is_admin() then
-    return new;
-  end if;
-
-  if new.id <> auth.uid() then
-    raise exception 'profile_update_forbidden';
-  end if;
-
-  if new.role <> old.role or new.is_active <> old.is_active then
-    raise exception 'profile_role_update_forbidden';
-  end if;
-
-  return new;
-end;
-$$;
-
-drop trigger if exists profiles_prevent_privilege_escalation on public.profiles;
-create trigger profiles_prevent_privilege_escalation
-before update on public.profiles
-for each row execute function public.prevent_profile_privilege_escalation();
-
 create or replace function public.is_admin()
 returns boolean
 language sql
@@ -222,6 +194,34 @@ stable
 as $$
   select public.current_role() in ('admin', 'staff', 'tax_accountant')
 $$;
+
+create or replace function public.prevent_profile_privilege_escalation()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.is_admin() then
+    return new;
+  end if;
+
+  if new.id <> auth.uid() then
+    raise exception 'profile_update_forbidden';
+  end if;
+
+  if new.role <> old.role or new.is_active <> old.is_active then
+    raise exception 'profile_role_update_forbidden';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_prevent_privilege_escalation on public.profiles;
+create trigger profiles_prevent_privilege_escalation
+before update on public.profiles
+for each row execute function public.prevent_profile_privilege_escalation();
 
 alter table public.profiles enable row level security;
 alter table public.branches enable row level security;
@@ -429,6 +429,7 @@ values
   ('imports', 'imports', false, 104857600, array['application/json', 'text/csv', 'application/zip', 'application/x-zip-compressed'])
 on conflict (id) do update
 set
+  name = excluded.name,
   public = excluded.public,
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
