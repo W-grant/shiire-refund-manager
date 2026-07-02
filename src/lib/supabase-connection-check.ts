@@ -7,7 +7,9 @@ const env = (import.meta as ImportMeta & { env: SupabaseConnectionEnv }).env;
 
 console.log("[Supabase] env check", {
   url: env.VITE_SUPABASE_URL ? "設定済み" : "未設定",
-  key: env.VITE_SUPABASE_ANON_KEY ? "設定済み" : "未設定"
+  key: env.VITE_SUPABASE_ANON_KEY ? "設定済み" : "未設定",
+  urlLength: env.VITE_SUPABASE_URL?.length ?? 0,
+  keyLength: env.VITE_SUPABASE_ANON_KEY?.length ?? 0
 });
 
 async function checkSupabaseConnection() {
