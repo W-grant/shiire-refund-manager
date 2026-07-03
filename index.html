@@ -1072,7 +1072,41 @@
       return getRecordImages(id).length > 0;
     }
 
-    async function loadAll() {
+    function waitForSupabaseReadService() {
+      if (window.ShiireSupabaseRead) return Promise.resolve(window.ShiireSupabaseRead);
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(null), 1500);
+        window.addEventListener("shiire:supabase-read-ready", () => {
+          clearTimeout(timer);
+          resolve(window.ShiireSupabaseRead || null);
+        }, { once: true });
+      });
+    }
+
+    async function loadSupabaseAll() {
+      const service = await waitForSupabaseReadService();
+      if (!service) return false;
+      try {
+        const snapshot = await service.loadAll();
+        if (snapshot.meta) {
+          META.branches = snapshot.meta.branches.length ? snapshot.meta.branches : META.branches;
+          META.channels = snapshot.meta.channels.length ? snapshot.meta.channels : META.channels;
+          META.categories = snapshot.meta.categories.length ? snapshot.meta.categories : META.categories;
+          initMeta();
+        }
+        state.records = snapshot.records || [];
+        state.images = new Map((snapshot.images || []).map((item) => [item.id, item]));
+        state.records.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+        render();
+        return true;
+      } catch (error) {
+        console.warn("[Supabase] purchase read failed", error);
+        $("ioStatus").textContent = "Supabase読み取りに失敗したためローカルデータを表示します";
+        return false;
+      }
+    }
+
+    async function loadIndexedDbAll() {
       const db = await openDb();
       try {
         state.records = await requestToPromise(db.transaction(STORE_RECORDS).objectStore(STORE_RECORDS).getAll());
@@ -1083,6 +1117,11 @@
       }
       state.records.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
       render();
+    }
+
+    async function loadAll() {
+      if (await loadSupabaseAll()) return;
+      await loadIndexedDbAll();
     }
 
     function defaultSettings() {
