@@ -257,6 +257,13 @@ on public.branches
 for select
 using (public.can_read_app_data());
 
+drop policy if exists "branches_select_public_master" on public.branches;
+create policy "branches_select_public_master"
+on public.branches
+for select
+to anon, authenticated
+using (true);
+
 drop policy if exists "branches_insert_admin" on public.branches;
 create policy "branches_insert_admin"
 on public.branches
@@ -282,6 +289,13 @@ on public.channels
 for select
 using (public.can_read_app_data());
 
+drop policy if exists "channels_select_public_master" on public.channels;
+create policy "channels_select_public_master"
+on public.channels
+for select
+to anon, authenticated
+using (true);
+
 drop policy if exists "channels_insert_admin" on public.channels;
 create policy "channels_insert_admin"
 on public.channels
@@ -306,6 +320,13 @@ create policy "categories_select"
 on public.categories
 for select
 using (public.can_read_app_data());
+
+drop policy if exists "categories_select_public_master" on public.categories;
+create policy "categories_select_public_master"
+on public.categories
+for select
+to anon, authenticated
+using (true);
 
 drop policy if exists "categories_insert_admin" on public.categories;
 create policy "categories_insert_admin"
