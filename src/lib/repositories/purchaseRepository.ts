@@ -88,7 +88,7 @@ export async function fetchPurchases() {
       branch:branches(name),
       channel:channels(name),
       category:categories(name),
-      staff:profiles(display_name)
+      staff:profiles!purchases_staff_id_fkey(display_name)
     `)
     .is("deleted_at", null)
     .order("purchase_date", { ascending: false });

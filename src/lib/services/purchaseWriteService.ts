@@ -10,6 +10,12 @@ type SupabaseWriteError = {
   hint?: string;
 };
 
+export type PurchaseSaveStatus = {
+  authenticated: boolean;
+  canInsert: boolean;
+  role: string | null;
+};
+
 function logInsertFailure(error: SupabaseWriteError) {
   console.error("[Save] Insert failed", {
     message: error.message,
@@ -17,6 +23,29 @@ function logInsertFailure(error: SupabaseWriteError) {
     details: error.details,
     hint: error.hint
   });
+}
+
+export async function getPurchaseSaveStatus(): Promise<PurchaseSaveStatus> {
+  const sessionResult = await supabase.auth.getSession();
+  if (sessionResult.error) throw sessionResult.error;
+  const userId = sessionResult.data.session?.user.id;
+  if (!userId) {
+    return { authenticated: false, canInsert: false, role: null };
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .single();
+  if (error) throw error;
+
+  const role = data?.role || null;
+  return {
+    authenticated: true,
+    canInsert: role === "admin" || role === "staff",
+    role
+  };
 }
 
 export async function savePurchase(record: LegacyRecord, classification: LegacyClassification) {

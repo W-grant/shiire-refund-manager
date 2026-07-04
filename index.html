@@ -1097,6 +1097,17 @@
     async function saveSupabaseNewRecord(record) {
       const service = await waitForSupabaseWriteService();
       if (!service) return false;
+      const status = await service.getSaveStatus();
+      if (!status.authenticated) {
+        console.info("[Save] Supabase skipped: not authenticated");
+        $("ioStatus").textContent = "Supabase未ログインのためローカル保存のみ";
+        return false;
+      }
+      if (!status.canInsert) {
+        console.warn("[Save] Supabase skipped: role cannot insert", { role: status.role });
+        $("ioStatus").textContent = "Supabase保存権限がないためローカル保存のみ";
+        return false;
+      }
       await service.savePurchase(record, classified(record));
       $("ioStatus").textContent = "Supabase insert succeeded";
       return true;
