@@ -17,11 +17,33 @@ export type EvidenceWithUrl = EvidenceRow & {
   url: string;
 };
 
+export type PurchaseEvidenceInsert = {
+  purchase_id: string;
+  storage_bucket: string;
+  storage_path: string;
+  file_name: string;
+  label: string | null;
+  mime_type: string;
+  file_size: number | null;
+  sort_order: number;
+  uploaded_by: string | null;
+};
+
 export async function fetchPurchaseEvidence() {
   const { data, error } = await supabase
     .from("purchase_evidence")
     .select("id,purchase_id,storage_bucket,storage_path,file_name,label,mime_type,file_size,sort_order,created_at")
     .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data || []) as EvidenceRow[];
+}
+
+export async function insertPurchaseEvidence(rows: PurchaseEvidenceInsert[]) {
+  if (!rows.length) return [];
+  const { data, error } = await supabase
+    .from("purchase_evidence")
+    .insert(rows)
+    .select("id,purchase_id,storage_bucket,storage_path,file_name,label,mime_type,file_size,sort_order,created_at");
   if (error) throw error;
   return (data || []) as EvidenceRow[];
 }

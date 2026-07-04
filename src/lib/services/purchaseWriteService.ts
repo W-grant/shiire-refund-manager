@@ -1,6 +1,7 @@
-import { legacyRecordToPurchaseInsert, type LegacyClassification, type LegacyRecord } from "../mappers/purchaseMapper";
+import { legacyRecordToPurchaseInsert, type LegacyClassification, type LegacyImage, type LegacyRecord } from "../mappers/purchaseMapper";
 import { fetchBranches, fetchCategories, fetchChannels } from "../repositories/masterRepository";
 import { insertPurchase } from "../repositories/purchaseRepository";
+import { uploadEvidenceImages, type EvidenceUploadResult } from "../repositories/storageRepository";
 import { supabase } from "../supabase";
 
 type SupabaseWriteError = {
@@ -14,6 +15,11 @@ export type PurchaseSaveStatus = {
   authenticated: boolean;
   canInsert: boolean;
   role: string | null;
+};
+
+export type PurchaseSaveResult = {
+  purchase: { id: string };
+  evidence: EvidenceUploadResult;
 };
 
 function logInsertFailure(error: SupabaseWriteError) {
@@ -48,7 +54,11 @@ export async function getPurchaseSaveStatus(): Promise<PurchaseSaveStatus> {
   };
 }
 
-export async function savePurchase(record: LegacyRecord, classification: LegacyClassification) {
+export async function savePurchase(
+  record: LegacyRecord,
+  classification: LegacyClassification,
+  images: LegacyImage[] = []
+): Promise<PurchaseSaveResult> {
   console.log("[Save] Start", { id: record.id });
   try {
     const [branches, channels, categories, sessionResult] = await Promise.all([
@@ -66,9 +76,19 @@ export async function savePurchase(record: LegacyRecord, classification: LegacyC
       sessionResult.data.session?.user.id || null
     );
     console.log("[Save] Before insert", { id: row.id });
-    const result = await insertPurchase(row);
-    console.log("[Save] Insert success", result);
-    return result;
+    const purchase = await insertPurchase(row);
+    console.log("[Save] Insert success", purchase);
+    const evidence = images.length
+      ? await uploadEvidenceImages(record, images, sessionResult.data.session?.user.id || null)
+      : { successes: [], failures: [] };
+    if (evidence.failures.length) {
+      console.warn("[Storage] Evidence upload completed with warnings", {
+        id: record.id,
+        successCount: evidence.successes.length,
+        failureCount: evidence.failures.length
+      });
+    }
+    return { purchase, evidence };
   } catch (error) {
     logInsertFailure(error as SupabaseWriteError);
     throw error;
