@@ -1097,7 +1097,7 @@
     async function saveSupabaseNewRecord(record) {
       const service = await waitForSupabaseWriteService();
       if (!service) return false;
-      await service.insertPurchase(record, classified(record));
+      await service.savePurchase(record, classified(record));
       $("ioStatus").textContent = "Supabase insert succeeded";
       return true;
     }

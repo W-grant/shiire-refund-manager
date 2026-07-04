@@ -1,6 +1,6 @@
 import "./lib/supabase-connection-check";
 import { loadSupabasePurchaseState } from "./lib/services/purchaseReadService";
-import { insertSupabasePurchase } from "./lib/services/purchaseWriteService";
+import { savePurchase } from "./lib/services/purchaseWriteService";
 
 declare global {
   interface Window {
@@ -8,7 +8,7 @@ declare global {
       loadAll: typeof loadSupabasePurchaseState;
     };
     ShiireSupabaseWrite?: {
-      insertPurchase: typeof insertSupabasePurchase;
+      savePurchase: typeof savePurchase;
     };
   }
 }
@@ -17,7 +17,7 @@ window.ShiireSupabaseRead = {
   loadAll: loadSupabasePurchaseState
 };
 window.ShiireSupabaseWrite = {
-  insertPurchase: insertSupabasePurchase
+  savePurchase
 };
 window.dispatchEvent(new Event("shiire:supabase-read-ready"));
 window.dispatchEvent(new Event("shiire:supabase-write-ready"));
