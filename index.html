@@ -581,6 +581,8 @@
           <div class="muted small">中古品リユース事業者向け 仕入管理・控除見える化</div>
         </div>
         <div class="header-actions">
+          <span id="userBadge" class="status small hidden"></span>
+          <button id="logoutBtn" type="button" class="hidden">ログアウト</button>
           <button id="refreshBtn" type="button">更新</button>
           <button id="settingsBtn" type="button">設定</button>
           <button id="sampleBtn" type="button">サンプル</button>
@@ -589,7 +591,35 @@
       </div>
     </header>
 
-    <main>
+    <section id="loginView" class="hidden" aria-labelledby="loginTitle">
+      <main>
+        <section class="panel">
+          <div class="panel-head">
+            <h2 id="loginTitle">ログイン</h2>
+            <span id="loginStatus" class="status small"></span>
+          </div>
+          <div class="panel-body">
+            <form id="loginForm">
+              <div class="form-grid">
+                <div class="field wide">
+                  <label for="loginEmail">メールアドレス</label>
+                  <input id="loginEmail" name="email" type="email" autocomplete="username" required>
+                </div>
+                <div class="field wide">
+                  <label for="loginPassword">パスワード</label>
+                  <input id="loginPassword" name="password" type="password" autocomplete="current-password" required>
+                </div>
+              </div>
+              <div class="actions">
+                <button id="loginBtn" class="primary" type="submit">ログイン</button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </main>
+    </section>
+
+    <main id="appMain" class="hidden">
       <div class="notice">最終処理は税理士に確認してください。</div>
 
       <div class="layout">
@@ -1000,7 +1030,8 @@
       aiImages: [],
       aiItems: [],
       currentEvidenceId: "",
-      currentEvidenceIndex: 0
+      currentEvidenceIndex: 0,
+      profile: null
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1070,6 +1101,77 @@
 
     function hasRecordImages(id) {
       return getRecordImages(id).length > 0;
+    }
+
+    function waitForAuthService() {
+      if (window.ShiireAuth) return Promise.resolve(window.ShiireAuth);
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(null), 1500);
+        window.addEventListener("shiire:auth-ready", () => {
+          clearTimeout(timer);
+          resolve(window.ShiireAuth || null);
+        }, { once: true });
+      });
+    }
+
+    function canWritePurchases() {
+      return state.profile && ["admin", "staff"].includes(state.profile.role);
+    }
+
+    function isAdmin() {
+      return state.profile && state.profile.role === "admin";
+    }
+
+    function setControlsDisabled(ids, disabled) {
+      ids.forEach((id) => {
+        const element = $(id);
+        if (element) element.disabled = disabled;
+      });
+    }
+
+    function applyRoleControls() {
+      const authenticated = Boolean(state.profile);
+      const canWrite = canWritePurchases();
+      $("loginView").classList.toggle("hidden", authenticated);
+      $("appMain").classList.toggle("hidden", !authenticated);
+      ["refreshBtn", "sampleBtn", "clearBtn"].forEach((id) => $(id).classList.toggle("hidden", !authenticated));
+      $("settingsBtn").classList.toggle("hidden", !authenticated || !isAdmin());
+      $("logoutBtn").classList.toggle("hidden", !authenticated);
+      $("userBadge").classList.toggle("hidden", !authenticated);
+      $("userBadge").textContent = authenticated ? `${state.profile.display_name} / ${state.profile.role}` : "";
+      document.querySelector(".left-stack")?.classList.toggle("hidden", authenticated && !canWrite);
+      Array.from(form.elements).forEach((element) => {
+        if (element.id !== "recordId") element.disabled = !canWrite;
+      });
+      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile"], !canWrite);
+      $("sampleBtn").disabled = !canWrite;
+      $("clearBtn").disabled = !isAdmin();
+      render();
+    }
+
+    async function refreshAuthState() {
+      const service = await waitForAuthService();
+      if (!service) {
+        state.profile = null;
+        applyRoleControls();
+        $("loginStatus").textContent = "ログイン機能を読み込めませんでした";
+        return false;
+      }
+      try {
+        const snapshot = await service.getCurrentAuth();
+        state.profile = snapshot.profile && snapshot.profile.is_active ? snapshot.profile : null;
+        applyRoleControls();
+        if (snapshot.authenticated && !state.profile) {
+          $("loginStatus").textContent = "このユーザーは利用できません";
+          return false;
+        }
+        return Boolean(state.profile);
+      } catch (error) {
+        state.profile = null;
+        applyRoleControls();
+        $("loginStatus").textContent = error.message || "ログイン状態を確認できませんでした";
+        return false;
+      }
     }
 
     function waitForSupabaseReadService() {
@@ -1323,6 +1425,11 @@
     }
 
     async function saveRecord(record, imageBundle) {
+      if (!canWritePurchases()) {
+        console.warn("[Auth] Save blocked: login or write role required");
+        $("ioStatus").textContent = "ログインまたは保存権限が必要です";
+        return false;
+      }
       const isNewRecord = !state.records.some((item) => item.id === record.id);
       let savedToSupabase = false;
       record.updatedAt = nowIso();
@@ -1355,6 +1462,7 @@
         return;
       }
       await loadAll();
+      return true;
     }
 
     async function deleteRecord(id) {
@@ -1573,6 +1681,17 @@
       const records = filteredRecords();
       renderSummary(records);
       renderRows(records);
+      applyRenderedRoleControls();
+    }
+
+    function applyRenderedRoleControls() {
+      if (!canWritePurchases()) {
+        document.querySelectorAll("[data-edit], [data-delete]").forEach((element) => element.remove());
+        return;
+      }
+      if (!isAdmin()) {
+        document.querySelectorAll("[data-delete]").forEach((element) => element.remove());
+      }
     }
 
     function renderMonths() {
@@ -2607,6 +2726,44 @@
     }
 
     function bindEvents() {
+      $("loginForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const service = await waitForAuthService();
+        if (!service) {
+          $("loginStatus").textContent = "ログイン機能を読み込めませんでした";
+          return;
+        }
+        const data = new FormData(event.currentTarget);
+        $("loginBtn").disabled = true;
+        $("loginStatus").textContent = "ログイン中...";
+        try {
+          const snapshot = await service.signInWithPassword(String(data.get("email") || ""), String(data.get("password") || ""));
+          state.profile = snapshot.profile && snapshot.profile.is_active ? snapshot.profile : null;
+          if (!state.profile) {
+            $("loginStatus").textContent = "このユーザーは利用できません";
+            await service.signOut();
+            applyRoleControls();
+            return;
+          }
+          $("loginStatus").textContent = "";
+          applyRoleControls();
+          await loadAll();
+        } catch (error) {
+          state.profile = null;
+          applyRoleControls();
+          $("loginStatus").textContent = error.message || "ログインに失敗しました";
+        } finally {
+          $("loginBtn").disabled = false;
+        }
+      });
+      $("logoutBtn").addEventListener("click", async () => {
+        const service = await waitForAuthService();
+        if (service) await service.signOut();
+        state.profile = null;
+        state.records = [];
+        state.images = new Map();
+        applyRoleControls();
+      });
       form.addEventListener("input", updateLiveClassify);
       form.addEventListener("change", updateLiveClassify);
       $("settingsBtn").addEventListener("click", () => {
@@ -2641,8 +2798,7 @@
         const images = [...getRecordImages(record.id), ...state.proofDraft];
         const bundle = imageBundleFor(record.id, images);
         record.hasImage = bundle.images.length > 0;
-        await saveRecord(record, bundle);
-        setForm(defaultRecord());
+        if (await saveRecord(record, bundle)) setForm(defaultRecord());
       });
       $("resetBtn").addEventListener("click", () => setForm(defaultRecord()));
       $("proofPreview").addEventListener("click", async (event) => {
@@ -2820,6 +2976,7 @@
       bindEvents();
       renderSettingsForm();
       setForm(defaultRecord());
+      if (!await refreshAuthState()) return;
       await loadAll();
       if (syncEnabled()) {
         try {
