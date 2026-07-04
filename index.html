@@ -1319,10 +1319,11 @@
 
     async function saveRecord(record, imageBundle) {
       const isNewRecord = !state.records.some((item) => item.id === record.id);
+      let savedToSupabase = false;
       record.updatedAt = nowIso();
       if (isNewRecord) {
         try {
-          await saveSupabaseNewRecord(record);
+          savedToSupabase = await saveSupabaseNewRecord(record);
         } catch (error) {
           console.error("[Supabase] purchase insert failed", {
             message: error && error.message,
@@ -1343,6 +1344,10 @@
           await tx(STORE_IMAGES, "readwrite", (store) => store.delete(record.id));
           await syncDel(`img/${record.id}`);
         }
+      }
+      if (isNewRecord && !savedToSupabase) {
+        await loadIndexedDbAll();
+        return;
       }
       await loadAll();
     }
