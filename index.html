@@ -619,6 +619,34 @@
       </main>
     </section>
 
+    <section id="passwordResetView" class="hidden" aria-labelledby="passwordResetTitle">
+      <main>
+        <section class="panel">
+          <div class="panel-head">
+            <h2 id="passwordResetTitle">パスワード再設定</h2>
+            <span id="passwordResetStatus" class="status small"></span>
+          </div>
+          <div class="panel-body">
+            <form id="passwordResetForm">
+              <div class="form-grid">
+                <div class="field wide">
+                  <label for="newPassword">新しいパスワード</label>
+                  <input id="newPassword" name="password" type="password" autocomplete="new-password" minlength="8" required>
+                </div>
+                <div class="field wide">
+                  <label for="newPasswordConfirm">新しいパスワード（確認）</label>
+                  <input id="newPasswordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" minlength="8" required>
+                </div>
+              </div>
+              <div class="actions">
+                <button id="passwordResetBtn" class="primary" type="submit">パスワードを更新</button>
+              </div>
+            </form>
+          </div>
+        </section>
+      </main>
+    </section>
+
     <main id="appMain" class="hidden">
       <div class="notice">最終処理は税理士に確認してください。</div>
 
@@ -1031,7 +1059,8 @@
       aiItems: [],
       currentEvidenceId: "",
       currentEvidenceIndex: 0,
-      profile: null
+      profile: null,
+      passwordRecovery: false
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1114,6 +1143,12 @@
       });
     }
 
+    function isPasswordRecoveryRoute() {
+      const search = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      return search.get("type") === "recovery" || hash.get("type") === "recovery";
+    }
+
     function canWritePurchases() {
       return state.profile && ["admin", "staff"].includes(state.profile.role);
     }
@@ -1132,13 +1167,15 @@
     function applyRoleControls() {
       const authenticated = Boolean(state.profile);
       const canWrite = canWritePurchases();
-      $("loginView").classList.toggle("hidden", authenticated);
-      $("appMain").classList.toggle("hidden", !authenticated);
-      ["refreshBtn", "sampleBtn", "clearBtn"].forEach((id) => $(id).classList.toggle("hidden", !authenticated));
-      $("settingsBtn").classList.toggle("hidden", !authenticated || !isAdmin());
-      $("logoutBtn").classList.toggle("hidden", !authenticated);
-      $("userBadge").classList.toggle("hidden", !authenticated);
-      $("userBadge").textContent = authenticated ? `${state.profile.display_name} / ${state.profile.role}` : "";
+      const passwordRecovery = state.passwordRecovery;
+      $("passwordResetView").classList.toggle("hidden", !passwordRecovery);
+      $("loginView").classList.toggle("hidden", passwordRecovery || authenticated);
+      $("appMain").classList.toggle("hidden", passwordRecovery || !authenticated);
+      ["refreshBtn", "sampleBtn", "clearBtn"].forEach((id) => $(id).classList.toggle("hidden", passwordRecovery || !authenticated));
+      $("settingsBtn").classList.toggle("hidden", passwordRecovery || !authenticated || !isAdmin());
+      $("logoutBtn").classList.toggle("hidden", passwordRecovery || !authenticated);
+      $("userBadge").classList.toggle("hidden", passwordRecovery || !authenticated);
+      $("userBadge").textContent = authenticated && !passwordRecovery ? `${state.profile.display_name} / ${state.profile.role}` : "";
       document.querySelector(".left-stack")?.classList.toggle("hidden", authenticated && !canWrite);
       Array.from(form.elements).forEach((element) => {
         if (element.id !== "recordId") element.disabled = !canWrite;
@@ -1151,6 +1188,7 @@
 
     async function refreshAuthState() {
       const service = await waitForAuthService();
+      state.passwordRecovery = isPasswordRecoveryRoute();
       if (!service) {
         state.profile = null;
         applyRoleControls();
@@ -1161,6 +1199,7 @@
         const snapshot = await service.getCurrentAuth();
         state.profile = snapshot.profile && snapshot.profile.is_active ? snapshot.profile : null;
         applyRoleControls();
+        if (state.passwordRecovery) return false;
         if (snapshot.authenticated && !state.profile) {
           $("loginStatus").textContent = "このユーザーは利用できません";
           return false;
@@ -2754,6 +2793,42 @@
           $("loginStatus").textContent = error.message || "ログインに失敗しました";
         } finally {
           $("loginBtn").disabled = false;
+        }
+      });
+      $("passwordResetForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const service = await waitForAuthService();
+        if (!service) {
+          $("passwordResetStatus").textContent = "ログイン機能を読み込めませんでした";
+          return;
+        }
+        const data = new FormData(event.currentTarget);
+        const password = String(data.get("password") || "");
+        const passwordConfirm = String(data.get("passwordConfirm") || "");
+        if (password.length < 8) {
+          $("passwordResetStatus").textContent = "パスワードは8文字以上で入力してください";
+          return;
+        }
+        if (password !== passwordConfirm) {
+          $("passwordResetStatus").textContent = "確認用パスワードが一致しません";
+          return;
+        }
+        $("passwordResetBtn").disabled = true;
+        $("passwordResetStatus").textContent = "更新中...";
+        try {
+          await service.updatePassword(password);
+          await service.signOut();
+          state.profile = null;
+          state.passwordRecovery = false;
+          event.currentTarget.reset();
+          window.history.replaceState(null, "", window.location.pathname);
+          $("loginStatus").textContent = "パスワードを更新しました。新しいパスワードでログインしてください";
+          $("passwordResetStatus").textContent = "";
+          applyRoleControls();
+        } catch (error) {
+          $("passwordResetStatus").textContent = error.message || "パスワード更新に失敗しました";
+        } finally {
+          $("passwordResetBtn").disabled = false;
         }
       });
       $("logoutBtn").addEventListener("click", async () => {

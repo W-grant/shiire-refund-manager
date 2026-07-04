@@ -1,5 +1,5 @@
 import "./lib/supabase-connection-check";
-import { getCurrentAuth, signInWithPassword, signOut } from "./lib/services/authService";
+import { getCurrentAuth, signInWithPassword, signOut, updatePassword } from "./lib/services/authService";
 import { loadSupabasePurchaseState } from "./lib/services/purchaseReadService";
 import { getPurchaseSaveStatus, savePurchase } from "./lib/services/purchaseWriteService";
 
@@ -9,6 +9,7 @@ declare global {
       getCurrentAuth: typeof getCurrentAuth;
       signInWithPassword: typeof signInWithPassword;
       signOut: typeof signOut;
+      updatePassword: typeof updatePassword;
     };
     ShiireSupabaseRead?: {
       loadAll: typeof loadSupabasePurchaseState;
@@ -23,7 +24,8 @@ declare global {
 window.ShiireAuth = {
   getCurrentAuth,
   signInWithPassword,
-  signOut
+  signOut,
+  updatePassword
 };
 window.ShiireSupabaseRead = {
   loadAll: loadSupabasePurchaseState
