@@ -31,6 +31,32 @@ export type PurchaseRow = {
   staff?: { display_name: string } | null;
 };
 
+export type PurchaseInsert = {
+  id: string;
+  purchase_date: string;
+  branch_id: string | null;
+  channel_id: string | null;
+  category_id: string | null;
+  staff_id: string | null;
+  name: string;
+  quantity: number;
+  amount: number;
+  tax_rate: number;
+  kind: "kobutsu" | "jun" | "other";
+  stock: "yes" | "no";
+  qualified: "yes" | "no" | "unknown";
+  transaction_type: "anon" | "named";
+  seller_name: string | null;
+  seller_address: string | null;
+  memo: string | null;
+  deduction_kind: string | null;
+  deduction_ratio: number | null;
+  deduction_tax: number | null;
+  classification_note: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+};
+
 export async function fetchPurchases() {
   const { data, error } = await supabase
     .from("purchases")
@@ -68,4 +94,14 @@ export async function fetchPurchases() {
     .order("purchase_date", { ascending: false });
   if (error) throw error;
   return (data || []) as PurchaseRow[];
+}
+
+export async function insertPurchase(row: PurchaseInsert) {
+  const { data, error } = await supabase
+    .from("purchases")
+    .insert(row)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data;
 }

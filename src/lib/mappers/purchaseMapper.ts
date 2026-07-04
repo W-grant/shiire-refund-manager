@@ -1,6 +1,6 @@
 import type { EvidenceWithUrl } from "../repositories/evidenceRepository";
 import type { MasterRow } from "../repositories/masterRepository";
-import type { PurchaseRow } from "../repositories/purchaseRepository";
+import type { PurchaseInsert, PurchaseRow } from "../repositories/purchaseRepository";
 
 export type LegacyRecord = {
   id: string;
@@ -36,8 +36,67 @@ export type LegacyImageBundle = {
   images: LegacyImage[];
 };
 
+export type LegacyClassification = {
+  kind?: string;
+  ratio?: number;
+  tax?: number;
+  note?: string;
+};
+
+export type MasterLookup = {
+  branches: MasterRow[];
+  channels: MasterRow[];
+  categories: MasterRow[];
+};
+
 export function masterNames(rows: MasterRow[]) {
   return rows.map((row) => row.name);
+}
+
+function byName(rows: MasterRow[], name: string | null | undefined, label: string) {
+  const value = String(name || "").trim();
+  if (!value) return null;
+  const row = rows.find((item) => item.name === value || item.name.trim() === value);
+  if (!row) throw new Error(`${label} not found: ${value}`);
+  return row.id;
+}
+
+function optionalText(value: string | null | undefined) {
+  const text = String(value || "").trim();
+  return text || null;
+}
+
+export function legacyRecordToPurchaseInsert(
+  record: LegacyRecord,
+  classification: LegacyClassification,
+  masters: MasterLookup,
+  userId: string | null
+): PurchaseInsert {
+  return {
+    id: record.id,
+    purchase_date: record.date,
+    branch_id: byName(masters.branches, record.branch, "branch"),
+    channel_id: byName(masters.channels, record.channel, "channel"),
+    category_id: byName(masters.categories, record.category, "category"),
+    staff_id: null,
+    name: record.name,
+    quantity: Number(record.qty || 1),
+    amount: Number(record.amount || 0),
+    tax_rate: Number(record.rate || 10),
+    kind: record.kind,
+    stock: record.stock,
+    qualified: record.qualified,
+    transaction_type: record.anon,
+    seller_name: optionalText(record.seller),
+    seller_address: optionalText(record.address),
+    memo: optionalText(record.memo),
+    deduction_kind: classification.kind || null,
+    deduction_ratio: typeof classification.ratio === "number" ? classification.ratio : null,
+    deduction_tax: typeof classification.tax === "number" ? classification.tax : null,
+    classification_note: classification.note || null,
+    created_by: userId,
+    updated_by: userId
+  };
 }
 
 export function purchasesToLegacyRecords(rows: PurchaseRow[], evidenceRows: EvidenceWithUrl[]) {

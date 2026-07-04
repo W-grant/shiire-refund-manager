@@ -1083,6 +1083,25 @@
       });
     }
 
+    function waitForSupabaseWriteService() {
+      if (window.ShiireSupabaseWrite) return Promise.resolve(window.ShiireSupabaseWrite);
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve(null), 1500);
+        window.addEventListener("shiire:supabase-write-ready", () => {
+          clearTimeout(timer);
+          resolve(window.ShiireSupabaseWrite || null);
+        }, { once: true });
+      });
+    }
+
+    async function saveSupabaseNewRecord(record) {
+      const service = await waitForSupabaseWriteService();
+      if (!service) return false;
+      await service.insertPurchase(record, classified(record));
+      $("ioStatus").textContent = "Supabase insert succeeded";
+      return true;
+    }
+
     async function loadSupabaseAll() {
       const service = await waitForSupabaseReadService();
       if (!service) return false;
@@ -1288,7 +1307,20 @@
     }
 
     async function saveRecord(record, imageBundle) {
+      const isNewRecord = !state.records.some((item) => item.id === record.id);
       record.updatedAt = nowIso();
+      if (isNewRecord) {
+        try {
+          await saveSupabaseNewRecord(record);
+        } catch (error) {
+          console.error("[Supabase] purchase insert failed", {
+            message: error && error.message,
+            status: error && error.status,
+            details: error && error.details
+          });
+          $("ioStatus").textContent = `Supabase insert failed: ${error && error.message ? error.message : "unknown error"}`;
+        }
+      }
       await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
       await syncSet(`rec/${record.id}`, record);
       if (imageBundle) {
