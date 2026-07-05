@@ -2258,7 +2258,10 @@
           <td>${selectHtml(index, "qualified", qualifiedOptions, record.qualified)}</td>
           <td>${selectHtml(index, "anon", anonOptions, record.anon)}</td>
           <td><select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select></td>
-          <td><button class="danger" type="button" data-review-delete="${index}">×</button></td>
+          <td>
+            <button type="button" data-review-apply="${index}">フォーム</button>
+            <button class="danger" type="button" data-review-delete="${index}">×</button>
+          </td>
         </tr>
       `).join("");
     }
@@ -2297,6 +2300,19 @@
       const count = state.aiItems.length;
       clearExtract();
       $("extractStatus").textContent = `${count}件を追加しました`;
+    }
+
+    function applyExtractedToForm(index) {
+      const sourceRecord = state.aiItems[index];
+      if (!sourceRecord) return;
+      const { imageIndex, ...record } = sourceRecord;
+      const selectedImages = imageIndex === "all" ? state.aiImages : [state.aiImages[Number(imageIndex)]].filter(Boolean);
+      setForm({ ...record, id: "", hasImage: selectedImages.length > 0 });
+      state.proofDraft = selectedImages.map((image) => ({ ...image }));
+      renderProofPreview([]);
+      updateLiveClassify();
+      $("extractStatus").textContent = "フォームへ反映しました。内容を確認して保存してください";
+      $("formTitle").scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function exportRows(records, type) {
@@ -3162,6 +3178,11 @@
         state.aiItems[index][field] = ["amount", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
       });
       $("reviewRows").addEventListener("click", (event) => {
+        const applyButton = event.target.closest("[data-review-apply]");
+        if (applyButton) {
+          applyExtractedToForm(Number(applyButton.dataset.reviewApply));
+          return;
+        }
         const button = event.target.closest("[data-review-delete]");
         if (!button) return;
         state.aiItems.splice(Number(button.dataset.reviewDelete), 1);
