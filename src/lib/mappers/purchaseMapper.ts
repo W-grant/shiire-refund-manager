@@ -29,6 +29,9 @@ export type LegacyImage = {
   thumb: string;
   fileName: string;
   label?: string;
+  evidenceId?: string;
+  storageBucket?: string;
+  storagePath?: string;
 };
 
 export type LegacyImageBundle = {
@@ -154,7 +157,10 @@ export function evidenceToLegacyImageBundles(rows: EvidenceWithUrl[]) {
       full: row.url,
       thumb: row.url,
       fileName: row.file_name,
-      label: row.label || undefined
+      label: row.label || undefined,
+      evidenceId: row.id,
+      storageBucket: row.storage_bucket,
+      storagePath: row.storage_path
     });
     bundles.set(row.purchase_id, bundle);
   });

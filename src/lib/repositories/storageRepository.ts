@@ -78,7 +78,8 @@ function errorPayload(error: unknown, fileName: string): EvidenceUploadFailure {
 export async function uploadEvidenceImages(
   record: LegacyRecord,
   images: LegacyImage[],
-  uploadedBy: string | null
+  uploadedBy: string | null,
+  startIndex = 0
 ): Promise<EvidenceUploadResult> {
   const successes: EvidenceUploadSuccess[] = [];
   const failures: EvidenceUploadFailure[] = [];
@@ -92,7 +93,8 @@ export async function uploadEvidenceImages(
       console.log("[Storage] Upload start", { id: record.id, fileName });
       const blob = await dataUrlToBlob(source);
       const mimeType = blob.type || "image/jpeg";
-      const storagePath = evidenceStoragePath(record, image, index, mimeType);
+      const sortOrder = startIndex + index;
+      const storagePath = evidenceStoragePath(record, image, sortOrder, mimeType);
       const { error } = await supabase.storage
         .from(EVIDENCE_BUCKET)
         .upload(storagePath, blob, { contentType: mimeType, upsert: false });
@@ -105,7 +107,7 @@ export async function uploadEvidenceImages(
         label: image.label || null,
         mimeType,
         fileSize: blob.size,
-        sortOrder: index
+        sortOrder
       });
     } catch (error) {
       const failure = errorPayload(error, fileName);

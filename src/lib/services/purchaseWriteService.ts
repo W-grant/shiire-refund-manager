@@ -1,4 +1,5 @@
 import { legacyRecordToPurchaseInsert, legacyRecordToPurchaseUpdate, type LegacyClassification, type LegacyImage, type LegacyRecord } from "../mappers/purchaseMapper";
+import { deletePurchaseEvidenceByIds, fetchPurchaseEvidenceByPurchaseId } from "../repositories/evidenceRepository";
 import { fetchBranches, fetchCategories, fetchChannels } from "../repositories/masterRepository";
 import { insertPurchase, markPurchaseDeleted, updatePurchase as updatePurchaseRow } from "../repositories/purchaseRepository";
 import { uploadEvidenceImages, type EvidenceUploadResult } from "../repositories/storageRepository";
@@ -20,6 +21,12 @@ export type PurchaseSaveStatus = {
 export type PurchaseSaveResult = {
   purchase: { id: string };
   evidence: EvidenceUploadResult;
+};
+
+export type PurchaseUpdateResult = {
+  purchase: { id: string };
+  evidence: EvidenceUploadResult;
+  removedEvidenceCount: number;
 };
 
 function logInsertFailure(error: SupabaseWriteError) {
@@ -99,8 +106,9 @@ export const insertSupabasePurchase = savePurchase;
 
 export async function updatePurchase(
   record: LegacyRecord,
-  classification: LegacyClassification
-) {
+  classification: LegacyClassification,
+  images: LegacyImage[] = []
+): Promise<PurchaseUpdateResult> {
   console.log("[Save] Update start", { id: record.id });
   try {
     const [branches, channels, categories, sessionResult] = await Promise.all([
@@ -120,7 +128,41 @@ export async function updatePurchase(
     console.log("[Save] Before update", { id: record.id });
     const purchase = await updatePurchaseRow(record.id, row);
     console.log("[Save] Update success", purchase);
-    return purchase;
+    const existingEvidence = await fetchPurchaseEvidenceByPurchaseId(record.id);
+    const retainedImages = images.filter((image) => !String(image.full || "").startsWith("data:"));
+    const newImages = images.filter((image) => String(image.full || "").startsWith("data:"));
+    const retainedIds = new Set(retainedImages.map((image) => image.evidenceId).filter(Boolean));
+    const retainedPaths = new Set(retainedImages.map((image) => image.storagePath).filter(Boolean));
+    const canDiffSavedEvidence = retainedImages.every((image) => image.evidenceId || image.storagePath);
+    let removedEvidenceCount = 0;
+
+    if (canDiffSavedEvidence) {
+      const removedEvidenceIds = existingEvidence
+        .filter((row) => !retainedIds.has(row.id) && !retainedPaths.has(row.storage_path))
+        .map((row) => row.id);
+      if (removedEvidenceIds.length) {
+        const removedRows = await deletePurchaseEvidenceByIds(removedEvidenceIds);
+        removedEvidenceCount = removedRows.length;
+        console.log("[Storage] Evidence metadata delete success", { id: record.id, count: removedEvidenceCount });
+      }
+    }
+
+    const evidence = newImages.length
+      ? await uploadEvidenceImages(
+          record,
+          newImages,
+          sessionResult.data.session?.user.id || null,
+          retainedImages.length
+        )
+      : { successes: [], failures: [] };
+    if (evidence.failures.length) {
+      console.warn("[Storage] Evidence update completed with warnings", {
+        id: record.id,
+        successCount: evidence.successes.length,
+        failureCount: evidence.failures.length
+      });
+    }
+    return { purchase, evidence, removedEvidenceCount };
   } catch (error) {
     console.error("[Save] Update failed", {
       message: (error as SupabaseWriteError).message,

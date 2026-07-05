@@ -1278,12 +1278,17 @@
       return true;
     }
 
-    async function updateSupabaseRecord(record) {
+    async function updateSupabaseRecord(record, imageBundle) {
       const service = await waitForSupabaseWriteService();
       if (!service) return false;
-      const result = await service.updatePurchase(record, classified(record));
+      const bundle = normalizeImageBundle(imageBundle);
+      const result = await service.updatePurchase(record, classified(record), bundle ? bundle.images : []);
+      if (result.evidence && result.evidence.failures.length) {
+        $("ioStatus").textContent = `Supabase update succeeded, evidence warning: ${result.evidence.failures.length}`;
+        return false;
+      }
       $("ioStatus").textContent = "Supabase update succeeded";
-      return Boolean(result && result.id);
+      return Boolean(result && result.purchase && result.purchase.id);
     }
 
     async function deleteSupabaseRecord(id) {
@@ -1520,7 +1525,7 @@
         }
       } else {
         try {
-          savedToSupabase = await updateSupabaseRecord(record);
+          savedToSupabase = await updateSupabaseRecord(record, imageBundle);
         } catch (error) {
           console.error("[Supabase] purchase update failed", {
             message: error && error.message,
@@ -1973,6 +1978,11 @@
         state.proofDraft.splice(index, 1);
         $("proof").value = "";
       } else if (source === "saved" && id) {
+        if (!isAdmin()) {
+          console.warn("[Storage] Evidence metadata delete blocked: admin role required");
+          $("ioStatus").textContent = "Evidence delete blocked: admin role required";
+          return;
+        }
         const images = getRecordImages(id);
         images.splice(index, 1);
         const record = state.records.find((item) => item.id === id);

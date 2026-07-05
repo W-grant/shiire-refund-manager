@@ -38,11 +38,32 @@ export async function fetchPurchaseEvidence() {
   return (data || []) as EvidenceRow[];
 }
 
+export async function fetchPurchaseEvidenceByPurchaseId(purchaseId: string) {
+  const { data, error } = await supabase
+    .from("purchase_evidence")
+    .select("id,purchase_id,storage_bucket,storage_path,file_name,label,mime_type,file_size,sort_order,created_at")
+    .eq("purchase_id", purchaseId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data || []) as EvidenceRow[];
+}
+
 export async function insertPurchaseEvidence(rows: PurchaseEvidenceInsert[]) {
   if (!rows.length) return [];
   const { data, error } = await supabase
     .from("purchase_evidence")
     .insert(rows)
+    .select("id,purchase_id,storage_bucket,storage_path,file_name,label,mime_type,file_size,sort_order,created_at");
+  if (error) throw error;
+  return (data || []) as EvidenceRow[];
+}
+
+export async function deletePurchaseEvidenceByIds(ids: string[]) {
+  if (!ids.length) return [];
+  const { data, error } = await supabase
+    .from("purchase_evidence")
+    .delete()
+    .in("id", ids)
     .select("id,purchase_id,storage_bucket,storage_path,file_name,label,mime_type,file_size,sort_order,created_at");
   if (error) throw error;
   return (data || []) as EvidenceRow[];
