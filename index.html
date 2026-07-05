@@ -949,7 +949,7 @@
           </div>
           <div class="field wide">
             <label for="proxyUrl">中継URL</label>
-            <input id="proxyUrl" name="proxyUrl" type="url" placeholder="/.netlify/functions/extract">
+            <input id="proxyUrl" name="proxyUrl" type="url" placeholder="/extract">
           </div>
           <div class="field">
             <label for="syncMode">同期</label>
@@ -1040,7 +1040,7 @@
     const STORE_SETTINGS = "settings";
     const STORE_META = "meta";
 
-    const BUILTIN = { proxyUrl: "", syncUrl: "", secret: "", model: "claude-haiku-4-5-20251001" };
+    const BUILTIN = { proxyUrl: "/extract", syncUrl: "", secret: "", model: "claude-haiku-4-5-20251001" };
 
     const META = {
       branches: ["札幌", "千葉", "東京", "福岡"],
@@ -1467,6 +1467,10 @@
       const saved = await tx(STORE_SETTINGS, "readonly", (store) => requestToPromise(store.get("settings")));
       state.settings = { ...defaultSettings(), ...(saved || {}) };
       if (state.settings.aiMode === "key") state.settings.aiMode = state.settings.proxyUrl ? "proxy" : "none";
+      if (!state.settings.proxyUrl || state.settings.proxyUrl.includes("/.netlify/functions/extract")) {
+        state.settings.proxyUrl = "/extract";
+        state.settings.aiMode = "proxy";
+      }
       delete state.settings.apiKey;
       await saveSettings();
       return state.settings;

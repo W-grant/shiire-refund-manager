@@ -1,179 +1,171 @@
 # 仕入れ還付管理
 
-中古品リユース事業者向けの仕入管理・控除見える化アプリです。仕入明細、証憑画像、控除区分、控除対象仕入税額をブラウザ上で管理し、CSV / Excel / PDF 印刷向けに出力できます。
+中古品リユース事業者向けの仕入管理・控除見える化アプリです。仕入登録、証憑画像管理、古物商特例判定、CSV / Excel / PDF 出力、月次税理士提出ZIP、Supabase保存に対応します。
 
-> 最終的な税務判断・申告処理は税理士に確認してください。
+> 税務判断・申告処理は、必ず税理士へ確認してください。
 
-## 説明書
+## 現在の構成
 
-利用者向けの操作手順は [USER_GUIDE.md](USER_GUIDE.md) を確認してください。
+- Frontend: Vite + single page app
+- Hosting: Cloudflare Pages
+- Functions: Cloudflare Pages Functions
+- Database: Supabase Database
+- Storage: Supabase Storage
+- Auth: Supabase Auth
+- AI extraction: Claude API via Cloudflare Pages Function `/extract`
 
-### 税理士提出パッケージ
+## 主な機能
 
-`CSV入出力` の `税理士提出` から対象月を選び、`提出ZIP` を押すと、月次提出用ファイルを1つのZIPで保存できます。
+- Supabase Authによるログイン必須化
+- `admin` / `staff` / `tax_accountant` の権限制御
+- 仕入登録、一覧、編集、論理削除
+- 複数証憑画像の添付、代表サムネイル表示、詳細表示
+- Supabase Storage `evidence` への証憑画像保存
+- IndexedDBローカルデータのSupabase移行
+- 古物商特例、準古物、インボイス、経過措置の判定
+- 仕入一覧CSV、古物商特例帳簿CSV、電帳法索引簿CSV
+- Excel出力、PDF出力
+- 月次税理士提出ZIP作成
+- 月次税理士提出ZIPのStorage保存と履歴再ダウンロード
+- Claude APIによるAI抽出レビュー
 
-ZIP内の構成:
+## 権限
+
+| 権限 | できること |
+| --- | --- |
+| `admin` | 登録、編集、削除、証憑削除、設定、提出ZIP作成 |
+| `staff` | 登録、編集、証憑追加、提出ZIP作成 |
+| `tax_accountant` | 閲覧、CSV/Excel/PDF出力、保存済み提出ZIPの再ダウンロード |
+
+詳細は [docs/role-permission-checklist.md](docs/role-permission-checklist.md) を参照してください。
+
+## Cloudflare Pages設定
+
+Cloudflare Pagesの設定は以下です。
+
+- Build command: `pnpm run build`
+- Output directory: `dist`
+- Production URL: `https://shiire-refund-manager.pages.dev/`
+
+### 環境変数
+
+Cloudflare PagesのProduction環境に設定します。
+
+| 変数名 | 用途 |
+| --- | --- |
+| `VITE_SUPABASE_URL` | Supabase Project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase Publishable Key |
+| `ANTHROPIC_API_KEY` | AI抽出用Claude APIキー |
+| `SHARED_SECRET` | 任意。AI抽出Functionの共有シークレット |
+| `ALLOWED_ORIGIN` | 任意。CORS許可Origin |
+
+`ANTHROPIC_API_KEY` と `SHARED_SECRET` は `VITE_` を付けないでください。ブラウザに公開しないサーバー側変数です。
+
+## Cloudflare Pages Functions
+
+### `/extract`
+
+`functions/extract.js` がClaude APIへの中継を行います。
+
+- ブラウザにAnthropic APIキーを持たせません
+- `ANTHROPIC_API_KEY` をCloudflare側で参照します
+- `SHARED_SECRET` または `SYNC_SECRET` が設定されている場合、`X-App-Secret` ヘッダーで認証します
+
+アプリのAI中継URLの既定値は `/extract` です。
+
+## Supabase
+
+初期SQLは [supabase/schema.sql](supabase/schema.sql) です。
+
+主なテーブル:
+
+- `profiles`
+- `branches`
+- `channels`
+- `categories`
+- `purchases`
+- `purchase_evidence`
+- `monthly_packages`
+- `audit_logs`
+
+Storage buckets:
+
+- `evidence`
+- `tax-packages`
+- `imports`
+
+セットアップ手順は [docs/supabase-setup.md](docs/supabase-setup.md) を参照してください。
+
+## 月次税理士提出ZIP
+
+対象月を選び、`提出ZIP` を押すと以下を1つのZIPにまとめます。
 
 - `01_仕入一覧.csv`
 - `02_古物商特例帳簿.csv`
 - `03_電帳法索引簿.csv`
 - `04_月次サマリー.xlsx`
 - `05_月次レポート.pdf`
-- `証憑/`: 対象月の全証憑画像
+- `証憑/` 配下の全証憑画像
 
-1取引に複数の証憑画像がある場合も、すべて `証憑/` に出力されます。
+作成したZIPはダウンロードされ、同時にSupabase Storage `tax-packages` へ保存されます。保存履歴から再ダウンロードできます。
 
-## 現在の実装状況
+## 開発
 
-### 完了済み機能
-
-- 仕入登録・編集・削除
-- IndexedDB によるブラウザ内保存
-- 複数証憑画像の保存、代表サムネイル表示、切替表示、ダウンロード
-- 古物商特例、準古物、インボイス、経過措置の控除区分判定
-- 控除対象仕入税額の自動計算
-- 月別タブ、担当・チャネル・支店・控除区分・キーワードでの絞り込み
-- 日付、金額、控除税額での一覧ソート
-- 件数、仕入総額、控除対象税額、古物商特例分の集計
-- 仕入一覧 CSV、古物商特例帳簿 CSV、電帳法索引簿 CSV の出力
-- Excel 出力
-- PDF 印刷用レポート出力
-- 証憑画像の ZIP 一括保存
-- 月次の税理士提出パッケージZIP出力
-- CSV テンプレート出力、CSV インポート
-- CSV インポート時の証憑画像紐づけ
-- JSON バックアップ出力・復元
-- AI 抽出レビュー画面
-- 支店・担当・チャネル・品目のマスタ編集
-- Netlify Functions 経由の Anthropic API 中継
-- Netlify Blobs を使ったクラウド同期 API
-- 更新日時と削除マーカーを使った基本的な同期整合性管理
-- 保存前の入力チェックと注意表示
-- 分類ロジック、CSV 処理、Netlify Functions の自動テスト
-
-### 未実装機能
-
-- 複数端末で同じ明細を同時編集した場合の詳細な競合解決 UI
-- E2E テストまたはブラウザ操作テスト
-- Excel 出力ライブラリのローカル同梱化
-- PDF 帳票レイアウトの固定化
-
-### バグ・改善点
-
-- 同期は基本的な更新日時・削除マーカーに対応したが、同時編集時の差分表示や手動選択は未実装
-- 証憑 ZIP は無圧縮形式のため、画像点数が多い場合はファイルサイズが大きくなる
-- 外部 CDN の Excel ライブラリが読み込めない環境では Excel 出力が使えない
-- PDF はブラウザ印刷に依存しており、帳票レイアウトの固定度は高くない
-- Netlify Functions の秘密キー未設定時は認証なしで動くため、本番運用では環境変数設定が必須
-
-## 次に実装すべき内容
-
-1. 同時編集時の競合解決 UI を追加する
-2. Excel 出力ライブラリをローカル同梱化する
-3. PDF 帳票レイアウトを固定化する
-4. ブラウザでの主要操作テストを追加する
-
-## セットアップ
-
-Node.js が必要です。
+依存関係をインストールします。
 
 ```bash
-npm install
+pnpm install
 ```
 
-## 開発用チェック
+ローカル開発サーバー:
 
 ```bash
-npm run check
-npm test
+pnpm run dev
 ```
 
-## ローカルで開く
+構文チェック:
 
-静的ファイルとして `index.html` をブラウザで開くと、基本機能を確認できます。
+```bash
+pnpm run check
+```
 
-AI 抽出やクラウド同期も確認する場合は、Netlify Functions が動く環境で開いてください。
+テスト:
 
-## Netlify デプロイ
+```bash
+pnpm run test
+```
 
-このリポジトリは Netlify にそのままデプロイできます。Vite で `dist` を生成して公開し、AI 抽出とクラウド同期は Netlify Functions で動かします。
+本番ビルド:
 
-### デプロイ構成
+```bash
+pnpm run build
+```
 
-- 公開ディレクトリ: `dist`
-- ビルドコマンド: `pnpm run build`
-- Functions ディレクトリ: `netlify/functions`
-- Node.js: `22`
-- Functions bundler: `esbuild`
-- Blobs ストア名: `shiire`
+## デプロイ確認
 
-`pnpm run build` は構文チェック、テスト、Vite ビルドを実行します。失敗した場合は Netlify のデプロイも止まります。
+作業完了時は以下を確認します。
 
-### Functions
+- Build成功
+- Test成功
+- GitHub Push成功
+- Cloudflare Productionが最新commitになったこと
+- Production URLで最新コードが配信されていること
 
-- `/.netlify/functions/extract`
-  - Anthropic API への中継 Function です。
-  - ブラウザに API キーを持たせず、サーバー側の `ANTHROPIC_API_KEY` を使います。
-  - `SHARED_SECRET` または `SYNC_SECRET` が設定されている場合、`X-App-Secret` ヘッダーで認証します。
-- `/.netlify/functions/sync`
-  - Netlify Blobs を使った同期 Function です。
-  - `list` / `get` / `set` / `del` 操作に対応しています。
-  - `SYNC_SECRET` または `SHARED_SECRET` が設定されている場合、`X-App-Secret` ヘッダーで認証します。
+## 主要ファイル
 
-### Blobs
+- `index.html`: 画面、仕入管理、出力、AI抽出UI
+- `src/lib/supabase.ts`: Supabase client
+- `src/lib/repositories/`: Supabase Database / Storage access
+- `src/lib/services/`: Auth、仕入保存、月次ZIP保存
+- `functions/extract.js`: Cloudflare Pages Function Claude API中継
+- `netlify/functions/`: 旧Netlify用Function。移管前互換として残置
+- `supabase/schema.sql`: Supabase初期SQL
+- `docs/`: 設計書、検証手順、権限チェックリスト
 
-同期データは Netlify Blobs の `shiire` ストアに保存されます。
+## 残タスク
 
-保存キーの種類:
-
-- `rec/{id}`: 仕入明細
-- `img/{id}`: 証憑画像データ
-- `del/{id}`: 削除マーカー
-- `meta`: 支店・担当・チャネル・品目マスタ
-
-追加のデータベース作成は不要です。Netlify 上で Function が動くと、`@netlify/blobs` 経由でストアを利用します。
-
-### 環境変数
-
-Netlify の Site configuration から、必要に応じて次を設定してください。
-
-- `ANTHROPIC_API_KEY`: AI 抽出で使う Anthropic API キー
-- `SHARED_SECRET`: AI 抽出と同期で共通利用できる共有シークレット
-- `SYNC_SECRET`: 同期専用の共有シークレット。未設定なら `SHARED_SECRET` を使います
-- `ALLOWED_ORIGIN`: 許可する画面の Origin。例: `https://your-site-name.netlify.app`
-
-本番運用では `SHARED_SECRET` または `SYNC_SECRET` を必ず設定してください。未設定の場合、Functions は認証なしで呼び出せます。
-
-### デプロイ手順
-
-1. GitHub にこのリポジトリを push します。
-2. Netlify で `Add new site` → `Import an existing project` を選びます。
-3. GitHub リポジトリ `W-grant/shiire-refund-manager` を選びます。
-4. Build settings は `netlify.toml` の内容を使います。
-5. Environment variables に必要な値を設定します。
-6. Deploy を実行します。
-7. デプロイ完了後、発行された URL を開いて画面が表示されることを確認します。
-8. アプリの設定画面で AI 中継 URL、同期 URL、合言葉を設定します。
-
-アプリ側の設定画面では、必要に応じて次を設定します。
-
-- AI 中継 URL: `/.netlify/functions/extract`
-- 同期 URL: `/.netlify/functions/sync`
-- 合言葉: Netlify 側の `SHARED_SECRET` または `SYNC_SECRET` と同じ値
-
-### デプロイ後の確認
-
-- 仕入明細を1件保存できること
-- 証憑画像を添付して保存できること
-- 同期を使う場合、設定画面で同期を `クラウド` にして更新ボタンを押し、エラーが出ないこと
-- AI 抽出を使う場合、AI 接続を `中継` にして画像またはテキストを読み取れること
-- Netlify の Function logs に `missing_anthropic_api_key` や `unauthorized` が出る場合は環境変数と合言葉を見直すこと
-
-## 主なファイル
-
-- `index.html`: 画面、IndexedDB 保存、集計、入出力、AI 抽出 UI
-- `src/classify.js`: 控除区分と控除税額の判定ロジック
-- `src/csv.js`: CSV の読み書き
-- `netlify/functions/extract.js`: Anthropic API 中継
-- `netlify/functions/sync.js`: Netlify Blobs 同期 API
-- `test/*.test.js`: 自動テスト
+- Cloudflare本番でのAI抽出実データ確認
+- staff / tax_accountant の実アカウントで権限別テスト
+- 社内3〜5人での運用テスト
+- 文字化けが残る画面文言の整理
+- E2Eテストの追加
