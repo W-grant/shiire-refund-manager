@@ -57,6 +57,8 @@ export type PurchaseInsert = {
   updated_by?: string | null;
 };
 
+export type PurchaseUpdate = Omit<PurchaseInsert, "id" | "created_by">;
+
 export async function fetchPurchases() {
   const { data, error } = await supabase
     .from("purchases")
@@ -100,6 +102,17 @@ export async function insertPurchase(row: PurchaseInsert) {
   const { data, error } = await supabase
     .from("purchases")
     .insert(row)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePurchase(id: string, row: PurchaseUpdate) {
+  const { data, error } = await supabase
+    .from("purchases")
+    .update(row)
+    .eq("id", id)
     .select("id")
     .single();
   if (error) throw error;

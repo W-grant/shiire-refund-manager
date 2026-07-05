@@ -1,6 +1,6 @@
 import type { EvidenceWithUrl } from "../repositories/evidenceRepository";
 import type { MasterRow } from "../repositories/masterRepository";
-import type { PurchaseInsert, PurchaseRow } from "../repositories/purchaseRepository";
+import type { PurchaseInsert, PurchaseRow, PurchaseUpdate } from "../repositories/purchaseRepository";
 
 export type LegacyRecord = {
   id: string;
@@ -97,6 +97,18 @@ export function legacyRecordToPurchaseInsert(
     created_by: userId,
     updated_by: userId
   };
+}
+
+export function legacyRecordToPurchaseUpdate(
+  record: LegacyRecord,
+  classification: LegacyClassification,
+  masters: MasterLookup,
+  userId: string | null
+): PurchaseUpdate {
+  const { id, created_by, ...row } = legacyRecordToPurchaseInsert(record, classification, masters, userId);
+  void id;
+  void created_by;
+  return row;
 }
 
 export function purchasesToLegacyRecords(rows: PurchaseRow[], evidenceRows: EvidenceWithUrl[]) {

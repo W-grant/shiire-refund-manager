@@ -1,6 +1,6 @@
-import { legacyRecordToPurchaseInsert, type LegacyClassification, type LegacyImage, type LegacyRecord } from "../mappers/purchaseMapper";
+import { legacyRecordToPurchaseInsert, legacyRecordToPurchaseUpdate, type LegacyClassification, type LegacyImage, type LegacyRecord } from "../mappers/purchaseMapper";
 import { fetchBranches, fetchCategories, fetchChannels } from "../repositories/masterRepository";
-import { insertPurchase } from "../repositories/purchaseRepository";
+import { insertPurchase, updatePurchase as updatePurchaseRow } from "../repositories/purchaseRepository";
 import { uploadEvidenceImages, type EvidenceUploadResult } from "../repositories/storageRepository";
 import { supabase } from "../supabase";
 
@@ -96,3 +96,38 @@ export async function savePurchase(
 }
 
 export const insertSupabasePurchase = savePurchase;
+
+export async function updatePurchase(
+  record: LegacyRecord,
+  classification: LegacyClassification
+) {
+  console.log("[Save] Update start", { id: record.id });
+  try {
+    const [branches, channels, categories, sessionResult] = await Promise.all([
+      fetchBranches(),
+      fetchChannels(),
+      fetchCategories(),
+      supabase.auth.getSession()
+    ]);
+    if (sessionResult.error) throw sessionResult.error;
+
+    const row = legacyRecordToPurchaseUpdate(
+      record,
+      classification,
+      { branches, channels, categories },
+      sessionResult.data.session?.user.id || null
+    );
+    console.log("[Save] Before update", { id: record.id });
+    const purchase = await updatePurchaseRow(record.id, row);
+    console.log("[Save] Update success", purchase);
+    return purchase;
+  } catch (error) {
+    console.error("[Save] Update failed", {
+      message: (error as SupabaseWriteError).message,
+      code: (error as SupabaseWriteError).code,
+      details: (error as SupabaseWriteError).details,
+      hint: (error as SupabaseWriteError).hint
+    });
+    throw error;
+  }
+}

@@ -1278,6 +1278,14 @@
       return true;
     }
 
+    async function updateSupabaseRecord(record) {
+      const service = await waitForSupabaseWriteService();
+      if (!service) return false;
+      const result = await service.updatePurchase(record, classified(record));
+      $("ioStatus").textContent = "Supabase update succeeded";
+      return Boolean(result && result.id);
+    }
+
     async function loadSupabaseAll() {
       const service = await waitForSupabaseReadService();
       if (!service) return false;
@@ -1501,6 +1509,17 @@
             details: error && error.details
           });
           $("ioStatus").textContent = `Supabase insert failed: ${error && error.message ? error.message : "unknown error"}`;
+        }
+      } else {
+        try {
+          savedToSupabase = await updateSupabaseRecord(record);
+        } catch (error) {
+          console.error("[Supabase] purchase update failed", {
+            message: error && error.message,
+            status: error && error.status,
+            details: error && error.details
+          });
+          $("ioStatus").textContent = `Supabase update failed: ${error && error.message ? error.message : "unknown error"}`;
         }
       }
       await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
