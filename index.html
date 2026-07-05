@@ -1190,7 +1190,7 @@
       Array.from(form.elements).forEach((element) => {
         if (element.id !== "recordId") element.disabled = !canWrite;
       });
-      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn"], !canWrite);
+      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn", "taxPackageBtn"], !canWrite);
       $("sampleBtn").disabled = !canWrite;
       $("clearBtn").disabled = !isAdmin();
       render();
@@ -2844,6 +2844,10 @@
     }
 
     async function downloadTaxPackage() {
+      if (!canWritePurchases()) {
+        $("ioStatus").textContent = "Tax package creation blocked: admin or staff role required";
+        return;
+      }
       const month = $("taxPackageMonth").value;
       if (!month) {
         $("ioStatus").textContent = "対象月を選択してください";
