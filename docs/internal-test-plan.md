@@ -80,9 +80,10 @@ set
 1. Cloudflare Pagesの環境変数に `ANTHROPIC_API_KEY` を設定する
 2. 必要なら `SHARED_SECRET` を設定し、アプリ設定の合言葉と合わせる
 3. AI接続URLが `/extract` になっていることを確認する
-4. 証憑画像または明細テキストを読み取る
-5. 抽出候補を確認し、登録する
-6. 金額、日付、商品名、税率の読み取り結果を目視確認する
+4. `https://shiire-refund-manager.pages.dev/extract` を開き、`anthropicConfigured: true` になることを確認する
+5. 証憑画像または明細テキストを読み取る
+6. 抽出候補を確認し、登録する
+7. 金額、日付、商品名、税率の読み取り結果を目視確認する
 
 ## Supabase確認SQL
 

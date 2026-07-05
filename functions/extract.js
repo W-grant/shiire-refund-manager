@@ -8,7 +8,7 @@ function corsHeaders(request, env) {
   const origin = env.ALLOWED_ORIGIN || requestOrigin || "*";
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, X-App-Secret",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin"
@@ -37,6 +37,14 @@ export async function onRequest(context) {
 
   if (request.method === "OPTIONS") {
     return new Response("", { status: 204, headers: cors });
+  }
+
+  if (request.method === "GET") {
+    return json({
+      ok: true,
+      anthropicConfigured: Boolean(env.ANTHROPIC_API_KEY),
+      authRequired: Boolean(env.SHARED_SECRET || env.SYNC_SECRET)
+    }, 200, cors);
   }
 
   if (request.method !== "POST") {
