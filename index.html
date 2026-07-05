@@ -1332,6 +1332,22 @@
       return result.failed === 0;
     }
 
+    async function saveTaxPackageToSupabase(month, fileName, blob, records) {
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.saveMonthlyPackage) return false;
+      const totalAmount = records.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+      const totalDeductionTax = records.reduce((sum, record) => sum + classified(record).tax, 0);
+      const result = await service.saveMonthlyPackage({
+        month,
+        fileName,
+        blob,
+        purchaseCount: records.length,
+        totalAmount,
+        totalDeductionTax
+      });
+      return Boolean(result && result.id);
+    }
+
     async function loadSupabaseAll() {
       const service = await waitForSupabaseReadService();
       if (!service) return false;
@@ -2350,6 +2366,13 @@
       return bytes;
     }
 
+    async function imageSourceBytes(source) {
+      if (String(source || "").startsWith("data:")) return dataUrlBytes(source);
+      const response = await fetch(source);
+      if (!response.ok) throw new Error("証憑画像を取得できませんでした");
+      return new Uint8Array(await response.arrayBuffer());
+    }
+
     function uniqueZipName(name, used) {
       const safe = String(name || "evidence.jpg").replace(/[\\/:*?"<>|]/g, "_");
       if (!used.has(safe)) {
@@ -2790,21 +2813,34 @@
         addPackageFile(files, root, "05_月次レポート.pdf", createMonthlyPdfBytes(records, month));
 
         const used = new Set(files.map((file) => file.name));
-        records.forEach((record, recordIndex) => {
-          getRecordImages(record.id).forEach((image, imageIndex) => {
+        for (const [recordIndex, record] of records.entries()) {
+          for (const [imageIndex, image] of getRecordImages(record.id).entries()) {
             const name = uniqueZipPath(`${root}/証憑/${taxPackageEvidenceName(record, image, recordIndex, imageIndex)}`, used);
-            files.push({ name, bytes: dataUrlBytes(image.full) });
-          });
-        });
+            files.push({ name, bytes: await imageSourceBytes(image.full) });
+          }
+        }
 
         const blob = createZip(files);
+        const fileName = `${root}.zip`;
+        let savedToSupabase = false;
+        try {
+          savedToSupabase = await saveTaxPackageToSupabase(month, fileName, blob, records);
+        } catch (error) {
+          console.error("[TaxPackage] Supabase save failed", {
+            message: error && error.message,
+            status: error && error.status,
+            details: error && error.details
+          });
+        }
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${root}.zip`;
+        a.download = fileName;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        $("ioStatus").textContent = `${month} の税理士提出ZIPを保存しました`;
+        $("ioStatus").textContent = savedToSupabase
+          ? `Tax package ${month} saved to Supabase Storage`
+          : `Tax package ${month} downloaded; Supabase Storage save was skipped or failed`;
       } catch (error) {
         $("ioStatus").textContent = error.message;
       }
