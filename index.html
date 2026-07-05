@@ -1286,6 +1286,14 @@
       return Boolean(result && result.id);
     }
 
+    async function deleteSupabaseRecord(id) {
+      const service = await waitForSupabaseWriteService();
+      if (!service) return false;
+      const result = await service.deletePurchase(id);
+      $("ioStatus").textContent = "Supabase delete succeeded";
+      return Boolean(result && result.id);
+    }
+
     async function loadSupabaseAll() {
       const service = await waitForSupabaseReadService();
       if (!service) return false;
@@ -1543,12 +1551,29 @@
     }
 
     async function deleteRecord(id) {
+      if (!isAdmin()) {
+        console.warn("[Delete] blocked: admin role required");
+        $("ioStatus").textContent = "Supabase delete blocked: admin role required";
+        return false;
+      }
+      try {
+        await deleteSupabaseRecord(id);
+      } catch (error) {
+        console.error("[Supabase] purchase delete failed", {
+          message: error && error.message,
+          status: error && error.status,
+          details: error && error.details
+        });
+        $("ioStatus").textContent = `Supabase delete failed: ${error && error.message ? error.message : "unknown error"}`;
+        return false;
+      }
       await syncSet(`del/${id}`, { id, deletedAt: nowIso() });
       await tx(STORE_RECORDS, "readwrite", (store) => store.delete(id));
       await tx(STORE_IMAGES, "readwrite", (store) => store.delete(id));
       await syncDel(`rec/${id}`);
       await syncDel(`img/${id}`);
       await loadAll();
+      return true;
     }
 
     function populateSelect(select, items, allLabel) {

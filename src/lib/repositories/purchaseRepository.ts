@@ -118,3 +118,17 @@ export async function updatePurchase(id: string, row: PurchaseUpdate) {
   if (error) throw error;
   return data;
 }
+
+export async function markPurchaseDeleted(id: string, userId: string) {
+  const { data, error } = await supabase
+    .from("purchases")
+    .update({
+      deleted_at: new Date().toISOString(),
+      updated_by: userId
+    })
+    .eq("id", id)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data;
+}

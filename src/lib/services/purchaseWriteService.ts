@@ -1,6 +1,6 @@
 import { legacyRecordToPurchaseInsert, legacyRecordToPurchaseUpdate, type LegacyClassification, type LegacyImage, type LegacyRecord } from "../mappers/purchaseMapper";
 import { fetchBranches, fetchCategories, fetchChannels } from "../repositories/masterRepository";
-import { insertPurchase, updatePurchase as updatePurchaseRow } from "../repositories/purchaseRepository";
+import { insertPurchase, markPurchaseDeleted, updatePurchase as updatePurchaseRow } from "../repositories/purchaseRepository";
 import { uploadEvidenceImages, type EvidenceUploadResult } from "../repositories/storageRepository";
 import { supabase } from "../supabase";
 
@@ -123,6 +123,41 @@ export async function updatePurchase(
     return purchase;
   } catch (error) {
     console.error("[Save] Update failed", {
+      message: (error as SupabaseWriteError).message,
+      code: (error as SupabaseWriteError).code,
+      details: (error as SupabaseWriteError).details,
+      hint: (error as SupabaseWriteError).hint
+    });
+    throw error;
+  }
+}
+
+export async function deletePurchase(id: string) {
+  console.log("[Delete] Start", { id });
+  try {
+    const sessionResult = await supabase.auth.getSession();
+    if (sessionResult.error) throw sessionResult.error;
+    const userId = sessionResult.data.session?.user.id;
+    if (!userId) {
+      throw new Error("Supabase login is required to delete purchases");
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .single();
+    if (profileError) throw profileError;
+    if (profile?.role !== "admin") {
+      throw new Error("Admin role is required to delete purchases");
+    }
+
+    console.log("[Delete] Before soft delete", { id });
+    const purchase = await markPurchaseDeleted(id, userId);
+    console.log("[Delete] Soft delete success", purchase);
+    return purchase;
+  } catch (error) {
+    console.error("[Delete] Soft delete failed", {
       message: (error as SupabaseWriteError).message,
       code: (error as SupabaseWriteError).code,
       details: (error as SupabaseWriteError).details,
