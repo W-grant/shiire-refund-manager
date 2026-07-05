@@ -908,6 +908,7 @@
                   <label for="taxPackageMonth">対象月</label>
                   <select id="taxPackageMonth"></select>
                   <button id="taxPackageBtn" type="button">提出ZIP</button>
+                  <div id="taxPackageHistory" class="small muted"></div>
                 </div>
                 <div class="drop">
                   <h3>読み込み</h3>
@@ -1058,6 +1059,7 @@
       proofDraft: [],
       aiImages: [],
       aiItems: [],
+      taxPackages: [],
       currentEvidenceId: "",
       currentEvidenceIndex: 0,
       profile: null,
@@ -1348,6 +1350,54 @@
       return Boolean(result && result.id);
     }
 
+    function renderTaxPackageHistory() {
+      const box = $("taxPackageHistory");
+      if (!box) return;
+      if (!state.taxPackages.length) {
+        box.textContent = "Saved package history: none";
+        return;
+      }
+      box.innerHTML = state.taxPackages.slice(0, 8).map((item) => {
+        const month = String(item.target_month || "").slice(0, 7);
+        const generatedAt = item.generated_at ? new Date(item.generated_at).toLocaleString("ja-JP") : "";
+        return `
+          <div class="inline">
+            <span>${escapeHtml(month)} / ${escapeHtml(item.file_name || "")}</span>
+            <span>${item.purchase_count || 0}件 ${yen(item.total_amount || 0)}</span>
+            <span>${escapeHtml(generatedAt)}</span>
+            <button type="button" data-tax-package-download="${escapeHtml(item.id)}">DL</button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function loadTaxPackageHistory() {
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.listMonthlyPackages) return false;
+      try {
+        state.taxPackages = await service.listMonthlyPackages();
+        renderTaxPackageHistory();
+        return true;
+      } catch (error) {
+        console.warn("[TaxPackage] History load failed", error);
+        state.taxPackages = [];
+        renderTaxPackageHistory();
+        return false;
+      }
+    }
+
+    async function downloadSavedTaxPackage(id) {
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.getMonthlyPackageDownloadUrl) return false;
+      const result = await service.getMonthlyPackageDownloadUrl(id);
+      const a = document.createElement("a");
+      a.href = result.url;
+      a.download = result.fileName || "tax-package.zip";
+      a.click();
+      $("ioStatus").textContent = "Saved tax package download started";
+      return true;
+    }
+
     async function loadSupabaseAll() {
       const service = await waitForSupabaseReadService();
       if (!service) return false;
@@ -1363,6 +1413,7 @@
         state.images = new Map((snapshot.images || []).map((item) => [item.id, item]));
         state.records.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
         render();
+        await loadTaxPackageHistory();
         return true;
       } catch (error) {
         console.warn("[Supabase] purchase read failed", error);
@@ -2838,6 +2889,7 @@
         a.download = fileName;
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
+        if (savedToSupabase) await loadTaxPackageHistory();
         $("ioStatus").textContent = savedToSupabase
           ? `Tax package ${month} saved to Supabase Storage`
           : `Tax package ${month} downloaded; Supabase Storage save was skipped or failed`;
@@ -3134,6 +3186,16 @@
       $("printPdfBtn").addEventListener("click", printPdf);
       $("exportEvidenceBtn").addEventListener("click", downloadAllEvidence);
       $("taxPackageBtn").addEventListener("click", downloadTaxPackage);
+      $("taxPackageHistory").addEventListener("click", async (event) => {
+        const button = event.target.closest("[data-tax-package-download]");
+        if (!button) return;
+        try {
+          await downloadSavedTaxPackage(button.dataset.taxPackageDownload);
+        } catch (error) {
+          console.error("[TaxPackage] Saved package download failed", error);
+          $("ioStatus").textContent = `Saved tax package download failed: ${error && error.message ? error.message : "unknown error"}`;
+        }
+      });
       $("backupBtn").addEventListener("click", exportBackup);
       $("downloadTemplateBtn").addEventListener("click", () => downloadCsv(exportRows([], "list"), "仕入一覧テンプレート.csv"));
       $("importFile").addEventListener("change", async (event) => {

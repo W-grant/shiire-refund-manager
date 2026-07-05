@@ -13,6 +13,19 @@ export type MonthlyPackageInsert = {
   generated_by: string | null;
 };
 
+export type MonthlyPackageRow = {
+  id: string;
+  target_month: string;
+  storage_bucket: string;
+  storage_path: string;
+  file_name: string;
+  purchase_count: number;
+  total_amount: number;
+  total_deduction_tax: number;
+  generated_at: string;
+  generated_by: string | null;
+};
+
 function sanitizePathPart(value: string, fallback: string) {
   const safe = String(value || "")
     .normalize("NFKC")
@@ -46,4 +59,22 @@ export async function insertMonthlyPackage(row: MonthlyPackageInsert) {
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function fetchMonthlyPackages() {
+  const { data, error } = await supabase
+    .from("monthly_packages")
+    .select("id,target_month,storage_bucket,storage_path,file_name,purchase_count,total_amount,total_deduction_tax,generated_at,generated_by")
+    .order("generated_at", { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  return (data || []) as MonthlyPackageRow[];
+}
+
+export async function createMonthlyPackageSignedUrl(row: Pick<MonthlyPackageRow, "storage_bucket" | "storage_path">) {
+  const { data, error } = await supabase.storage
+    .from(row.storage_bucket)
+    .createSignedUrl(row.storage_path, 60 * 10);
+  if (error) throw error;
+  return data.signedUrl;
 }

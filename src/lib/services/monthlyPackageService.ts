@@ -1,4 +1,4 @@
-import { insertMonthlyPackage, monthlyPackageStoragePath, uploadMonthlyPackage } from "../repositories/monthlyPackageRepository";
+import { createMonthlyPackageSignedUrl, fetchMonthlyPackages, insertMonthlyPackage, monthlyPackageStoragePath, uploadMonthlyPackage } from "../repositories/monthlyPackageRepository";
 import { supabase } from "../supabase";
 
 export type SaveMonthlyPackageInput = {
@@ -46,4 +46,16 @@ export async function saveMonthlyPackage(input: SaveMonthlyPackageInput) {
   });
   console.log("[TaxPackage] Metadata insert success", metadata);
   return metadata;
+}
+
+export async function listMonthlyPackages() {
+  return fetchMonthlyPackages();
+}
+
+export async function getMonthlyPackageDownloadUrl(id: string) {
+  const rows = await fetchMonthlyPackages();
+  const row = rows.find((item) => item.id === id);
+  if (!row) throw new Error("Monthly package was not found");
+  const url = await createMonthlyPackageSignedUrl(row);
+  return { url, fileName: row.file_name };
 }
