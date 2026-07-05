@@ -462,6 +462,41 @@
       min-width: 760px;
     }
 
+    .review-row-error {
+      background: #fff0ed;
+    }
+
+    .review-row-warning {
+      background: #fff8df;
+    }
+
+    .review-flags {
+      display: grid;
+      gap: 4px;
+      min-width: 160px;
+      margin-bottom: 8px;
+    }
+
+    .review-flag {
+      display: inline-flex;
+      width: fit-content;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .review-flag.error {
+      background: #ffe1dc;
+      color: var(--red);
+    }
+
+    .review-flag.warning {
+      background: #fff1c4;
+      color: #755514;
+    }
+
     .thumb-list {
       display: flex;
       flex-wrap: wrap;
@@ -2230,6 +2265,26 @@
       return `<select data-review="${index}" data-field="${field}">${normalized.map(([value, label]) => optionHtml(value, label, selected)).join("")}</select>`;
     }
 
+    function reviewValidation(record) {
+      const hasSelectedImage = record.imageIndex === "all" || Number(record.imageIndex) >= 0;
+      const checkedRecord = { ...record, hasImage: Boolean(hasSelectedImage && state.aiImages.length) };
+      const c = classified(checkedRecord);
+      const validation = validateRecord(checkedRecord, c);
+      return {
+        errors: validation.errors,
+        warnings: [...validation.warnings, ...(c.flags || [])]
+      };
+    }
+
+    function reviewFlagsHtml(result) {
+      const flags = [
+        ...result.errors.map((message) => ["error", message]),
+        ...result.warnings.map((message) => ["warning", message])
+      ];
+      if (!flags.length) return "";
+      return `<div class="review-flags">${flags.map(([type, message]) => `<span class="review-flag ${type}">${escapeHtml(message)}</span>`).join("")}</div>`;
+    }
+
     function renderReview() {
       $("reviewWrap").classList.toggle("hidden", state.aiItems.length === 0);
       const imageOptions = (selected) => [
@@ -2243,8 +2298,11 @@
       const stockOptions = [["yes", "はい"], ["no", "いいえ"]];
       const qualifiedOptions = [["no", "登録なし"], ["yes", "登録あり"], ["unknown", "不明"]];
       const anonOptions = [["anon", "匿名"], ["named", "本名判明"]];
-      $("reviewRows").innerHTML = state.aiItems.map((record, index) => `
-        <tr>
+      $("reviewRows").innerHTML = state.aiItems.map((record, index) => {
+        const result = reviewValidation(record);
+        const rowClass = result.errors.length ? "review-row-error" : result.warnings.length ? "review-row-warning" : "";
+        return `
+        <tr class="${rowClass}">
           <td><input data-review="${index}" data-field="date" type="date" value="${escapeHtml(record.date)}"></td>
           <td>${selectHtml(index, "channel", channelOptions, record.channel)}</td>
           <td><input data-review="${index}" data-field="name" type="text" value="${escapeHtml(record.name)}"></td>
@@ -2259,11 +2317,13 @@
           <td>${selectHtml(index, "anon", anonOptions, record.anon)}</td>
           <td><select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select></td>
           <td>
+            ${reviewFlagsHtml(result)}
             <button type="button" data-review-apply="${index}">フォーム</button>
             <button class="danger" type="button" data-review-delete="${index}">×</button>
           </td>
         </tr>
-      `).join("");
+      `;
+      }).join("");
     }
 
     async function runExtract() {
@@ -2289,6 +2349,14 @@
     }
 
     async function addExtracted() {
+      const invalidRows = state.aiItems
+        .map((record, index) => ({ index, result: reviewValidation(record) }))
+        .filter((item) => item.result.errors.length);
+      if (invalidRows.length) {
+        renderReview();
+        $("extractStatus").textContent = `要修正の行があります: ${invalidRows.map((item) => item.index + 1).join(", ")}行目`;
+        return;
+      }
       for (let index = 0; index < state.aiItems.length; index += 1) {
         const sourceRecord = state.aiItems[index];
         const { imageIndex, ...record } = sourceRecord;
@@ -3176,6 +3244,7 @@
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
         state.aiItems[index][field] = ["amount", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        renderReview();
       });
       $("reviewRows").addEventListener("click", (event) => {
         const applyButton = event.target.closest("[data-review-apply]");
