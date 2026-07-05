@@ -29,6 +29,20 @@ export type PurchaseUpdateResult = {
   removedEvidenceCount: number;
 };
 
+export type LegacyImageBundle = {
+  id: string;
+  images: LegacyImage[];
+};
+
+export type PurchaseMigrationResult = {
+  inserted: number;
+  skipped: number;
+  failed: number;
+  evidenceUploaded: number;
+  evidenceFailed: number;
+  errors: Array<{ id: string; message: string }>;
+};
+
 function logInsertFailure(error: SupabaseWriteError) {
   console.error("[Save] Insert failed", {
     message: error.message,
@@ -103,6 +117,60 @@ export async function savePurchase(
 }
 
 export const insertSupabasePurchase = savePurchase;
+
+function isDuplicateKeyError(error: unknown) {
+  return (error as SupabaseWriteError).code === "23505";
+}
+
+export async function migratePurchases(
+  records: LegacyRecord[],
+  imageBundles: LegacyImageBundle[],
+  classifyRecord: (record: LegacyRecord) => LegacyClassification
+): Promise<PurchaseMigrationResult> {
+  console.log("[Migration] Start", { count: records.length });
+  const status = await getPurchaseSaveStatus();
+  if (!status.authenticated || !status.canInsert) {
+    throw new Error("Supabase login with admin or staff role is required to migrate purchases");
+  }
+
+  const imagesById = new Map(imageBundles.map((bundle) => [bundle.id, bundle.images || []]));
+  const result: PurchaseMigrationResult = {
+    inserted: 0,
+    skipped: 0,
+    failed: 0,
+    evidenceUploaded: 0,
+    evidenceFailed: 0,
+    errors: []
+  };
+
+  for (const record of records) {
+    try {
+      const images = imagesById.get(record.id) || [];
+      const saveResult = await savePurchase(record, classifyRecord(record), images);
+      result.inserted += 1;
+      result.evidenceUploaded += saveResult.evidence.successes.length;
+      result.evidenceFailed += saveResult.evidence.failures.length;
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        console.info("[Migration] Skipped existing purchase", { id: record.id });
+        result.skipped += 1;
+        continue;
+      }
+      console.error("[Migration] Failed purchase", {
+        id: record.id,
+        message: (error as SupabaseWriteError).message
+      });
+      result.failed += 1;
+      result.errors.push({
+        id: record.id,
+        message: (error as SupabaseWriteError).message || String(error)
+      });
+    }
+  }
+
+  console.log("[Migration] Complete", result);
+  return result;
+}
 
 export async function updatePurchase(
   record: LegacyRecord,

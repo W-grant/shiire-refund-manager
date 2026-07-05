@@ -1,7 +1,7 @@
 import "./lib/supabase-connection-check";
 import { completePasswordRecovery, getCurrentAuth, signInWithPassword, signOut, updatePassword } from "./lib/services/authService";
 import { loadSupabasePurchaseState } from "./lib/services/purchaseReadService";
-import { deletePurchase, getPurchaseSaveStatus, savePurchase, updatePurchase } from "./lib/services/purchaseWriteService";
+import { deletePurchase, getPurchaseSaveStatus, migratePurchases, savePurchase, updatePurchase } from "./lib/services/purchaseWriteService";
 
 declare global {
   interface Window {
@@ -20,6 +20,7 @@ declare global {
       savePurchase: typeof savePurchase;
       updatePurchase: typeof updatePurchase;
       deletePurchase: typeof deletePurchase;
+      migratePurchases: typeof migratePurchases;
     };
   }
 }
@@ -38,7 +39,8 @@ window.ShiireSupabaseWrite = {
   getSaveStatus: getPurchaseSaveStatus,
   savePurchase,
   updatePurchase,
-  deletePurchase
+  deletePurchase,
+  migratePurchases
 };
 window.dispatchEvent(new Event("shiire:supabase-read-ready"));
 window.dispatchEvent(new Event("shiire:supabase-write-ready"));

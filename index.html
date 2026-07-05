@@ -917,6 +917,7 @@
                   <button id="downloadTemplateBtn" type="button">テンプレート</button>
                   <label for="restoreFile">バックアップ復元</label>
                   <input id="restoreFile" type="file" accept="application/json,.json">
+                  <button id="migrateLocalBtn" type="button">ローカルデータ移行</button>
                 </div>
               </div>
             </div>
@@ -1187,7 +1188,7 @@
       Array.from(form.elements).forEach((element) => {
         if (element.id !== "recordId") element.disabled = !canWrite;
       });
-      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile"], !canWrite);
+      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn"], !canWrite);
       $("sampleBtn").disabled = !canWrite;
       $("clearBtn").disabled = !isAdmin();
       render();
@@ -1297,6 +1298,38 @@
       const result = await service.deletePurchase(id);
       $("ioStatus").textContent = "Supabase delete succeeded";
       return Boolean(result && result.id);
+    }
+
+    async function readIndexedDbSnapshot() {
+      const db = await openDb();
+      try {
+        const records = await requestToPromise(db.transaction(STORE_RECORDS).objectStore(STORE_RECORDS).getAll());
+        const rawImages = await requestToPromise(db.transaction(STORE_IMAGES).objectStore(STORE_IMAGES).getAll());
+        const images = rawImages.map((item) => normalizeImageBundle(item)).filter((item) => item && item.images.length);
+        return { records, images };
+      } finally {
+        db.close();
+      }
+    }
+
+    async function migrateLocalPurchases() {
+      if (!canWritePurchases()) {
+        $("ioStatus").textContent = "Supabase migration blocked: login or write role required";
+        return false;
+      }
+      const service = await waitForSupabaseWriteService();
+      if (!service) return false;
+      const snapshot = await readIndexedDbSnapshot();
+      if (!snapshot.records.length) {
+        $("ioStatus").textContent = "ローカル移行対象データはありません";
+        return false;
+      }
+      if (!confirm(`${snapshot.records.length}件のローカル仕入データをSupabaseへ移行しますか？`)) return false;
+      $("ioStatus").textContent = "Supabase migration running...";
+      const result = await service.migratePurchases(snapshot.records, snapshot.images, classified);
+      $("ioStatus").textContent = `Supabase migration: inserted ${result.inserted}, skipped ${result.skipped}, failed ${result.failed}, evidence ${result.evidenceUploaded}`;
+      await loadAll();
+      return result.failed === 0;
     }
 
     async function loadSupabaseAll() {
@@ -3085,6 +3118,14 @@
           $("ioStatus").textContent = error.message;
         } finally {
           event.target.value = "";
+        }
+      });
+      $("migrateLocalBtn").addEventListener("click", async () => {
+        try {
+          await migrateLocalPurchases();
+        } catch (error) {
+          console.error("[Migration] local purchase migration failed", error);
+          $("ioStatus").textContent = `Supabase migration failed: ${error && error.message ? error.message : "unknown error"}`;
         }
       });
       $("closeEvidenceBtn").addEventListener("click", () => $("evidenceDialog").close());
