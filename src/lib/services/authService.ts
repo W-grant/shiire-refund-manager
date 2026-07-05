@@ -44,11 +44,27 @@ export async function signOut() {
 export async function completePasswordRecovery(url: string) {
   const parsedUrl = new URL(url);
   const code = parsedUrl.searchParams.get("code");
-  if (!code) return false;
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+    return true;
+  }
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const hash = new URLSearchParams(parsedUrl.hash.replace(/^#/, ""));
+  const accessToken = hash.get("access_token");
+  const refreshToken = hash.get("refresh_token");
+  if (accessToken && refreshToken) {
+    const { error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken
+    });
+    if (error) throw error;
+    return true;
+  }
+
+  const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
-  return true;
+  return Boolean(data.session);
 }
 
 export async function updatePassword(password: string) {
