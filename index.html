@@ -2148,6 +2148,14 @@
       return [{ role: "user", content }];
     }
 
+    function extractErrorMessage(payload) {
+      if (!payload) return "AI extract failed";
+      if (typeof payload.error === "string") return payload.error;
+      if (payload.error && typeof payload.error.message === "string") return payload.error.message;
+      if (typeof payload.message === "string") return payload.message;
+      return "AI extract failed";
+    }
+
     async function callExtract(messages) {
       const settings = state.settings || defaultSettings();
       if (settings.aiMode !== "proxy") {
@@ -2168,7 +2176,7 @@
         })
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "AI抽出に失敗しました。");
+      if (!response.ok) throw new Error(extractErrorMessage(payload));
       return parseExtractResponse(payload);
     }
 
