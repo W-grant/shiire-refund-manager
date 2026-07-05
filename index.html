@@ -1146,7 +1146,11 @@
     function isPasswordRecoveryRoute() {
       const search = new URLSearchParams(window.location.search);
       const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-      return search.get("type") === "recovery" || hash.get("type") === "recovery";
+      return search.get("type") === "recovery" || hash.get("type") === "recovery" || search.has("code");
+    }
+
+    function clearAuthUrl() {
+      window.history.replaceState(null, "", window.location.pathname);
     }
 
     function canWritePurchases() {
@@ -1196,10 +1200,18 @@
         return false;
       }
       try {
+        if (state.passwordRecovery) {
+          $("passwordResetStatus").textContent = "リセットリンクを確認中...";
+          await service.completePasswordRecovery(window.location.href);
+          clearAuthUrl();
+          $("passwordResetStatus").textContent = "";
+          state.profile = null;
+          applyRoleControls();
+          return false;
+        }
         const snapshot = await service.getCurrentAuth();
         state.profile = snapshot.profile && snapshot.profile.is_active ? snapshot.profile : null;
         applyRoleControls();
-        if (state.passwordRecovery) return false;
         if (snapshot.authenticated && !state.profile) {
           $("loginStatus").textContent = "このユーザーは利用できません";
           return false;
@@ -1208,7 +1220,11 @@
       } catch (error) {
         state.profile = null;
         applyRoleControls();
-        $("loginStatus").textContent = error.message || "ログイン状態を確認できませんでした";
+        if (state.passwordRecovery) {
+          $("passwordResetStatus").textContent = error.message || "リセットリンクを確認できませんでした。メールを再送してください";
+        } else {
+          $("loginStatus").textContent = error.message || "ログイン状態を確認できませんでした";
+        }
         return false;
       }
     }

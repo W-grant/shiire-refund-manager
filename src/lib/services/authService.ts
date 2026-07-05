@@ -41,6 +41,16 @@ export async function signOut() {
   if (error) throw error;
 }
 
+export async function completePasswordRecovery(url: string) {
+  const parsedUrl = new URL(url);
+  const code = parsedUrl.searchParams.get("code");
+  if (!code) return false;
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) throw error;
+  return true;
+}
+
 export async function updatePassword(password: string) {
   const { error } = await supabase.auth.updateUser({ password });
   if (error) throw error;

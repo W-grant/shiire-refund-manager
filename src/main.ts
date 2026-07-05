@@ -1,5 +1,5 @@
 import "./lib/supabase-connection-check";
-import { getCurrentAuth, signInWithPassword, signOut, updatePassword } from "./lib/services/authService";
+import { completePasswordRecovery, getCurrentAuth, signInWithPassword, signOut, updatePassword } from "./lib/services/authService";
 import { loadSupabasePurchaseState } from "./lib/services/purchaseReadService";
 import { getPurchaseSaveStatus, savePurchase } from "./lib/services/purchaseWriteService";
 
@@ -7,6 +7,7 @@ declare global {
   interface Window {
     ShiireAuth?: {
       getCurrentAuth: typeof getCurrentAuth;
+      completePasswordRecovery: typeof completePasswordRecovery;
       signInWithPassword: typeof signInWithPassword;
       signOut: typeof signOut;
       updatePassword: typeof updatePassword;
@@ -22,6 +23,7 @@ declare global {
 }
 
 window.ShiireAuth = {
+  completePasswordRecovery,
   getCurrentAuth,
   signInWithPassword,
   signOut,
