@@ -1153,6 +1153,18 @@
         .join(" | ");
     }
 
+    function formatErrorDetails(error) {
+      if (!error) return "unknown error";
+      const parts = [
+        error.message || String(error),
+        error.status ? `status=${error.status}` : "",
+        error.code ? `code=${error.code}` : "",
+        error.details ? `details=${error.details}` : "",
+        error.hint ? `hint=${error.hint}` : ""
+      ].filter(Boolean);
+      return parts.join(" / ");
+    }
+
     function normalizeImageBundle(item) {
       if (!item) return null;
       if (Array.isArray(item.images)) {
@@ -2991,13 +3003,17 @@
         const blob = createZip(files);
         const fileName = `${root}.zip`;
         let savedToSupabase = false;
+        let saveError = null;
         try {
           savedToSupabase = await saveTaxPackageToSupabase(month, fileName, blob, records);
         } catch (error) {
+          saveError = error;
           console.error("[TaxPackage] Supabase save failed", {
             message: error && error.message,
             status: error && error.status,
-            details: error && error.details
+            code: error && error.code,
+            details: error && error.details,
+            hint: error && error.hint
           });
         }
         const url = URL.createObjectURL(blob);
@@ -3009,7 +3025,7 @@
         if (savedToSupabase) await loadTaxPackageHistory();
         $("ioStatus").textContent = savedToSupabase
           ? `Tax package ${month} saved to Supabase Storage`
-          : `Tax package ${month} downloaded; Supabase Storage save was skipped or failed`;
+          : `Tax package ${month} downloaded; Supabase Storage save failed: ${formatErrorDetails(saveError)}`;
       } catch (error) {
         $("ioStatus").textContent = error.message;
       }
