@@ -1430,6 +1430,7 @@
             <span>${item.purchase_count || 0}件 ${yen(item.total_amount || 0)}</span>
             <span>${escapeHtml(generatedAt)}</span>
             <button type="button" data-tax-package-download="${escapeHtml(item.id)}">DL</button>
+            ${isAdmin() ? `<button class="danger" type="button" data-tax-package-delete="${escapeHtml(item.id)}">削除</button>` : ""}
           </div>
         `;
       }).join("");
@@ -1459,6 +1460,19 @@
       a.download = result.fileName || "tax-package.zip";
       a.click();
       $("ioStatus").textContent = "Saved tax package download started";
+      return true;
+    }
+
+    async function deleteSavedTaxPackage(id) {
+      if (!isAdmin()) {
+        $("ioStatus").textContent = "Tax package delete blocked: admin role required";
+        return false;
+      }
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.deleteMonthlyPackage) return false;
+      await service.deleteMonthlyPackage(id);
+      await loadTaxPackageHistory();
+      $("ioStatus").textContent = "Saved tax package deleted";
       return true;
     }
 
@@ -3326,6 +3340,17 @@
       $("exportEvidenceBtn").addEventListener("click", downloadAllEvidence);
       $("taxPackageBtn").addEventListener("click", downloadTaxPackage);
       $("taxPackageHistory").addEventListener("click", async (event) => {
+        const deleteButton = event.target.closest("[data-tax-package-delete]");
+        if (deleteButton) {
+          if (!confirm("保存済みの税理士提出ZIPを削除しますか？")) return;
+          try {
+            await deleteSavedTaxPackage(deleteButton.dataset.taxPackageDelete);
+          } catch (error) {
+            console.error("[TaxPackage] Saved package delete failed", error);
+            $("ioStatus").textContent = `Saved tax package delete failed: ${formatErrorDetails(error)}`;
+          }
+          return;
+        }
         const button = event.target.closest("[data-tax-package-download]");
         if (!button) return;
         try {

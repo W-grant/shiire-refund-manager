@@ -1,4 +1,4 @@
-import { createMonthlyPackageSignedUrl, fetchMonthlyPackages, insertMonthlyPackage, monthlyPackageStoragePath, uploadMonthlyPackage } from "../repositories/monthlyPackageRepository";
+import { createMonthlyPackageSignedUrl, deleteMonthlyPackageObject, deleteMonthlyPackageRow, fetchMonthlyPackageById, fetchMonthlyPackages, insertMonthlyPackage, monthlyPackageStoragePath, uploadMonthlyPackage } from "../repositories/monthlyPackageRepository";
 import { supabase } from "../supabase";
 
 export type SaveMonthlyPackageInput = {
@@ -10,13 +10,11 @@ export type SaveMonthlyPackageInput = {
   totalDeductionTax: number;
 };
 
-export async function saveMonthlyPackage(input: SaveMonthlyPackageInput) {
+async function getCurrentUserRole() {
   const sessionResult = await supabase.auth.getSession();
   if (sessionResult.error) throw sessionResult.error;
   const userId = sessionResult.data.session?.user.id;
-  if (!userId) {
-    throw new Error("Supabase login is required to save monthly packages");
-  }
+  if (!userId) throw new Error("Supabase login is required");
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
@@ -24,7 +22,12 @@ export async function saveMonthlyPackage(input: SaveMonthlyPackageInput) {
     .eq("id", userId)
     .single();
   if (profileError) throw profileError;
-  if (!["admin", "staff"].includes(profile?.role)) {
+  return { userId, role: profile?.role };
+}
+
+export async function saveMonthlyPackage(input: SaveMonthlyPackageInput) {
+  const { userId, role } = await getCurrentUserRole();
+  if (!["admin", "staff"].includes(role)) {
     throw new Error("Admin or staff role is required to save monthly packages");
   }
 
@@ -58,4 +61,17 @@ export async function getMonthlyPackageDownloadUrl(id: string) {
   if (!row) throw new Error("Monthly package was not found");
   const url = await createMonthlyPackageSignedUrl(row);
   return { url, fileName: row.file_name };
+}
+
+export async function deleteMonthlyPackage(id: string) {
+  const { role } = await getCurrentUserRole();
+  if (role !== "admin") {
+    throw new Error("Admin role is required to delete monthly packages");
+  }
+
+  const row = await fetchMonthlyPackageById(id);
+  await deleteMonthlyPackageObject(row);
+  const deleted = await deleteMonthlyPackageRow(id);
+  console.log("[TaxPackage] Delete success", { id, storagePath: row.storage_path });
+  return deleted;
 }

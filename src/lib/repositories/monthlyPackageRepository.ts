@@ -72,6 +72,35 @@ export async function fetchMonthlyPackages() {
   return (data || []) as MonthlyPackageRow[];
 }
 
+export async function fetchMonthlyPackageById(id: string) {
+  const { data, error } = await supabase
+    .from("monthly_packages")
+    .select("id,target_month,storage_bucket,storage_path,file_name,purchase_count,total_amount,total_deduction_tax,generated_at,generated_by")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return data as MonthlyPackageRow;
+}
+
+export async function deleteMonthlyPackageObject(row: Pick<MonthlyPackageRow, "storage_bucket" | "storage_path">) {
+  const { error } = await supabase.storage
+    .from(row.storage_bucket)
+    .remove([row.storage_path]);
+  if (error) throw error;
+  return true;
+}
+
+export async function deleteMonthlyPackageRow(id: string) {
+  const { data, error } = await supabase
+    .from("monthly_packages")
+    .delete()
+    .eq("id", id)
+    .select("id,target_month,storage_bucket,storage_path,file_name,purchase_count,total_amount,total_deduction_tax,generated_at,generated_by")
+    .single();
+  if (error) throw error;
+  return data as MonthlyPackageRow;
+}
+
 export async function createMonthlyPackageSignedUrl(row: Pick<MonthlyPackageRow, "storage_bucket" | "storage_path">) {
   const { data, error } = await supabase.storage
     .from(row.storage_bucket)
