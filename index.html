@@ -1138,6 +1138,21 @@
       });
     }
 
+    function formatEvidenceFailures(failures) {
+      return (failures || [])
+        .map((failure) => {
+          const parts = [
+            failure.fileName || "evidence",
+            failure.message || "unknown error",
+            failure.code ? `code=${failure.code}` : "",
+            failure.details ? `details=${failure.details}` : "",
+            failure.hint ? `hint=${failure.hint}` : ""
+          ].filter(Boolean);
+          return parts.join(" / ");
+        })
+        .join(" | ");
+    }
+
     function normalizeImageBundle(item) {
       if (!item) return null;
       if (Array.isArray(item.images)) {
@@ -1309,7 +1324,8 @@
       const bundle = normalizeImageBundle(imageBundle);
       const result = await service.savePurchase(record, classified(record), bundle ? bundle.images : []);
       if (result.evidence && result.evidence.failures.length) {
-        $("ioStatus").textContent = `Supabase purchase saved, evidence upload warning: ${result.evidence.failures.length}`;
+        console.warn("[Storage] Evidence failures", result.evidence.failures);
+        $("ioStatus").textContent = `Supabase purchase saved, evidence warning: ${formatEvidenceFailures(result.evidence.failures)}`;
         return false;
       }
       $("ioStatus").textContent = "Supabase insert succeeded";
@@ -1322,7 +1338,8 @@
       const bundle = normalizeImageBundle(imageBundle);
       const result = await service.updatePurchase(record, classified(record), bundle ? bundle.images : []);
       if (result.evidence && result.evidence.failures.length) {
-        $("ioStatus").textContent = `Supabase update succeeded, evidence warning: ${result.evidence.failures.length}`;
+        console.warn("[Storage] Evidence failures", result.evidence.failures);
+        $("ioStatus").textContent = `Supabase update succeeded, evidence warning: ${formatEvidenceFailures(result.evidence.failures)}`;
         return false;
       }
       $("ioStatus").textContent = "Supabase update succeeded";
