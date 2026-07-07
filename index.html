@@ -2147,7 +2147,7 @@
         <div class="inline">
           <img class="thumb" src="${image.thumb}" alt="">
           <span class="muted small">${escapeHtml(image.fileName || "証憑画像")}</span>
-          <button class="danger" type="button" data-proof-remove="${source}:${index}">削除</button>
+          ${source === "draft" || isAdmin() ? `<button class="danger" type="button" data-proof-remove="${source}:${index}">削除</button>` : ""}
         </div>
       `).join("");
     }

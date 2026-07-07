@@ -26,14 +26,14 @@
 - 仕入一覧CSV、古物商特例帳簿CSV、電帳法索引簿CSV
 - Excel出力、PDF出力
 - 月次税理士提出ZIP作成
-- 月次税理士提出ZIPのStorage保存と履歴再ダウンロード
+- 月次税理士提出ZIPのStorage保存、履歴再ダウンロード、管理者削除
 - Claude APIによるAI抽出レビュー
 
 ## 権限
 
 | 権限 | できること |
 | --- | --- |
-| `admin` | 登録、編集、削除、証憑削除、設定、提出ZIP作成 |
+| `admin` | 登録、編集、削除、証憑削除、設定、提出ZIP作成、提出ZIP履歴削除 |
 | `staff` | 登録、編集、証憑追加、提出ZIP作成 |
 | `tax_accountant` | 閲覧、CSV/Excel/PDF出力、保存済み提出ZIPの再ダウンロード |
 
@@ -108,7 +108,7 @@ Storage buckets:
 - `05_月次レポート.pdf`
 - `証憑/` 配下の全証憑画像
 
-作成したZIPはダウンロードされ、同時にSupabase Storage `tax-packages` へ保存されます。保存履歴から再ダウンロードできます。
+作成したZIPはダウンロードされ、同時にSupabase Storage `tax-packages` へ保存されます。保存履歴から再ダウンロードできます。履歴削除は `admin` のみ可能です。
 
 ## 開発
 
@@ -165,7 +165,6 @@ pnpm run build
 
 ## 残タスク
 
-- Cloudflare本番でのAI抽出実データ確認
 - staff / tax_accountant の実アカウントで権限別テスト
 - 社内3〜5人での運用テスト
 - 文字化けが残る画面文言の整理
