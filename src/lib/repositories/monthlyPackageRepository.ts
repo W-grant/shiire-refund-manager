@@ -39,7 +39,8 @@ function sanitizePathPart(value: string, fallback: string) {
 export function monthlyPackageStoragePath(month: string, fileName: string) {
   const [year = "unknown", rawMonth = "unknown"] = String(month || "").split("-");
   const timestamp = new Date().toISOString().replace(/[-:.]/g, "").slice(0, 15);
-  const safeName = sanitizePathPart(fileName, "tax-package.zip");
+  const extension = String(fileName || "").toLowerCase().endsWith(".zip") ? ".zip" : "";
+  const safeName = `tax_package_${sanitizePathPart(year, "unknown")}_${sanitizePathPart(rawMonth, "unknown")}${extension}`;
   return `monthly/${year}/${rawMonth}/${timestamp}_${safeName}`;
 }
 
