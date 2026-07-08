@@ -1045,10 +1045,12 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="/assets/classify.js"></script>
   <script src="/assets/csv.js"></script>
+  <script src="/assets/zip.js"></script>
   <script type="module" src="/src/main.ts"></script>
   <script>
     const { classify } = window.ShiireClassify;
     const Csv = window.ShiireCsv;
+    const Zip = window.ShiireZip;
 
     const EXTRACT_PROMPT = `あなたは中古品リユース事業者の仕入記録アシスタントです。提供された画像（ヤフオク/メルカリ/ラクマの取引画面、または古物市場・業者オークション・買取の明細書）から、仕入れた商品を1点ずつ抽出してください。市場の明細書は複数行（複数商品）あり得るので、各商品を1要素にします。
 
@@ -2600,63 +2602,7 @@
     }
 
     function createZip(files) {
-      const encoder = new TextEncoder();
-      const chunks = [];
-      const central = [];
-      let offset = 0;
-      const stamp = dosDateTime(new Date());
-
-      files.forEach((file) => {
-        const nameBytes = encoder.encode(file.name);
-        const data = file.bytes;
-        const checksum = crc32(data);
-        const local = [];
-        writeUint32(local, 0x04034b50);
-        writeUint16(local, 20);
-        writeUint16(local, 0x0800);
-        writeUint16(local, 0);
-        writeUint16(local, stamp.time);
-        writeUint16(local, stamp.date);
-        writeUint32(local, checksum);
-        writeUint32(local, data.length);
-        writeUint32(local, data.length);
-        writeUint16(local, nameBytes.length);
-        writeUint16(local, 0);
-        chunks.push(new Uint8Array(local), nameBytes, data);
-
-        const directory = [];
-        writeUint32(directory, 0x02014b50);
-        writeUint16(directory, 20);
-        writeUint16(directory, 20);
-        writeUint16(directory, 0x0800);
-        writeUint16(directory, 0);
-        writeUint16(directory, stamp.time);
-        writeUint16(directory, stamp.date);
-        writeUint32(directory, checksum);
-        writeUint32(directory, data.length);
-        writeUint32(directory, data.length);
-        writeUint16(directory, nameBytes.length);
-        writeUint16(directory, 0);
-        writeUint16(directory, 0);
-        writeUint16(directory, 0);
-        writeUint16(directory, 0);
-        writeUint32(directory, 0);
-        writeUint32(directory, offset);
-        central.push(new Uint8Array(directory), nameBytes);
-        offset += local.length + nameBytes.length + data.length;
-      });
-
-      const centralSize = central.reduce((sum, chunk) => sum + chunk.length, 0);
-      const end = [];
-      writeUint32(end, 0x06054b50);
-      writeUint16(end, 0);
-      writeUint16(end, 0);
-      writeUint16(end, files.length);
-      writeUint16(end, files.length);
-      writeUint32(end, centralSize);
-      writeUint32(end, offset);
-      writeUint16(end, 0);
-      return new Blob([...chunks, ...central, new Uint8Array(end)], { type: "application/zip" });
+      return Zip.createZip(files);
     }
 
     function downloadAllEvidence() {
@@ -2968,7 +2914,7 @@
     }
 
     function bytesFromText(text) {
-      return new TextEncoder().encode(text);
+      return Zip.bytesFromText(text);
     }
 
     function taxPackageEvidenceName(record, image, recordIndex, imageIndex) {

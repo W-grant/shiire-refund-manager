@@ -3,7 +3,8 @@ import { defineConfig } from "vite";
 
 const legacyScripts = [
   { source: "src/classify.js", output: "assets/classify.js", contentType: "application/javascript; charset=utf-8" },
-  { source: "src/csv.js", output: "assets/csv.js", contentType: "application/javascript; charset=utf-8" }
+  { source: "src/csv.js", output: "assets/csv.js", contentType: "application/javascript; charset=utf-8" },
+  { source: "src/zip.js", output: "assets/zip.js", contentType: "application/javascript; charset=utf-8" }
 ];
 
 export default defineConfig({
