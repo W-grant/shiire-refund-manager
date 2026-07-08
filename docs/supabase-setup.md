@@ -154,33 +154,28 @@ insert into public.profiles (id, display_name, role)
 values ('AUTH_USER_UUID_HERE', '税理士閲覧用', 'tax_accountant');
 ```
 
-## 7. Netlifyに設定すべき環境変数
+## 7. Cloudflare Pagesに設定すべき環境変数
 
-Version 2 実装時に Netlify の Environment variables に設定します。
+現在のCloudflare Pages Production環境に設定します。
 
 | 変数名 | 必須 | 用途 |
 | --- | --- | --- |
-| `SUPABASE_URL` | 必須 | Supabase Project URL |
-| `SUPABASE_ANON_KEY` | 必須 | フロントエンドから利用する anon key |
+| `VITE_SUPABASE_URL` | 必須 | Supabase Project URL |
+| `VITE_SUPABASE_ANON_KEY` | 必須 | フロントエンドから利用する Supabase Publishable Key |
+| `ANTHROPIC_API_KEY` | AI抽出を使う場合は必須 | Cloudflare Pages Function `/extract` からClaude APIを呼び出す |
+| `SHARED_SECRET` | 任意 | `/extract` の共有シークレット |
+| `ALLOWED_ORIGIN` | 任意 | CORS許可Origin |
 | `SUPABASE_SERVICE_ROLE_KEY` | 原則サーバー側のみ | 移行処理や管理処理で必要な場合のみ |
 | `SUPABASE_STORAGE_EVIDENCE_BUCKET` | 任意 | 既定値: `evidence` |
 | `SUPABASE_STORAGE_TAX_PACKAGES_BUCKET` | 任意 | 既定値: `tax-packages` |
 | `SUPABASE_STORAGE_IMPORTS_BUCKET` | 任意 | 既定値: `imports` |
 | `APP_ENV` | 任意 | `production` / `staging` など |
 
-既存の Netlify Functions を併用する場合は、現行の変数も必要です。
-
-| 変数名 | 用途 |
-| --- | --- |
-| `ANTHROPIC_API_KEY` | AI抽出 |
-| `SHARED_SECRET` | 既存Functionsの共通認証 |
-| `SYNC_SECRET` | 既存同期Functionの認証 |
-| `ALLOWED_ORIGIN` | CORS許可Origin |
-
 注意:
 
 - `SUPABASE_SERVICE_ROLE_KEY` はブラウザに露出させてはいけません。
 - Vite 等でフロントエンドに公開する場合も、service role key は絶対に `VITE_` などの公開prefixにしません。
+- `ANTHROPIC_API_KEY` と `SHARED_SECRET` はブラウザへ公開しないため、`VITE_` を付けません。
 
 ## 8. 初期マスタ
 

@@ -165,7 +165,7 @@ pnpm run build
 - `supabase/schema.sql`: Supabase初期SQL
 - `docs/`: 設計書、検証手順、権限チェックリスト
 
-## 残タスク
+## Release前の最終確認
 
 - admin実務データでの最終通し確認
 - CSV / Excel / PDF / 税理士提出ZIPの実ファイル確認

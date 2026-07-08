@@ -22,7 +22,7 @@ Phase1 では次の状態まで完了している前提です。
 
 ## Supabase接続情報として必要な環境変数
 
-Phase2 でアプリ本体へ接続する前に、次の値を Supabase Dashboard で控えます。
+Phase2 でアプリ本体へ接続する前に、次の値を Supabase Dashboard で控え、Cloudflare Pages Production環境へ設定します。
 
 取得場所:
 
@@ -35,8 +35,8 @@ Phase2 でアプリ本体へ接続する前に、次の値を Supabase Dashboard
 
 | 環境変数 | 必須 | 公開可否 | 用途 |
 | --- | --- | --- | --- |
-| `SUPABASE_URL` | 必須 | 公開可 | Supabase Project URL |
-| `SUPABASE_ANON_KEY` | 必須 | 公開可 | ログイン済みユーザーとして Database / Storage にアクセスするための anon key |
+| `VITE_SUPABASE_URL` | 必須 | 公開可 | Supabase Project URL |
+| `VITE_SUPABASE_ANON_KEY` | 必須 | 公開可 | ログイン済みユーザーとして Database / Storage にアクセスするための Supabase Publishable Key |
 | `SUPABASE_STORAGE_EVIDENCE_BUCKET` | 任意 | 公開可 | 証憑画像bucket名。既定値は `evidence` |
 | `SUPABASE_STORAGE_TAX_PACKAGES_BUCKET` | 任意 | 公開可 | 税理士提出ZIP bucket名。既定値は `tax-packages` |
 | `SUPABASE_STORAGE_IMPORTS_BUCKET` | 任意 | 公開可 | V1移行用bucket名。既定値は `imports` |
@@ -47,20 +47,19 @@ Phase2 でアプリ本体へ接続する前に、次の値を Supabase Dashboard
 | --- | --- | --- | --- |
 | `SUPABASE_SERVICE_ROLE_KEY` | 必要時のみ | 絶対に公開不可 | 移行処理、管理処理、サーバー側バッチでRLSを bypass する場合のみ使用 |
 
-### 既存機能で引き続き使う可能性がある値
+### Cloudflare Pages Functionsで使う値
 
 | 環境変数 | 用途 |
 | --- | --- |
 | `ANTHROPIC_API_KEY` | AI抽出用 |
-| `SHARED_SECRET` | 既存Netlify Functionsの共通認証 |
-| `SYNC_SECRET` | 既存Netlify Blobs同期用 |
-| `ALLOWED_ORIGIN` | Netlify Functions の CORS 許可Origin |
+| `SHARED_SECRET` | 任意。Cloudflare Pages Function `/extract` の共通認証 |
+| `ALLOWED_ORIGIN` | 任意。Cloudflare Pages Functions の CORS 許可Origin |
 
 注意:
 
 - `SUPABASE_SERVICE_ROLE_KEY` はブラウザに絶対に渡しません。
-- Netlify のフロントエンド公開prefixを使う場合でも、service role key には公開prefixを付けません。
-- Phase2 では、まず `SUPABASE_URL` と `SUPABASE_ANON_KEY` だけでログイン・RLS確認を行います。
+- Cloudflare Pages / Vite の公開prefixを使う場合でも、service role key には公開prefixを付けません。
+- Phase2 では、まず `VITE_SUPABASE_URL` と `VITE_SUPABASE_ANON_KEY` だけでログイン・RLS確認を行います。
 
 ## RLS確認の準備
 
@@ -625,11 +624,11 @@ rollback;
 ### Phase2 実装前の判断
 
 - [ ] ローカル IndexedDB から Supabase へ移行する方式を決めた
-- [ ] 既存 Netlify Blobs 同期を残すか廃止するか決めた
+- [ ] 旧Netlify Blobs同期を廃止し、Supabase保存へ寄せることを確認した
 - [ ] 税理士閲覧用ユーザーに見せる範囲を決めた
 - [ ] 証憑画像のStorage pathルールを確定した
 - [ ] 月次税理士提出ZIPのStorage保存タイミングを決めた
-- [ ] Netlify環境変数の登録先を確認した
+- [ ] Cloudflare Pages環境変数の登録先を確認した
 - [ ] 本番用と検証用のSupabaseプロジェクトを分けるか決めた
 
 ## Phase1検証完了の目安
