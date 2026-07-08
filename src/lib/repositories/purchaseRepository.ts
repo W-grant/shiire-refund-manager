@@ -132,3 +132,14 @@ export async function markPurchaseDeleted(id: string, userId: string) {
   if (error) throw error;
   return data;
 }
+
+export async function hardDeletePurchase(id: string) {
+  const { data, error } = await supabase
+    .from("purchases")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data;
+}

@@ -1,7 +1,7 @@
 import { legacyRecordToPurchaseInsert, legacyRecordToPurchaseUpdate, type LegacyClassification, type LegacyImage, type LegacyRecord } from "../mappers/purchaseMapper";
 import { deletePurchaseEvidenceByIds, fetchPurchaseEvidenceByPurchaseId } from "../repositories/evidenceRepository";
 import { fetchBranches, fetchCategories, fetchChannels } from "../repositories/masterRepository";
-import { insertPurchase, markPurchaseDeleted, updatePurchase as updatePurchaseRow } from "../repositories/purchaseRepository";
+import { hardDeletePurchase, insertPurchase, markPurchaseDeleted, updatePurchase as updatePurchaseRow } from "../repositories/purchaseRepository";
 import { uploadEvidenceImages, type EvidenceUploadResult } from "../repositories/storageRepository";
 import { supabase } from "../supabase";
 
@@ -268,9 +268,21 @@ export async function deletePurchase(id: string) {
     }
 
     console.log("[Delete] Before soft delete", { id });
-    const purchase = await markPurchaseDeleted(id, userId);
-    console.log("[Delete] Soft delete success", purchase);
-    return purchase;
+    try {
+      const purchase = await markPurchaseDeleted(id, userId);
+      console.log("[Delete] Soft delete success", purchase);
+      return purchase;
+    } catch (softDeleteError) {
+      console.warn("[Delete] Soft delete failed; trying hard delete", {
+        message: (softDeleteError as SupabaseWriteError).message,
+        code: (softDeleteError as SupabaseWriteError).code,
+        details: (softDeleteError as SupabaseWriteError).details,
+        hint: (softDeleteError as SupabaseWriteError).hint
+      });
+      const purchase = await hardDeletePurchase(id);
+      console.log("[Delete] Hard delete success", purchase);
+      return purchase;
+    }
   } catch (error) {
     console.error("[Delete] Soft delete failed", {
       message: (error as SupabaseWriteError).message,
