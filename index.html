@@ -1195,8 +1195,13 @@
       return { id: item.id, images: [] };
     }
 
-    function imageBundleFor(id, images) {
-      return { id, images: (images || []).filter((image) => image && image.full && image.thumb) };
+    function imageBundleFor(id, images, removedImages = []) {
+      return {
+        id,
+        images: (images || []).filter((image) => image && image.full && image.thumb),
+        removedEvidenceIds: (removedImages || []).map((image) => image && image.evidenceId).filter(Boolean),
+        removedStoragePaths: (removedImages || []).map((image) => image && image.storagePath).filter(Boolean)
+      };
     }
 
     function getRecordImages(id) {
@@ -1363,7 +1368,15 @@
       const service = await waitForSupabaseWriteService();
       if (!service) return false;
       const bundle = normalizeImageBundle(imageBundle);
-      const result = await service.updatePurchase(record, classified(record), bundle ? bundle.images : []);
+      const result = await service.updatePurchase(
+        record,
+        classified(record),
+        bundle ? bundle.images : [],
+        {
+          removedEvidenceIds: imageBundle && Array.isArray(imageBundle.removedEvidenceIds) ? imageBundle.removedEvidenceIds : [],
+          removedStoragePaths: imageBundle && Array.isArray(imageBundle.removedStoragePaths) ? imageBundle.removedStoragePaths : []
+        }
+      );
       if (result.evidence && result.evidence.failures.length) {
         console.warn("[Storage] Evidence failures", result.evidence.failures);
         $("ioStatus").textContent = `仕入は更新しましたが、一部の証憑画像を保存できませんでした: ${formatEvidenceFailures(result.evidence.failures)}`;
@@ -2181,11 +2194,11 @@
           return;
         }
         const images = getRecordImages(id);
-        images.splice(index, 1);
+        const removedImages = images.splice(index, 1);
         const record = state.records.find((item) => item.id === id);
         if (record) {
           record.hasImage = images.length > 0;
-          await saveRecord(record, imageBundleFor(id, images));
+          await saveRecord(record, imageBundleFor(id, images, removedImages));
         }
       }
       renderProofPreview(id ? getRecordImages(id) : []);

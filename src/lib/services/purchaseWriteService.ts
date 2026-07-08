@@ -32,6 +32,8 @@ export type PurchaseUpdateResult = {
 export type LegacyImageBundle = {
   id: string;
   images: LegacyImage[];
+  removedEvidenceIds?: string[];
+  removedStoragePaths?: string[];
 };
 
 export type PurchaseMigrationResult = {
@@ -175,7 +177,8 @@ export async function migratePurchases(
 export async function updatePurchase(
   record: LegacyRecord,
   classification: LegacyClassification,
-  images: LegacyImage[] = []
+  images: LegacyImage[] = [],
+  removedEvidence: { removedEvidenceIds?: string[]; removedStoragePaths?: string[] } = {}
 ): Promise<PurchaseUpdateResult> {
   console.log("[Save] Update start", { id: record.id });
   try {
@@ -201,18 +204,20 @@ export async function updatePurchase(
     const newImages = images.filter((image) => String(image.full || "").startsWith("data:"));
     const retainedIds = new Set(retainedImages.map((image) => image.evidenceId).filter(Boolean));
     const retainedPaths = new Set(retainedImages.map((image) => image.storagePath).filter(Boolean));
-    const canDiffSavedEvidence = retainedImages.every((image) => image.evidenceId || image.storagePath);
+    const explicitRemovedIds = new Set((removedEvidence.removedEvidenceIds || []).filter(Boolean));
+    const explicitRemovedPaths = new Set((removedEvidence.removedStoragePaths || []).filter(Boolean));
     let removedEvidenceCount = 0;
 
-    if (canDiffSavedEvidence) {
-      const removedEvidenceIds = existingEvidence
-        .filter((row) => !retainedIds.has(row.id) && !retainedPaths.has(row.storage_path))
-        .map((row) => row.id);
-      if (removedEvidenceIds.length) {
-        const removedRows = await deletePurchaseEvidenceByIds(removedEvidenceIds);
-        removedEvidenceCount = removedRows.length;
-        console.log("[Storage] Evidence metadata delete success", { id: record.id, count: removedEvidenceCount });
-      }
+    const removedEvidenceIds = existingEvidence
+      .filter((row) => {
+        if (explicitRemovedIds.has(row.id) || explicitRemovedPaths.has(row.storage_path)) return true;
+        return !retainedIds.has(row.id) && !retainedPaths.has(row.storage_path);
+      })
+      .map((row) => row.id);
+    if (removedEvidenceIds.length) {
+      const removedRows = await deletePurchaseEvidenceByIds(removedEvidenceIds);
+      removedEvidenceCount = removedRows.length;
+      console.log("[Storage] Evidence metadata delete success", { id: record.id, count: removedEvidenceCount });
     }
 
     const evidence = newImages.length
