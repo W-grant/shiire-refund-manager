@@ -542,6 +542,42 @@
       gap: 10px;
     }
 
+    .drop details {
+      display: grid;
+      gap: 10px;
+    }
+
+    .drop summary {
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      font-weight: 700;
+      list-style: none;
+    }
+
+    .drop summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .drop summary::after {
+      content: "開く";
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .drop details[open] summary::after {
+      content: "閉じる";
+    }
+
+    .collapsed-body {
+      display: grid;
+      gap: 10px;
+    }
+
     .status {
       min-height: 20px;
       color: var(--muted);
@@ -960,14 +996,19 @@
                   <div id="taxPackageHistory" class="small muted"></div>
                 </div>
                 <div class="drop">
-                  <h3>読み込み</h3>
-                  <input id="importFile" type="file" accept=".csv,text/csv">
-                  <label for="importEvidenceFiles">証憑画像</label>
-                  <input id="importEvidenceFiles" type="file" accept="image/*" multiple>
-                  <button id="downloadTemplateBtn" type="button">テンプレート</button>
-                  <label for="restoreFile">バックアップ復元</label>
-                  <input id="restoreFile" type="file" accept="application/json,.json">
-                  <button id="migrateLocalBtn" type="button">ローカルデータ移行</button>
+                  <details>
+                    <summary>読み込み・復元</summary>
+                    <div class="collapsed-body">
+                      <label for="importFile">仕入CSV</label>
+                      <input id="importFile" type="file" accept=".csv,text/csv">
+                      <label for="importEvidenceFiles">証憑画像</label>
+                      <input id="importEvidenceFiles" type="file" accept="image/*" multiple>
+                      <button id="downloadTemplateBtn" type="button">テンプレート</button>
+                      <label for="restoreFile">バックアップ復元</label>
+                      <input id="restoreFile" type="file" accept="application/json,.json">
+                      <button id="migrateLocalBtn" type="button">ローカルデータ移行</button>
+                    </div>
+                  </details>
                 </div>
               </div>
             </div>
