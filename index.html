@@ -307,6 +307,69 @@
       margin-bottom: 12px;
     }
 
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .dashboard-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8faf7 100%);
+      min-height: 86px;
+      display: grid;
+      align-content: space-between;
+      gap: 4px;
+    }
+
+    .dashboard-card strong {
+      font-size: 21px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+    }
+
+    .dashboard-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 10px;
+    }
+
+    .dashboard-list {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      min-height: 116px;
+    }
+
+    .dashboard-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .dashboard-bar {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--ink-soft);
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .dashboard-bar span {
+      display: block;
+      height: 100%;
+      min-width: 2px;
+      background: #1f6a4b;
+    }
+
     .metric {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -630,6 +693,10 @@
       .filters {
         grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
       }
+
+      .dashboard-split {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 720px) {
@@ -647,6 +714,7 @@
       .form-grid,
       .filters,
       .io-grid,
+      .dashboard-grid,
       .summary-grid {
         grid-template-columns: 1fr;
       }
@@ -903,6 +971,47 @@
         </div>
 
         <div class="right-stack">
+          <section class="panel" aria-labelledby="dashboardTitle">
+            <div class="panel-head">
+              <h2 id="dashboardTitle">経営ダッシュボード</h2>
+              <span class="status small">販売管理連携準備中</span>
+            </div>
+            <div class="panel-body">
+              <div class="dashboard-grid">
+                <div class="dashboard-card">
+                  <span class="muted small">今月仕入</span>
+                  <strong id="dashMonthPurchase">0円</strong>
+                  <span id="dashMonthCount" class="small muted">0件</span>
+                </div>
+                <div class="dashboard-card">
+                  <span class="muted small">推定在庫金額</span>
+                  <strong id="dashInventory">0円</strong>
+                  <span class="small muted">販売管理追加後に精緻化</span>
+                </div>
+                <div class="dashboard-card">
+                  <span class="muted small">証憑添付率</span>
+                  <strong id="dashEvidenceRate">0%</strong>
+                  <span id="dashEvidenceCount" class="small muted">0 / 0件</span>
+                </div>
+                <div class="dashboard-card">
+                  <span class="muted small">未処理</span>
+                  <strong id="dashOpenTasks">0</strong>
+                  <span class="small muted">証憑なし・販売先未設定</span>
+                </div>
+              </div>
+              <div class="dashboard-split">
+                <div class="dashboard-list">
+                  <strong class="small">担当者別 仕入額</strong>
+                  <div id="dashStaffRanking"></div>
+                </div>
+                <div class="dashboard-list">
+                  <strong class="small">販売先準備状況</strong>
+                  <div id="dashDestinationBreakdown"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="panel" aria-labelledby="summaryTitle">
             <div class="panel-head">
               <h2 id="summaryTitle">一覧・集計</h2>
@@ -2107,6 +2216,7 @@
     function render() {
       renderMonths();
       const records = filteredRecords();
+      renderDashboard(records);
       renderSummary(records);
       renderRows(records);
       applyRenderedRoleControls();
@@ -2151,6 +2261,69 @@
         render();
       });
       return button;
+    }
+
+    function renderDashboard(records) {
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const monthRecords = records.filter((record) => monthKey(record) === currentMonth);
+      const monthAmount = monthRecords.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+      const totalAmount = records.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+      const evidenceCount = records.filter((record) => hasRecordImages(record.id)).length;
+      const noEvidenceCount = records.length - evidenceCount;
+      const missingDestinationCount = records.filter((record) => !record.destination || record.destination === "undecided").length;
+      const evidenceRate = records.length ? Math.round(evidenceCount / records.length * 100) : 0;
+
+      $("dashMonthPurchase").textContent = yen(monthAmount);
+      $("dashMonthCount").textContent = `${monthRecords.length}件`;
+      $("dashInventory").textContent = yen(totalAmount);
+      $("dashEvidenceRate").textContent = `${evidenceRate}%`;
+      $("dashEvidenceCount").textContent = `${evidenceCount} / ${records.length}件`;
+      $("dashOpenTasks").textContent = noEvidenceCount + missingDestinationCount;
+
+      renderDashboardRanking("dashStaffRanking", sumBy(records, (record) => record.staff || "未設定", (record) => Number(record.amount || 0)));
+      renderDashboardRanking("dashDestinationBreakdown", sumBy(records, destinationLabel, (record) => Number(record.amount || 0)));
+    }
+
+    function sumBy(records, keyFn, valueFn) {
+      return records.reduce((acc, record) => {
+        const key = keyFn(record);
+        acc[key] = (acc[key] || 0) + valueFn(record);
+        return acc;
+      }, {});
+    }
+
+    function destinationLabel(record) {
+      const labels = {
+        catawiki: "CATAWIKI",
+        ebay: "EBAY",
+        both: "共通",
+        other: "その他",
+        undecided: "未定"
+      };
+      return labels[record.destination] || "未定";
+    }
+
+    function renderDashboardRanking(id, values) {
+      const target = $(id);
+      const entries = Object.entries(values).sort((a, b) => b[1] - a[1]).slice(0, 4);
+      const max = Math.max(...entries.map(([, value]) => value), 0);
+      if (!entries.length) {
+        target.innerHTML = `<span class="muted small">データがありません</span>`;
+        return;
+      }
+      target.innerHTML = entries.map(([label, value]) => {
+        const width = max ? Math.max(4, Math.round(value / max * 100)) : 0;
+        return `
+          <div class="dashboard-row">
+            <div>
+              <strong>${escapeHtml(label)}</strong>
+              <div class="dashboard-bar"><span style="width:${width}%"></span></div>
+            </div>
+            <span class="money">${yen(value)}</span>
+          </div>
+        `;
+      }).join("");
     }
 
     function renderSummary(records) {
