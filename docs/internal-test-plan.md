@@ -1,11 +1,12 @@
 # 社内運用テスト計画
 
-Version1リリース前に、社内3〜5人で実務操作を確認する。
+Version1リリース前に、まずadmin中心で実務操作を確認する。staff / tax_accountant は必要になった時点で追加して確認する。
 
 ## 目的
 
 - Supabase保存が実運用で成立することを確認する
-- admin / staff / tax_accountant の権限制御を確認する
+- adminで日常運用が成立することを確認する
+- staff / tax_accountant を使う場合は権限制御を確認する
 - 証憑画像、月次税理士提出ZIP、保存履歴が業務で使えることを確認する
 - AI抽出の読み取り精度と登録前レビューの流れを確認する
 
@@ -16,10 +17,10 @@ Supabase DashboardのAuthenticationでユーザーを作成し、SQL Editorで `
 | 用途 | role | 人数 |
 | --- | --- | --- |
 | 管理者 | `admin` | 1 |
-| 社内担当者 | `staff` | 2〜3 |
-| 税理士閲覧用 | `tax_accountant` | 1 |
+| 社内担当者 | `staff` | 必要時 |
+| 税理士閲覧用 | `tax_accountant` | 必要時 |
 
-本番テストでは、最低でも以下の3アカウントを用意する。
+当面adminのみで運用開始する場合、staff / tax_accountant は作成しなくてよい。複数人で使い始めるタイミングで以下を追加する。
 
 | 用途 | 例 |
 | --- | --- |
@@ -121,9 +122,10 @@ limit 30;
 
 ## 合格条件
 
-- admin / staff / tax_accountant の権限差が画面とRLSの両方で成立する
+- adminで仕入登録、編集、削除、証憑追加、月次ZIP作成が完了する
+- staff / tax_accountant を使う場合は、権限差が画面とRLSの両方で成立する
 - 仕入登録、編集、証憑追加、月次ZIP作成が実務データで完了する
-- 税理士閲覧用ユーザーが保存済みZIPを取得できる
+- tax_accountant を使う場合は、税理士閲覧用ユーザーが保存済みZIPを取得できる
 - 管理者だけが保存済みZIPを削除できる
 - AI抽出がCloudflare `/extract` 経由で動作する
 - 重大なレイアウト崩れやクリック不能箇所がない

@@ -39,6 +39,8 @@
 
 詳細は [docs/role-permission-checklist.md](docs/role-permission-checklist.md) を参照してください。
 
+Version1の最終リリース判定は [docs/v1-final-release-check.md](docs/v1-final-release-check.md) を参照してください。
+
 ## Cloudflare Pages設定
 
 Cloudflare Pagesの設定は以下です。
@@ -165,7 +167,7 @@ pnpm run build
 
 ## 残タスク
 
-- staff / tax_accountant の実アカウントで権限別テスト
-- 社内3〜5人での運用テスト
-- 文字化けが残る画面文言の整理
-- E2Eテストの追加
+- admin実務データでの最終通し確認
+- CSV / Excel / PDF / 税理士提出ZIPの実ファイル確認
+- staff / tax_accountant は必要になった時点で実アカウントを追加して権限別テスト
+- ブラウザE2Eテストの追加
