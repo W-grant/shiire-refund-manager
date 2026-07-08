@@ -1566,7 +1566,9 @@
         return true;
       } catch (error) {
         console.warn("[Supabase] purchase read failed", error);
-        $("ioStatus").textContent = "Supabase読み取りに失敗したためローカルデータを表示します";
+        $("ioStatus").textContent = state.profile
+          ? "Supabase読み取りに失敗しました"
+          : "Supabase読み取りに失敗したためローカルデータを表示します";
         return false;
       }
     }
@@ -1797,6 +1799,10 @@
           $("ioStatus").textContent = `仕入を更新できませんでした: ${formatErrorDetails(error)}`;
         }
       }
+      if (state.profile && !savedToSupabase) {
+        await loadAll();
+        return false;
+      }
       await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
       await syncSet(`rec/${record.id}`, record);
       if (imageBundle) {
@@ -1811,7 +1817,7 @@
       }
       if (isNewRecord && !savedToSupabase) {
         await loadIndexedDbAll();
-        return;
+        return false;
       }
       await loadAll();
       return true;
@@ -2506,7 +2512,11 @@
         const selectedImages = imageIndex === "all" ? state.aiImages : [state.aiImages[Number(imageIndex)]].filter(Boolean);
         const bundle = selectedImages.length ? imageBundleFor(record.id, selectedImages) : null;
         record.hasImage = Boolean(bundle && bundle.images.length);
-        await saveRecord(record, bundle);
+        const saved = await saveRecord(record, bundle);
+        if (!saved) {
+          $("extractStatus").textContent = `${index + 1}行目の保存に失敗しました`;
+          return;
+        }
       }
       const count = state.aiItems.length;
       clearExtract();
