@@ -528,3 +528,129 @@ flowchart TD
 - 手動同期ボタンのみ
 
 この範囲なら、現在の仕入管理機能を壊さずにGoogle Sheets連携を追加できる。
+
+## 確定方針: CATAWIKI / EBAY向け追加項目
+
+Google Sheets連携に先立ち、アプリ側の仕入データに以下の項目を追加する。
+
+| 項目 | 用途 | 初期値 |
+| --- | --- | --- |
+| `manufacturer` | メーカー名 | 空欄 |
+| `item_price` | 商品本体価格 | 既存の仕入総額 |
+| `shipping_fee_total` | 送料・手数料合計 | `0` |
+| `destination` | 利用先 | `undecided` |
+
+### 金額の定義
+
+既存の `amount` は引き続き仕入総額として扱う。
+
+```text
+仕入総額税込 = 商品本体価格 + 送料・手数料合計
+```
+
+税務計算、控除税額、古物商特例判定は、これまで通り仕入総額税込 `amount` を対象にする。
+
+Google Sheetsでは以下の列へ出力する。
+
+| Sheets列 | 内容 | アプリ項目 |
+| --- | --- | --- |
+| F列 | 商品名 | `name` |
+| G列 | メーカー名 | `manufacturer` |
+| J列 | 仕入れ日 | `date` / `purchase_date` |
+| K列 | 仕入れ価格 | `item_price` |
+| L列 | 送料、手数料合計 | `shipping_fee_total` |
+
+### 利用先
+
+仕入登録に `利用先` を追加する。
+
+候補:
+
+- CATAWIKI
+- EBAY
+- 共通
+- 未定
+- その他
+
+内部値:
+
+| 表示 | 内部値 |
+| --- | --- |
+| CATAWIKI | `catawiki` |
+| EBAY | `ebay` |
+| 共通 | `both` |
+| 未定 | `undecided` |
+| その他 | `other` |
+
+`destination` はGoogle SheetsのCATAWIKIタブ、EBAYタブへの振り分けに使う。
+
+### 既存データの移行
+
+既存データは壊さず、以下の初期値で扱う。
+
+| 既存データ | 新項目の初期値 |
+| --- | --- |
+| `manufacturer` | 空欄 |
+| `item_price` | 既存の `amount` |
+| `shipping_fee_total` | `0` |
+| `destination` | `undecided` |
+
+この移行により、既存の控除判定、CSV、Excel、PDF、税理士提出ZIPの金額計算を維持する。
+
+### AI抽出方針
+
+AI抽出では以下を追加で抽出する。
+
+- メーカー名
+- 商品本体価格
+- 送料
+- 手数料
+- 送料・手数料合計
+- 利用先候補
+
+保存項目としては、まず以下に絞る。
+
+- `manufacturer`
+- `item_price`
+- `shipping_fee_total`
+- `destination`
+
+送料と手数料を個別保持するかは、次の段階で判断する。Version1.1では合計値だけでよい。
+
+### Supabase追加カラム案
+
+`public.purchases` に以下を追加する。
+
+```sql
+alter table public.purchases
+  add column if not exists manufacturer text,
+  add column if not exists item_price integer,
+  add column if not exists shipping_fee_total integer not null default 0,
+  add column if not exists destination text not null default 'undecided'
+    check (destination in ('catawiki', 'ebay', 'both', 'undecided', 'other'));
+```
+
+既存行の初期補正:
+
+```sql
+update public.purchases
+set item_price = amount
+where item_price is null;
+```
+
+### 実装順
+
+1. Supabase schemaに追加カラムを定義
+2. Mapper / Repository / Serviceに新項目を追加
+3. 仕入登録フォームに `メーカー名`, `商品本体価格`, `送料・手数料合計`, `利用先` を追加
+4. `amount` を `item_price + shipping_fee_total` で更新するUIにする
+5. AI抽出結果に新項目を追加
+6. CSV / Excel / PDF / 税理士提出ZIPの既存出力が壊れていないことを確認
+7. Google Sheets同期でF/G/J/K/Lへ出力
+
+### 注意点
+
+- `amount` は税務計算のため残す。
+- `item_price` と `shipping_fee_total` の合計が `amount` とずれた場合は、保存前に画面で補正または警告する。
+- メーカー名はAI推定だけにせず、必ず手修正できるようにする。
+- CATAWIKI / EBAYの補助管理項目は `purchase_sales_links` へ分離し、仕入本体を肥大化させない。
