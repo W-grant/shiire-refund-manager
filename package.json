@@ -2,9 +2,10 @@
   "scripts": {
     "dev": "vite",
     "vite:build": "vite build",
-    "build": "node --check src/classify.js && node --check src/csv.js && node --check src/zip.js && node --check functions/extract.js && node --check netlify/functions/extract.js && node --check netlify/functions/sync.js && node test/run-tests.js && vite build",
+    "build": "node --check src/classify.js && node --check src/csv.js && node --check src/zip.js && node --check test/production-smoke.mjs && node --check functions/extract.js && node --check netlify/functions/extract.js && node --check netlify/functions/sync.js && node test/run-tests.js && vite build",
     "test": "node test/run-tests.js",
-    "check": "node --check src/classify.js && node --check src/csv.js && node --check src/zip.js && node --check functions/extract.js && node --check netlify/functions/extract.js && node --check netlify/functions/sync.js"
+    "check": "node --check src/classify.js && node --check src/csv.js && node --check src/zip.js && node --check test/production-smoke.mjs && node --check functions/extract.js && node --check netlify/functions/extract.js && node --check netlify/functions/sync.js",
+    "smoke:production": "node test/production-smoke.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "^8.0.0",

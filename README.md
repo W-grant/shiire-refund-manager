@@ -144,6 +144,12 @@ pnpm run test
 pnpm run build
 ```
 
+Production URLと `/extract` のヘルスチェック:
+
+```bash
+pnpm run smoke:production
+```
+
 ## デプロイ確認
 
 作業完了時は以下を確認します。
@@ -153,6 +159,7 @@ pnpm run build
 - GitHub Push成功
 - Cloudflare Productionが最新commitになったこと
 - Production URLで最新コードが配信されていること
+- `pnpm run smoke:production` が成功すること
 
 ## 主要ファイル
 
