@@ -8,10 +8,14 @@ export type LegacyRecord = {
   channel: string;
   staff: string;
   name: string;
+  manufacturer?: string;
   category: string;
   qty: number;
   branch: string;
+  itemPrice?: number;
+  shippingFeeTotal?: number;
   amount: number;
+  destination?: "catawiki" | "ebay" | "both" | "undecided" | "other";
   kind: "kobutsu" | "jun" | "other";
   stock: "yes" | "no";
   qualified: "yes" | "no" | "unknown";
@@ -83,8 +87,12 @@ export function legacyRecordToPurchaseInsert(
     category_id: byName(masters.categories, record.category, "category"),
     staff_id: null,
     name: record.name,
+    manufacturer: optionalText(record.manufacturer),
     quantity: Number(record.qty || 1),
+    item_price: Number(record.itemPrice ?? record.amount ?? 0),
+    shipping_fee_total: Number(record.shippingFeeTotal || 0),
     amount: Number(record.amount || 0),
+    destination: record.destination || "undecided",
     tax_rate: Number(record.rate || 10),
     kind: record.kind,
     stock: record.stock,
@@ -132,10 +140,14 @@ export function purchaseToLegacyRecord(row: PurchaseRow, evidenceRows: EvidenceW
     channel: row.channel?.name || "",
     staff: row.staff?.display_name || "未設定",
     name: row.name,
+    manufacturer: row.manufacturer || "",
     category: row.category?.name || "",
     qty: Number(row.quantity || 1),
     branch: row.branch?.name || "",
+    itemPrice: Number(row.item_price ?? row.amount ?? 0),
+    shippingFeeTotal: Number(row.shipping_fee_total || 0),
     amount: Number(row.amount || 0),
+    destination: row.destination || "undecided",
     kind: row.kind,
     stock: row.stock,
     qualified: row.qualified,

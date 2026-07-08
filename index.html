@@ -835,6 +835,20 @@
                   <input id="name" name="name" type="text" required autocomplete="off">
                 </div>
                 <div class="field">
+                  <label for="manufacturer">メーカー名</label>
+                  <input id="manufacturer" name="manufacturer" type="text" autocomplete="off">
+                </div>
+                <div class="field">
+                  <label for="destination">利用先</label>
+                  <select id="destination" name="destination">
+                    <option value="undecided">未定</option>
+                    <option value="catawiki">CATAWIKI</option>
+                    <option value="ebay">EBAY</option>
+                    <option value="both">共通</option>
+                    <option value="other">その他</option>
+                  </select>
+                </div>
+                <div class="field">
                   <label for="category">品目</label>
                   <select id="category" name="category"></select>
                 </div>
@@ -843,7 +857,15 @@
                   <input id="qty" name="qty" type="number" min="1" step="1" value="1" required>
                 </div>
                 <div class="field">
-                  <label for="amount">金額（税込）</label>
+                  <label for="itemPrice">商品本体価格</label>
+                  <input id="itemPrice" name="itemPrice" type="number" min="0" step="1">
+                </div>
+                <div class="field">
+                  <label for="shippingFeeTotal">送料・手数料合計</label>
+                  <input id="shippingFeeTotal" name="shippingFeeTotal" type="number" min="0" step="1" value="0">
+                </div>
+                <div class="field">
+                  <label for="amount">仕入総額（税込）</label>
                   <input id="amount" name="amount" type="number" min="0" step="1" required>
                 </div>
                 <div class="field">
@@ -947,10 +969,14 @@
                     <th>仕入日</th>
                     <th>チャネル</th>
                     <th>商品</th>
+                    <th>メーカー</th>
                     <th>品目</th>
                     <th>数量</th>
-                    <th>金額</th>
+                    <th>本体価格</th>
+                    <th>送料手数料</th>
+                    <th>総額</th>
                     <th>税率</th>
+                    <th>利用先</th>
                     <th>相手方</th>
                     <th>古物</th>
                     <th>棚卸</th>
@@ -1223,9 +1249,13 @@
 "仕入日":"YYYY-MM-DD または null",
 "チャネル":"ヤフオク|メルカリ|ラクマ|市場（古物市場）|業者オークション|店頭買取|その他",
 "商品名":"文字列",
+"メーカー名":"文字列 または null",
 "品目":"時計|バッグ|貴金属・宝飾|カメラ|コイン・切手|美術品・骨董|道具類|衣類|その他",
 "数量":1,
+"商品本体価格":数値,
+"送料手数料合計":数値,
 "金額税込":数値,
+"利用先":"CATAWIKI|EBAY|共通|未定|その他",
 "相手方氏名":"出品者名/店名 または null",
 "相手方住所":"判明すれば文字列 / 通常null",
 "適格請求書発行事業者":true/false/null,
@@ -2077,10 +2107,14 @@
         channel: META.channels[0] || "その他",
         staff: META.staff[0] || "未設定",
         name: "",
+        manufacturer: "",
         category: META.categories[0] || "その他",
         qty: 1,
         branch: META.branches[0] || "未設定",
+        itemPrice: 0,
+        shippingFeeTotal: 0,
         amount: 0,
+        destination: "undecided",
         kind: "kobutsu",
         stock: "yes",
         qualified: "no",
@@ -2095,6 +2129,9 @@
 
     function setForm(record) {
       const value = { ...defaultRecord(), ...record };
+      value.itemPrice = Number(value.itemPrice ?? value.item_price ?? value.amount ?? 0);
+      value.shippingFeeTotal = Number(value.shippingFeeTotal ?? value.shipping_fee_total ?? 0);
+      value.destination = value.destination || "undecided";
       for (const key of Object.keys(value)) {
         if (form.elements[key]) form.elements[key].value = value[key];
       }
@@ -2108,17 +2145,25 @@
 
     function readForm() {
       const data = new FormData(form);
-      const amount = Number(data.get("amount") || 0);
+      const itemPrice = Number(data.get("itemPrice") || 0);
+      const shippingFeeTotal = Number(data.get("shippingFeeTotal") || 0);
+      const amountInput = Number(data.get("amount") || 0);
+      const calculatedAmount = Number(itemPrice || 0) + Number(shippingFeeTotal || 0);
+      const amount = calculatedAmount > 0 ? calculatedAmount : amountInput;
       return {
         id: $("recordId").value || crypto.randomUUID(),
         date: data.get("date"),
         channel: data.get("channel"),
         staff: data.get("staff"),
         name: String(data.get("name") || "").trim(),
+        manufacturer: String(data.get("manufacturer") || "").trim(),
         category: data.get("category"),
         qty: Number(data.get("qty") || 1),
         branch: data.get("branch"),
+        itemPrice: Number.isFinite(itemPrice) ? Math.round(itemPrice) : 0,
+        shippingFeeTotal: Number.isFinite(shippingFeeTotal) ? Math.round(shippingFeeTotal) : 0,
         amount: Number.isFinite(amount) ? Math.round(amount) : 0,
+        destination: data.get("destination") || "undecided",
         kind: data.get("kind"),
         stock: data.get("stock"),
         qualified: data.get("qualified"),
@@ -2383,9 +2428,9 @@
           <td>${image ? `<img class="thumb" src="${image.thumb}" alt="" data-evidence="${record.id}"><span class="muted small">${imageCount}枚</span>` : `<span class="empty-thumb">なし</span>`}</td>
           <td><strong>${escapeHtml(record.date || "")}</strong><br><span class="muted small">${escapeHtml(record.branch || "")}</span></td>
           <td>${escapeHtml(record.channel || "")}</td>
-          <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
+          <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.manufacturer || record.category || "")} / ${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
           <td>${escapeHtml(record.seller || "")}<br><span class="muted small">${escapeHtml(flagText(c))}</span></td>
-          <td><span class="money">${yen(record.amount)}</span><br><span class="muted small">${record.rate || 10}%</span></td>
+          <td><span class="money">${yen(record.amount)}</span><br><span class="muted small">${record.rate || 10}% / ${escapeHtml(destinationLabel(record))}</span></td>
           <td>${badge(c.kind)}<br><span class="muted small">${Math.round(c.ratio * 100)}%</span></td>
           <td><span class="money">${yen(c.tax)}</span></td>
           <td>${escapeHtml(record.staff || "")}</td>
@@ -2595,16 +2640,23 @@
       const channel = item["チャネル"] || "その他";
       const qualifiedRaw = item["適格請求書発行事業者"];
       const anonRaw = item["匿名取引"];
+      const itemPrice = Number(item["商品本体価格"] ?? item["金額税込"] ?? 0);
+      const shippingFeeTotal = Number(item["送料手数料合計"] ?? 0);
+      const amount = Number(item["金額税込"] ?? (itemPrice + shippingFeeTotal));
       return {
         id: crypto.randomUUID(),
         date: item["仕入日"] || today(),
         channel,
         staff: META.staff[0] || "未設定",
         name: item["商品名"] || "",
+        manufacturer: item["メーカー名"] || "",
         category: item["品目"] || "その他",
         qty: Number(item["数量"] || 1),
         branch: META.branches[0] || "未設定",
-        amount: Number(item["金額税込"] || 0),
+        itemPrice,
+        shippingFeeTotal,
+        amount,
+        destination: destinationValue(item["利用先"]),
         kind: "kobutsu",
         stock: "yes",
         qualified: qualifiedRaw === true ? "yes" : qualifiedRaw === null ? "unknown" : "no",
@@ -2639,6 +2691,23 @@
       };
     }
 
+    function syncAmountFields() {
+      const itemPrice = Number($("itemPrice").value || 0);
+      const shippingFeeTotal = Number($("shippingFeeTotal").value || 0);
+      const total = Number(itemPrice || 0) + Number(shippingFeeTotal || 0);
+      if (total > 0) $("amount").value = String(Math.round(total));
+      updateLiveClassify();
+    }
+
+    function destinationValue(value) {
+      const text = String(value || "").trim().toLowerCase();
+      if (text.includes("catawiki")) return "catawiki";
+      if (text.includes("ebay") || text.includes("e-bay")) return "ebay";
+      if (text.includes("共通") || text.includes("both")) return "both";
+      if (text.includes("その他") || text.includes("other")) return "other";
+      return "undecided";
+    }
+
     function reviewFlagsHtml(result) {
       const flags = [
         ...result.errors.map((message) => ["error", message]),
@@ -2657,6 +2726,7 @@
       ].join("");
       const channelOptions = META.channels.map((item) => [item, item]);
       const categoryOptions = META.categories.map((item) => [item, item]);
+      const destinationOptions = [["undecided", "未定"], ["catawiki", "CATAWIKI"], ["ebay", "EBAY"], ["both", "共通"], ["other", "その他"]];
       const kindOptions = [["kobutsu", "古物"], ["jun", "準古物"], ["other", "古物以外"]];
       const stockOptions = [["yes", "はい"], ["no", "いいえ"]];
       const qualifiedOptions = [["no", "登録なし"], ["yes", "登録あり"], ["unknown", "不明"]];
@@ -2669,10 +2739,14 @@
           <td><input data-review="${index}" data-field="date" type="date" value="${escapeHtml(record.date)}"></td>
           <td>${selectHtml(index, "channel", channelOptions, record.channel)}</td>
           <td><input data-review="${index}" data-field="name" type="text" value="${escapeHtml(record.name)}"></td>
+          <td><input data-review="${index}" data-field="manufacturer" type="text" value="${escapeHtml(record.manufacturer || "")}"></td>
           <td>${selectHtml(index, "category", categoryOptions, record.category)}</td>
           <td><input data-review="${index}" data-field="qty" type="number" min="1" step="1" value="${escapeHtml(record.qty)}"></td>
+          <td><input data-review="${index}" data-field="itemPrice" type="number" value="${escapeHtml(record.itemPrice ?? record.amount ?? 0)}"></td>
+          <td><input data-review="${index}" data-field="shippingFeeTotal" type="number" value="${escapeHtml(record.shippingFeeTotal ?? 0)}"></td>
           <td><input data-review="${index}" data-field="amount" type="number" value="${escapeHtml(record.amount)}"></td>
           <td>${selectHtml(index, "rate", [["10", "10%"], ["8", "8%"]], record.rate)}</td>
+          <td>${selectHtml(index, "destination", destinationOptions, record.destination || "undecided")}</td>
           <td><input data-review="${index}" data-field="seller" type="text" value="${escapeHtml(record.seller)}"></td>
           <td>${selectHtml(index, "kind", kindOptions, record.kind)}</td>
           <td>${selectHtml(index, "stock", stockOptions, record.stock)}</td>
@@ -3450,6 +3524,10 @@
       });
       form.addEventListener("input", updateLiveClassify);
       form.addEventListener("change", updateLiveClassify);
+      ["itemPrice", "shippingFeeTotal"].forEach((id) => {
+        $(id).addEventListener("input", syncAmountFields);
+        $(id).addEventListener("change", syncAmountFields);
+      });
       $("settingsBtn").addEventListener("click", () => {
         renderSettingsForm();
         $("settingsDialog").showModal();
@@ -3552,14 +3630,20 @@
         if (!target) return;
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
-        state.aiItems[index][field] = ["amount", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        state.aiItems[index][field] = ["amount", "itemPrice", "shippingFeeTotal", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        if (field === "itemPrice" || field === "shippingFeeTotal") {
+          state.aiItems[index].amount = Number(state.aiItems[index].itemPrice || 0) + Number(state.aiItems[index].shippingFeeTotal || 0);
+        }
       });
       $("reviewRows").addEventListener("change", (event) => {
         const target = event.target.closest("[data-review]");
         if (!target) return;
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
-        state.aiItems[index][field] = ["amount", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        state.aiItems[index][field] = ["amount", "itemPrice", "shippingFeeTotal", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        if (field === "itemPrice" || field === "shippingFeeTotal") {
+          state.aiItems[index].amount = Number(state.aiItems[index].itemPrice || 0) + Number(state.aiItems[index].shippingFeeTotal || 0);
+        }
         renderReview();
       });
       $("reviewRows").addEventListener("click", (event) => {

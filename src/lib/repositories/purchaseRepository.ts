@@ -8,8 +8,12 @@ export type PurchaseRow = {
   category_id: string | null;
   staff_id: string | null;
   name: string;
+  manufacturer: string | null;
   quantity: number;
+  item_price: number | null;
+  shipping_fee_total: number;
   amount: number;
+  destination: "catawiki" | "ebay" | "both" | "undecided" | "other";
   tax_rate: number;
   kind: "kobutsu" | "jun" | "other";
   stock: "yes" | "no";
@@ -39,8 +43,12 @@ export type PurchaseInsert = {
   category_id: string | null;
   staff_id: string | null;
   name: string;
+  manufacturer: string | null;
   quantity: number;
+  item_price: number | null;
+  shipping_fee_total: number;
   amount: number;
+  destination: "catawiki" | "ebay" | "both" | "undecided" | "other";
   tax_rate: number;
   kind: "kobutsu" | "jun" | "other";
   stock: "yes" | "no";
@@ -70,8 +78,12 @@ export async function fetchPurchases() {
       category_id,
       staff_id,
       name,
+      manufacturer,
       quantity,
+      item_price,
+      shipping_fee_total,
       amount,
+      destination,
       tax_rate,
       kind,
       stock,
