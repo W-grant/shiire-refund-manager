@@ -1145,7 +1145,7 @@
         .map((failure) => {
           const parts = [
             failure.fileName || "evidence",
-            failure.message || "unknown error",
+            failure.message || "原因不明のエラー",
             failure.code ? `code=${failure.code}` : "",
             failure.details ? `details=${failure.details}` : "",
             failure.hint ? `hint=${failure.hint}` : ""
@@ -1155,10 +1155,23 @@
         .join(" | ");
     }
 
+    function readableErrorMessage(value, fallback = "原因不明のエラー") {
+      if (!value) return fallback;
+      if (typeof value === "string") return value;
+      if (value.message) return value.message;
+      if (value.error_description) return value.error_description;
+      if (value.error) return readableErrorMessage(value.error, fallback);
+      try {
+        return JSON.stringify(value);
+      } catch (error) {
+        return fallback;
+      }
+    }
+
     function formatErrorDetails(error) {
-      if (!error) return "unknown error";
+      if (!error) return "原因不明のエラー";
       const parts = [
-        error.message || String(error),
+        readableErrorMessage(error),
         error.status ? `status=${error.status}` : "",
         error.code ? `code=${error.code}` : "",
         error.details ? `details=${error.details}` : "",
@@ -1327,22 +1340,22 @@
       const status = await service.getSaveStatus();
       if (!status.authenticated) {
         console.info("[Save] Supabase skipped: not authenticated");
-        $("ioStatus").textContent = "Supabase未ログインのためローカル保存のみ";
+        $("ioStatus").textContent = "ログインしていないため保存できません";
         return false;
       }
       if (!status.canInsert) {
         console.warn("[Save] Supabase skipped: role cannot insert", { role: status.role });
-        $("ioStatus").textContent = "Supabase保存権限がないためローカル保存のみ";
+        $("ioStatus").textContent = "この権限では仕入を保存できません";
         return false;
       }
       const bundle = normalizeImageBundle(imageBundle);
       const result = await service.savePurchase(record, classified(record), bundle ? bundle.images : []);
       if (result.evidence && result.evidence.failures.length) {
         console.warn("[Storage] Evidence failures", result.evidence.failures);
-        $("ioStatus").textContent = `Supabase purchase saved, evidence warning: ${formatEvidenceFailures(result.evidence.failures)}`;
+        $("ioStatus").textContent = `仕入は保存しましたが、一部の証憑画像を保存できませんでした: ${formatEvidenceFailures(result.evidence.failures)}`;
         return false;
       }
-      $("ioStatus").textContent = "Supabase insert succeeded";
+      $("ioStatus").textContent = "仕入を保存しました";
       return true;
     }
 
@@ -1353,10 +1366,10 @@
       const result = await service.updatePurchase(record, classified(record), bundle ? bundle.images : []);
       if (result.evidence && result.evidence.failures.length) {
         console.warn("[Storage] Evidence failures", result.evidence.failures);
-        $("ioStatus").textContent = `Supabase update succeeded, evidence warning: ${formatEvidenceFailures(result.evidence.failures)}`;
+        $("ioStatus").textContent = `仕入は更新しましたが、一部の証憑画像を保存できませんでした: ${formatEvidenceFailures(result.evidence.failures)}`;
         return false;
       }
-      $("ioStatus").textContent = "Supabase update succeeded";
+      $("ioStatus").textContent = "仕入を更新しました";
       return Boolean(result && result.purchase && result.purchase.id);
     }
 
@@ -1364,7 +1377,7 @@
       const service = await waitForSupabaseWriteService();
       if (!service) return false;
       const result = await service.deletePurchase(id);
-      $("ioStatus").textContent = "Supabase delete succeeded";
+      $("ioStatus").textContent = "仕入を削除しました";
       return Boolean(result && result.id);
     }
 
@@ -1382,7 +1395,7 @@
 
     async function migrateLocalPurchases() {
       if (!canWritePurchases()) {
-        $("ioStatus").textContent = "Supabase migration blocked: login or write role required";
+        $("ioStatus").textContent = "ローカルデータ移行にはログインと保存権限が必要です";
         return false;
       }
       const service = await waitForSupabaseWriteService();
@@ -1393,9 +1406,9 @@
         return false;
       }
       if (!confirm(`${snapshot.records.length}件のローカル仕入データをSupabaseへ移行しますか？`)) return false;
-      $("ioStatus").textContent = "Supabase migration running...";
+      $("ioStatus").textContent = "ローカルデータを移行しています...";
       const result = await service.migratePurchases(snapshot.records, snapshot.images, classified);
-      $("ioStatus").textContent = `Supabase migration: inserted ${result.inserted}, skipped ${result.skipped}, failed ${result.failed}, evidence ${result.evidenceUploaded}`;
+      $("ioStatus").textContent = `移行完了: 追加 ${result.inserted}件 / スキップ ${result.skipped}件 / 失敗 ${result.failed}件 / 証憑 ${result.evidenceUploaded}件`;
       await loadAll();
       return result.failed === 0;
     }
@@ -1420,7 +1433,7 @@
       const box = $("taxPackageHistory");
       if (!box) return;
       if (!state.taxPackages.length) {
-        box.textContent = "Saved package history: none";
+        box.textContent = "保存済みの税理士提出パッケージはありません";
         return;
       }
       box.innerHTML = state.taxPackages.slice(0, 8).map((item) => {
@@ -1461,20 +1474,20 @@
       a.href = result.url;
       a.download = result.fileName || "tax-package.zip";
       a.click();
-      $("ioStatus").textContent = "Saved tax package download started";
+      $("ioStatus").textContent = "保存済みパッケージのダウンロードを開始しました";
       return true;
     }
 
     async function deleteSavedTaxPackage(id) {
       if (!isAdmin()) {
-        $("ioStatus").textContent = "Tax package delete blocked: admin role required";
+        $("ioStatus").textContent = "税理士提出パッケージの削除には管理者権限が必要です";
         return false;
       }
       const service = await waitForSupabaseWriteService();
       if (!service || !service.deleteMonthlyPackage) return false;
       await service.deleteMonthlyPackage(id);
       await loadTaxPackageHistory();
-      $("ioStatus").textContent = "Saved tax package deleted";
+      $("ioStatus").textContent = "保存済みパッケージを削除しました";
       return true;
     }
 
@@ -1705,7 +1718,7 @@
             status: error && error.status,
             details: error && error.details
           });
-          $("ioStatus").textContent = `Supabase insert failed: ${error && error.message ? error.message : "unknown error"}`;
+          $("ioStatus").textContent = `仕入を保存できませんでした: ${formatErrorDetails(error)}`;
         }
       } else {
         try {
@@ -1716,7 +1729,7 @@
             status: error && error.status,
             details: error && error.details
           });
-          $("ioStatus").textContent = `Supabase update failed: ${error && error.message ? error.message : "unknown error"}`;
+          $("ioStatus").textContent = `仕入を更新できませんでした: ${formatErrorDetails(error)}`;
         }
       }
       await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
@@ -1742,7 +1755,7 @@
     async function deleteRecord(id) {
       if (!isAdmin()) {
         console.warn("[Delete] blocked: admin role required");
-        $("ioStatus").textContent = "Supabase delete blocked: admin role required";
+        $("ioStatus").textContent = "仕入の削除には管理者権限が必要です";
         return false;
       }
       try {
@@ -1753,7 +1766,7 @@
           status: error && error.status,
           details: error && error.details
         });
-        $("ioStatus").textContent = `Supabase delete failed: ${error && error.message ? error.message : "unknown error"}`;
+        $("ioStatus").textContent = `仕入を削除できませんでした: ${formatErrorDetails(error)}`;
         return false;
       }
       await syncSet(`del/${id}`, { id, deletedAt: nowIso() });
@@ -2164,7 +2177,7 @@
       } else if (source === "saved" && id) {
         if (!isAdmin()) {
           console.warn("[Storage] Evidence metadata delete blocked: admin role required");
-          $("ioStatus").textContent = "Evidence delete blocked: admin role required";
+          $("ioStatus").textContent = "証憑画像の削除には管理者権限が必要です";
           return;
         }
         const images = getRecordImages(id);
@@ -2229,11 +2242,12 @@
     }
 
     function extractErrorMessage(payload) {
-      if (!payload) return "AI extract failed";
+      if (!payload) return "AI抽出に失敗しました";
       if (typeof payload.error === "string") return payload.error;
       if (payload.error && typeof payload.error.message === "string") return payload.error.message;
+      if (payload.error) return readableErrorMessage(payload.error, "AI抽出に失敗しました");
       if (typeof payload.message === "string") return payload.message;
-      return "AI extract failed";
+      return "AI抽出に失敗しました";
     }
 
     async function callExtract(messages) {
@@ -2930,7 +2944,7 @@
 
     async function downloadTaxPackage() {
       if (!canWritePurchases()) {
-        $("ioStatus").textContent = "Tax package creation blocked: admin or staff role required";
+        $("ioStatus").textContent = "税理士提出パッケージの作成には保存権限が必要です";
         return;
       }
       const month = $("taxPackageMonth").value;
@@ -2984,10 +2998,10 @@
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         if (savedToSupabase) await loadTaxPackageHistory();
         $("ioStatus").textContent = savedToSupabase
-          ? `Tax package ${month} saved to Supabase Storage`
-          : `Tax package ${month} downloaded; Supabase Storage save failed: ${formatErrorDetails(saveError)}`;
+          ? `${month} の税理士提出パッケージを保存しました`
+          : `${month} の税理士提出パッケージをダウンロードしました。保存履歴への登録は失敗しました: ${formatErrorDetails(saveError)}`;
       } catch (error) {
-        $("ioStatus").textContent = error.message;
+        $("ioStatus").textContent = formatErrorDetails(error);
       }
     }
 
@@ -3293,7 +3307,7 @@
             await deleteSavedTaxPackage(deleteButton.dataset.taxPackageDelete);
           } catch (error) {
             console.error("[TaxPackage] Saved package delete failed", error);
-            $("ioStatus").textContent = `Saved tax package delete failed: ${formatErrorDetails(error)}`;
+            $("ioStatus").textContent = `保存済みパッケージを削除できませんでした: ${formatErrorDetails(error)}`;
           }
           return;
         }
@@ -3303,7 +3317,7 @@
           await downloadSavedTaxPackage(button.dataset.taxPackageDownload);
         } catch (error) {
           console.error("[TaxPackage] Saved package download failed", error);
-          $("ioStatus").textContent = `Saved tax package download failed: ${error && error.message ? error.message : "unknown error"}`;
+          $("ioStatus").textContent = `保存済みパッケージをダウンロードできませんでした: ${formatErrorDetails(error)}`;
         }
       });
       $("backupBtn").addEventListener("click", exportBackup);
@@ -3333,7 +3347,7 @@
           await migrateLocalPurchases();
         } catch (error) {
           console.error("[Migration] local purchase migration failed", error);
-          $("ioStatus").textContent = `Supabase migration failed: ${error && error.message ? error.message : "unknown error"}`;
+          $("ioStatus").textContent = `ローカルデータ移行に失敗しました: ${formatErrorDetails(error)}`;
         }
       });
       $("closeEvidenceBtn").addEventListener("click", () => $("evidenceDialog").close());
