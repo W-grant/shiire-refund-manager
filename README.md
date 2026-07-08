@@ -71,7 +71,7 @@ Cloudflare PagesのProduction環境に設定します。
 
 - ブラウザにAnthropic APIキーを持たせません
 - `ANTHROPIC_API_KEY` をCloudflare側で参照します
-- `SHARED_SECRET` または `SYNC_SECRET` が設定されている場合、`X-App-Secret` ヘッダーで認証します
+- `SHARED_SECRET` が設定されている場合、`X-App-Secret` ヘッダーで認証します
 - `GET /extract` で `anthropicConfigured` と `authRequired` を確認できます。APIキーの値そのものは返しません
 
 アプリのAI中継URLの既定値は `/extract` です。
