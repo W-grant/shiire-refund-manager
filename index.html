@@ -1587,6 +1587,13 @@
 
     async function loadAll() {
       if (await loadSupabaseAll()) return;
+      if (state.profile) {
+        state.records = [];
+        state.images = new Map();
+        render();
+        await loadTaxPackageHistory();
+        return;
+      }
       await loadIndexedDbAll();
     }
 
