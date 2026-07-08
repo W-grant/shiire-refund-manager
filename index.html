@@ -2193,12 +2193,19 @@
           $("ioStatus").textContent = "証憑画像の削除には管理者権限が必要です";
           return;
         }
-        const images = getRecordImages(id);
-        const removedImages = images.splice(index, 1);
+        const currentImages = getRecordImages(id);
+        const removedImages = currentImages.slice(index, index + 1);
+        const images = currentImages.filter((_, imageIndex) => imageIndex !== index);
         const record = state.records.find((item) => item.id === id);
         if (record) {
           record.hasImage = images.length > 0;
-          await saveRecord(record, imageBundleFor(id, images, removedImages));
+          const saved = await saveRecord(record, imageBundleFor(id, images, removedImages));
+          if (!saved) {
+            $("ioStatus").textContent = "証憑画像を削除できませんでした。再読み込み後にもう一度お試しください";
+            return;
+          }
+          state.images.set(id, imageBundleFor(id, images));
+          $("ioStatus").textContent = "証憑画像を削除しました";
         }
       }
       renderProofPreview(id ? getRecordImages(id) : []);
@@ -3229,6 +3236,7 @@
         if (!button) return;
         const index = Number(button.dataset.extractImageDelete);
         state.aiImages.splice(index, 1);
+        $("extractImages").value = "";
         state.aiItems.forEach((record) => {
           if (record.imageIndex === index) record.imageIndex = state.aiImages.length ? 0 : -1;
           if (record.imageIndex > index) record.imageIndex -= 1;
