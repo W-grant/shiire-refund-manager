@@ -1090,6 +1090,7 @@
     const STORE_IMAGES = "images";
     const STORE_SETTINGS = "settings";
     const STORE_META = "meta";
+    const LOCAL_DELETED_IDS_KEY = "shiire-refund-deleted-ids";
 
     const BUILTIN = { proxyUrl: "/extract", syncUrl: "", secret: "", model: "claude-haiku-4-5-20251001" };
 
@@ -1229,6 +1230,33 @@
 
     function hasRecordImages(id) {
       return getRecordImages(id).length > 0;
+    }
+
+    function localDeletedIds() {
+      try {
+        return new Set(JSON.parse(localStorage.getItem(LOCAL_DELETED_IDS_KEY) || "[]"));
+      } catch (error) {
+        return new Set();
+      }
+    }
+
+    function rememberLocalDeletedId(id) {
+      const ids = localDeletedIds();
+      ids.add(id);
+      localStorage.setItem(LOCAL_DELETED_IDS_KEY, JSON.stringify([...ids]));
+    }
+
+    function forgetLocalDeletedId(id) {
+      const ids = localDeletedIds();
+      ids.delete(id);
+      localStorage.setItem(LOCAL_DELETED_IDS_KEY, JSON.stringify([...ids]));
+    }
+
+    function applyLocalDeletedFilter() {
+      const ids = localDeletedIds();
+      if (!ids.size) return;
+      state.records = state.records.filter((record) => !ids.has(record.id));
+      ids.forEach((id) => state.images.delete(id));
     }
 
     function waitForAuthService() {
@@ -1531,6 +1559,7 @@
         }
         state.records = snapshot.records || [];
         state.images = new Map((snapshot.images || []).map((item) => [item.id, item]));
+        applyLocalDeletedFilter();
         state.records.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
         render();
         await loadTaxPackageHistory();
@@ -1548,6 +1577,7 @@
         state.records = await requestToPromise(db.transaction(STORE_RECORDS).objectStore(STORE_RECORDS).getAll());
         const images = await requestToPromise(db.transaction(STORE_IMAGES).objectStore(STORE_IMAGES).getAll());
         state.images = new Map(images.map((item) => normalizeImageBundle(item)).filter((item) => item && item.images.length).map((item) => [item.id, item]));
+        applyLocalDeletedFilter();
       } finally {
         db.close();
       }
@@ -1737,6 +1767,7 @@
       let savedToSupabase = false;
       record.updatedAt = nowIso();
       if (isNewRecord) {
+        forgetLocalDeletedId(record.id);
         try {
           savedToSupabase = await saveSupabaseNewRecord(record, imageBundle);
         } catch (error) {
@@ -1800,6 +1831,7 @@
         }
         console.warn("[Delete] Supabase row was not found; cleaning local stale data", { id });
       }
+      rememberLocalDeletedId(id);
       await syncSet(`del/${id}`, { id, deletedAt: nowIso() });
       await tx(STORE_RECORDS, "readwrite", (store) => store.delete(id));
       await tx(STORE_IMAGES, "readwrite", (store) => store.delete(id));
