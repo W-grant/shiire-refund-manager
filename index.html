@@ -1303,6 +1303,8 @@
                     <button id="exportIndexBtn" type="button">索引簿CSV</button>
                     <button id="exportSalesBtn" type="button">販売一覧CSV</button>
                     <button id="exportProfitBtn" type="button">利益管理CSV</button>
+                    <button id="exportSheetPurchaseBtn" type="button">スプシ仕入CSV</button>
+                    <button id="exportSheetSalesBtn" type="button">スプシ販売CSV</button>
                     <button id="exportExcelBtn" type="button">Excel</button>
                     <button id="printPdfBtn" type="button">PDF印刷</button>
                     <button id="exportEvidenceBtn" type="button">証憑ZIP</button>
@@ -3384,6 +3386,62 @@
       ];
     }
 
+    function googleSheetPurchaseRows(records) {
+      return [
+        ["A", "B", "C", "D", "E", "商品名", "メーカー名", "H", "I", "仕入れ日", "仕入れ価格", "送料、手数料合計", "利用先", "支店", "担当", "証憑枚数", "アプリID"],
+        ...records.map((record) => [
+          "",
+          "",
+          "",
+          "",
+          "",
+          record.name || "",
+          record.manufacturer || "",
+          "",
+          "",
+          record.date || "",
+          Number(record.itemPrice || record.amount || 0),
+          Number(record.shippingFeeTotal || 0),
+          destinationLabel(record),
+          record.branch || "",
+          record.staff || "",
+          getRecordImages(record.id).length,
+          record.id || ""
+        ])
+      ];
+    }
+
+    function googleSheetSalesRows(sales) {
+      return [
+        ["アプリ販売ID", "アプリ仕入ID", "商品名", "メーカー名", "販売先", "状態", "仕入日", "出品日", "販売日", "仕入原価", "販売価格", "費用合計", "粗利", "利益率", "担当", "管理番号", "SKU", "メモ"],
+        ...sales.map((sale) => {
+          const purchase = findPurchase(sale.purchase_id) || {};
+          const revenue = saleRevenueJpy(sale);
+          const profit = saleProfit(sale);
+          return [
+            sale.id || "",
+            sale.purchase_id || "",
+            purchase.name || "",
+            purchase.manufacturer || "",
+            saleDestinationLabel(sale.destination),
+            saleStatusLabel(sale.status),
+            purchase.date || "",
+            sale.listed_at || "",
+            sale.sold_at || "",
+            salePurchaseCost(sale),
+            revenue,
+            saleFeeTotal(sale),
+            profit,
+            `${saleMargin(revenue, profit)}%`,
+            purchase.staff || "",
+            sale.listing_id || "",
+            sale.sku || "",
+            sale.memo || ""
+          ];
+        })
+      ];
+    }
+
     function evidenceName(record, image, index = 0) {
       if (!record.hasImage && !image) return "";
       const seller = (record.seller || "取引先").replace(/[\\/:*?"<>|]/g, "");
@@ -4244,6 +4302,8 @@
       $("exportIndexBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "index"), "電帳法索引簿.csv"));
       $("exportSalesBtn").addEventListener("click", () => downloadCsv(saleExportRows(filteredSales(), "list"), "販売一覧.csv"));
       $("exportProfitBtn").addEventListener("click", () => downloadCsv(saleExportRows(filteredSales(), "profit"), "利益管理.csv"));
+      $("exportSheetPurchaseBtn").addEventListener("click", () => downloadCsv(googleSheetPurchaseRows(currentExportRecords()), "スプシ貼付_仕入.csv"));
+      $("exportSheetSalesBtn").addEventListener("click", () => downloadCsv(googleSheetSalesRows(filteredSales()), "スプシ貼付_販売.csv"));
       $("exportExcelBtn").addEventListener("click", exportExcel);
       $("printPdfBtn").addEventListener("click", printPdf);
       $("exportEvidenceBtn").addEventListener("click", downloadAllEvidence);
