@@ -1301,6 +1301,8 @@
                     <button id="exportListBtn" type="button">仕入一覧CSV</button>
                     <button id="exportBookBtn" type="button">古物商帳簿CSV</button>
                     <button id="exportIndexBtn" type="button">索引簿CSV</button>
+                    <button id="exportSalesBtn" type="button">販売一覧CSV</button>
+                    <button id="exportProfitBtn" type="button">利益管理CSV</button>
                     <button id="exportExcelBtn" type="button">Excel</button>
                     <button id="printPdfBtn" type="button">PDF印刷</button>
                     <button id="exportEvidenceBtn" type="button">証憑ZIP</button>
@@ -3324,6 +3326,64 @@
       ];
     }
 
+    function saleExportRows(sales, type = "list") {
+      if (type === "profit") {
+        return [
+          ["販売先", "状態", "商品名", "メーカー", "仕入日", "販売日", "仕入原価", "販売価格", "販売手数料", "決済手数料", "国内送料", "海外送料", "その他費用", "費用合計", "粗利", "利益率", "担当", "管理番号", "SKU", "メモ"],
+          ...sales.map((sale) => {
+            const purchase = findPurchase(sale.purchase_id) || {};
+            const revenue = saleRevenueJpy(sale);
+            const fees = saleFeeTotal(sale);
+            const profit = saleProfit(sale);
+            return [
+              saleDestinationLabel(sale.destination),
+              saleStatusLabel(sale.status),
+              purchase.name || "",
+              purchase.manufacturer || "",
+              purchase.date || "",
+              sale.sold_at || "",
+              salePurchaseCost(sale),
+              revenue,
+              sale.platform_fee || 0,
+              sale.payment_fee || 0,
+              sale.domestic_shipping_fee || 0,
+              sale.international_shipping_fee || 0,
+              sale.other_fee || 0,
+              fees,
+              profit,
+              `${saleMargin(revenue, profit)}%`,
+              purchase.staff || "",
+              sale.listing_id || "",
+              sale.sku || "",
+              sale.memo || ""
+            ];
+          })
+        ];
+      }
+      return [
+        ["販売先", "状態", "商品名", "仕入日", "出品日", "販売日", "販売価格", "粗利", "利益率", "管理番号", "SKU", "メモ"],
+        ...sales.map((sale) => {
+          const purchase = findPurchase(sale.purchase_id) || {};
+          const revenue = saleRevenueJpy(sale);
+          const profit = saleProfit(sale);
+          return [
+            saleDestinationLabel(sale.destination),
+            saleStatusLabel(sale.status),
+            purchase.name || "",
+            purchase.date || "",
+            sale.listed_at || "",
+            sale.sold_at || "",
+            revenue,
+            profit,
+            `${saleMargin(revenue, profit)}%`,
+            sale.listing_id || "",
+            sale.sku || "",
+            sale.memo || ""
+          ];
+        })
+      ];
+    }
+
     function evidenceName(record, image, index = 0) {
       if (!record.hasImage && !image) return "";
       const seller = (record.seller || "取引先").replace(/[\\/:*?"<>|]/g, "");
@@ -3612,6 +3672,8 @@
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(exportRows(records, "list")), "仕入明細");
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(exportRows(records, "book")), "古物商特例帳簿");
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(exportRows(records, "index")), "電帳法索引簿");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(saleExportRows(filteredSales(), "list")), "販売一覧");
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(saleExportRows(filteredSales(), "profit")), "利益管理");
       return workbook;
     }
 
@@ -3662,7 +3724,9 @@
         ["月次サマリー", summaryRows(records)],
         ["仕入明細", exportRows(records, "list")],
         ["古物商特例帳簿", exportRows(records, "book")],
-        ["電帳法索引簿", exportRows(records, "index")]
+        ["電帳法索引簿", exportRows(records, "index")],
+        ["販売一覧", saleExportRows(filteredSales(), "list")],
+        ["利益管理", saleExportRows(filteredSales(), "profit")]
       ];
       const sheetDefs = sheets.map(([name], index) => `<sheet name="${xmlEscape(name)}" sheetId="${index + 1}" r:id="rId${index + 1}"/>`).join("");
       const workbookRels = sheets.map((_, index) => `<Relationship Id="rId${index + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${index + 1}.xml"/>`).join("");
@@ -4178,6 +4242,8 @@
       $("exportListBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "list"), "仕入一覧.csv"));
       $("exportBookBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "book"), "古物商特例帳簿.csv"));
       $("exportIndexBtn").addEventListener("click", () => downloadCsv(exportRows(currentExportRecords(), "index"), "電帳法索引簿.csv"));
+      $("exportSalesBtn").addEventListener("click", () => downloadCsv(saleExportRows(filteredSales(), "list"), "販売一覧.csv"));
+      $("exportProfitBtn").addEventListener("click", () => downloadCsv(saleExportRows(filteredSales(), "profit"), "利益管理.csv"));
       $("exportExcelBtn").addEventListener("click", exportExcel);
       $("printPdfBtn").addEventListener("click", printPdf);
       $("exportEvidenceBtn").addEventListener("click", downloadAllEvidence);
