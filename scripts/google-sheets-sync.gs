@@ -2,7 +2,7 @@ const CONFIG = {
   purchaseSheetName: '仕入管理',
   salesSheetName: '販売管理',
   dashboardSheetName: 'ダッシュボード',
-  secret: ''
+  secretPropertyName: 'SHEETS_SYNC_SECRET'
 };
 
 function onOpen() {
@@ -25,7 +25,8 @@ function importSalesCsv() {
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents || '{}');
-    if (CONFIG.secret && payload.secret !== CONFIG.secret) {
+    const secret = getSharedSecret_();
+    if (secret && payload.secret !== secret) {
       return jsonOutput_({ ok: false, error: 'unauthorized' });
     }
     if (payload.type === 'purchases' || payload.type === 'all') {
@@ -43,6 +44,12 @@ function doPost(e) {
   } catch (error) {
     return jsonOutput_({ ok: false, error: error.message || String(error) });
   }
+}
+
+function getSharedSecret_() {
+  return PropertiesService
+    .getScriptProperties()
+    .getProperty(CONFIG.secretPropertyName) || '';
 }
 
 function importCsvToSheet_(sheetName, fileNameHint) {

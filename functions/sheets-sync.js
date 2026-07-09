@@ -21,9 +21,13 @@ function json(body, status, headers) {
 }
 
 function isAuthorized(request, env) {
-  const secret = env.SHARED_SECRET || env.SHEETS_SYNC_SECRET || env.SYNC_SECRET;
+  const secret = env.SHEETS_SYNC_CLIENT_SECRET || env.CLIENT_SYNC_SECRET || env.SHARED_SECRET;
   if (!secret) return true;
   return request.headers.get("x-app-secret") === secret;
+}
+
+function appsScriptSecret(env) {
+  return env.SHEETS_SYNC_SECRET || env.GOOGLE_SHEETS_SECRET || env.SYNC_SECRET || env.SHARED_SECRET || "";
 }
 
 export async function onRequest(context) {
@@ -38,7 +42,8 @@ export async function onRequest(context) {
     return json({
       ok: true,
       googleSheetsConfigured: Boolean(env.GOOGLE_SHEETS_WEBAPP_URL),
-      authRequired: Boolean(env.SHARED_SECRET || env.SHEETS_SYNC_SECRET || env.SYNC_SECRET)
+      authRequired: Boolean(env.SHEETS_SYNC_CLIENT_SECRET || env.CLIENT_SYNC_SECRET || env.SHARED_SECRET),
+      googleSheetsAuthRequired: Boolean(appsScriptSecret(env))
     }, 200, cors);
   }
 
@@ -73,7 +78,7 @@ export async function onRequest(context) {
       },
       body: JSON.stringify({
         ...payload,
-        secret: env.SHEETS_SYNC_SECRET || env.SHARED_SECRET || env.SYNC_SECRET || ""
+        secret: appsScriptSecret(env)
       })
     });
     const text = await response.text();
