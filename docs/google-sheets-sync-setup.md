@@ -89,7 +89,35 @@ CSV入出力の書き出し欄に以下を追加しています。
 CSV運用で列と運用が固まった後、以下へ進めます。
 
 - Google Apps Script Web App化
-- アプリからApps Script URLへ直接POST
+- Cloudflare Pages Function `sheets-sync` 経由でGoogle SheetsへPOST
 - Supabase Edge FunctionまたはCloudflare Workers経由でGoogle Sheets APIへ反映
 
 Version1ではCSV + Apps Scriptで運用確認し、Version2以降で完全自動同期へ進めるのが安全です。
+
+## ワンクリック送信の準備
+
+アプリには `スプシへ送信` ボタンを追加しています。
+
+このボタンを使う場合は、Cloudflare Pagesの環境変数に以下を設定します。
+
+| 変数名 | 内容 |
+| --- | --- |
+| `GOOGLE_SHEETS_WEBAPP_URL` | Apps ScriptをWebアプリとしてデプロイしたURL |
+| `SHEETS_SYNC_SECRET` | 任意の共有シークレット。Apps Script側の `CONFIG.secret` と同じ値 |
+
+Apps Script側は `scripts/google-sheets-sync.gs` の `CONFIG.secret` に同じ文字列を入れます。
+
+### Apps Script Web App公開手順
+
+1. Apps Script画面で `デプロイ` → `新しいデプロイ` を選びます。
+2. 種類は `ウェブアプリ` を選びます。
+3. 実行ユーザーは `自分` を選びます。
+4. アクセスできるユーザーは社内運用に合わせます。まずは動作確認用に `全員` または `リンクを知っている全員` を使い、`SHEETS_SYNC_SECRET` で保護します。
+5. 発行されたWeb App URLをCloudflareの `GOOGLE_SHEETS_WEBAPP_URL` に設定します。
+6. Cloudflare Pagesを再デプロイします。
+
+### アプリ側の設定
+
+通常は `スプシ送信URL` を `/sheets-sync` のまま使います。
+
+直接Apps Script URLへ送るのではなく、Cloudflare Pages Functionを中継します。これにより、ブラウザ側にApps Script URLやシークレットを出しにくくできます。

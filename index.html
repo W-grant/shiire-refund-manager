@@ -1305,6 +1305,7 @@
                     <button id="exportProfitBtn" type="button">利益管理CSV</button>
                     <button id="exportSheetPurchaseBtn" type="button">スプシ仕入CSV</button>
                     <button id="exportSheetSalesBtn" type="button">スプシ販売CSV</button>
+                    <button id="syncSheetsBtn" type="button">スプシへ送信</button>
                     <button id="exportExcelBtn" type="button">Excel</button>
                     <button id="printPdfBtn" type="button">PDF印刷</button>
                     <button id="exportEvidenceBtn" type="button">証憑ZIP</button>
@@ -1378,6 +1379,10 @@
           <div class="field wide">
             <label for="syncUrl">同期URL</label>
             <input id="syncUrl" name="syncUrl" type="url" placeholder="/.netlify/functions/sync">
+          </div>
+          <div class="field wide">
+            <label for="sheetSyncUrl">スプシ送信URL</label>
+            <input id="sheetSyncUrl" name="sheetSyncUrl" type="text" placeholder="/sheets-sync">
           </div>
           <div class="field wide">
             <label for="branchesText">支店</label>
@@ -2238,7 +2243,8 @@
         model: "claude-haiku-4-5-20251001",
         syncMode: "none",
         syncUrl: "",
-        syncSecret: ""
+        syncSecret: "",
+        sheetSyncUrl: "/sheets-sync"
       };
       if (BUILTIN.proxyUrl) {
         settings.proxyUrl = BUILTIN.proxyUrl;
@@ -2513,7 +2519,7 @@
 
     function renderSettingsForm() {
       const settings = state.settings || defaultSettings();
-      ["aiMode", "proxyUrl", "model", "syncMode", "syncUrl", "syncSecret"].forEach((key) => {
+      ["aiMode", "proxyUrl", "model", "syncMode", "syncUrl", "syncSecret", "sheetSyncUrl"].forEach((key) => {
         if ($(key)) $(key).value = settings[key] || "";
       });
       $("branchesText").value = META.branches.join("\n");
@@ -2539,7 +2545,8 @@
         model: String(data.get("model") || "claude-haiku-4-5-20251001"),
         syncMode: data.get("syncMode"),
         syncUrl: String(data.get("syncUrl") || ""),
-        syncSecret: String(data.get("syncSecret") || "")
+        syncSecret: String(data.get("syncSecret") || ""),
+        sheetSyncUrl: String(data.get("sheetSyncUrl") || "/sheets-sync")
       };
       META.branches = listFromTextarea("branchesText", META.branches);
       META.channels = listFromTextarea("channelsText", META.channels);
@@ -3442,6 +3449,47 @@
       ];
     }
 
+    function googleSheetSyncPayload() {
+      const purchases = googleSheetPurchaseRows(currentExportRecords());
+      const sales = googleSheetSalesRows(filteredSales());
+      return {
+        type: "all",
+        generatedAt: new Date().toISOString(),
+        purchases,
+        sales
+      };
+    }
+
+    async function syncGoogleSheets() {
+      const settings = state.settings || defaultSettings();
+      const url = settings.sheetSyncUrl || "/sheets-sync";
+      if (!url) {
+        $("ioStatus").textContent = "スプシ送信URLを設定してください";
+        return false;
+      }
+      $("ioStatus").textContent = "スプシへ送信しています...";
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Secret": settings.syncSecret || ""
+        },
+        body: JSON.stringify(googleSheetSyncPayload())
+      });
+      const text = await response.text();
+      let payload = {};
+      try {
+        payload = text ? JSON.parse(text) : {};
+      } catch (error) {
+        payload = { message: text };
+      }
+      if (!response.ok) {
+        throw new Error(payload.error || payload.message || "スプシ送信に失敗しました");
+      }
+      $("ioStatus").textContent = `スプシへ送信しました: 仕入${currentExportRecords().length}件 / 販売${filteredSales().length}件`;
+      return true;
+    }
+
     function evidenceName(record, image, index = 0) {
       if (!record.hasImage && !image) return "";
       const seller = (record.seller || "取引先").replace(/[\\/:*?"<>|]/g, "");
@@ -4304,6 +4352,14 @@
       $("exportProfitBtn").addEventListener("click", () => downloadCsv(saleExportRows(filteredSales(), "profit"), "利益管理.csv"));
       $("exportSheetPurchaseBtn").addEventListener("click", () => downloadCsv(googleSheetPurchaseRows(currentExportRecords()), "スプシ貼付_仕入.csv"));
       $("exportSheetSalesBtn").addEventListener("click", () => downloadCsv(googleSheetSalesRows(filteredSales()), "スプシ貼付_販売.csv"));
+      $("syncSheetsBtn").addEventListener("click", async () => {
+        try {
+          await syncGoogleSheets();
+        } catch (error) {
+          console.error("[Sheets] Sync failed", error);
+          $("ioStatus").textContent = `スプシ送信に失敗しました: ${formatErrorDetails(error)}`;
+        }
+      });
       $("exportExcelBtn").addEventListener("click", exportExcel);
       $("printPdfBtn").addEventListener("click", printPdf);
       $("exportEvidenceBtn").addEventListener("click", downloadAllEvidence);

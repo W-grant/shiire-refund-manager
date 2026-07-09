@@ -1,7 +1,8 @@
 const CONFIG = {
   purchaseSheetName: '仕入管理',
   salesSheetName: '販売管理',
-  dashboardSheetName: 'ダッシュボード'
+  dashboardSheetName: 'ダッシュボード',
+  secret: ''
 };
 
 function onOpen() {
@@ -19,6 +20,29 @@ function importPurchaseCsv() {
 
 function importSalesCsv() {
   importCsvToSheet_(CONFIG.salesSheetName, 'スプシ貼付_販売.csv');
+}
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents || '{}');
+    if (CONFIG.secret && payload.secret !== CONFIG.secret) {
+      return jsonOutput_({ ok: false, error: 'unauthorized' });
+    }
+    if (payload.type === 'purchases' || payload.type === 'all') {
+      writeRows_(CONFIG.purchaseSheetName, payload.purchases || []);
+    }
+    if (payload.type === 'sales' || payload.type === 'all') {
+      writeRows_(CONFIG.salesSheetName, payload.sales || []);
+    }
+    refreshDashboard();
+    return jsonOutput_({
+      ok: true,
+      purchaseRows: Math.max(0, (payload.purchases || []).length - 1),
+      salesRows: Math.max(0, (payload.sales || []).length - 1)
+    });
+  } catch (error) {
+    return jsonOutput_({ ok: false, error: error.message || String(error) });
+  }
 }
 
 function importCsvToSheet_(sheetName, fileNameHint) {
@@ -51,10 +75,17 @@ function importCsvToSheet_(sheetName, fileNameHint) {
 
   const sheet = ensureSheet_(sheetName);
   sheet.clearContents();
+  writeRows_(sheetName, rows);
+  ui.alert(`${sheetName}へ${rows.length - 1}件を取り込みました。`);
+}
+
+function writeRows_(sheetName, rows) {
+  if (!rows.length) return;
+  const sheet = ensureSheet_(sheetName);
+  sheet.clearContents();
   sheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
   sheet.setFrozenRows(1);
   sheet.autoResizeColumns(1, rows[0].length);
-  ui.alert(`${sheetName}へ${rows.length - 1}件を取り込みました。`);
 }
 
 function refreshDashboard() {
@@ -97,4 +128,10 @@ function refreshDashboard() {
 function ensureSheet_(name) {
   const book = SpreadsheetApp.getActiveSpreadsheet();
   return book.getSheetByName(name) || book.insertSheet(name);
+}
+
+function jsonOutput_(body) {
+  return ContentService
+    .createTextOutput(JSON.stringify(body))
+    .setMimeType(ContentService.MimeType.JSON);
 }
