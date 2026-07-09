@@ -3,6 +3,7 @@ import { completePasswordRecovery, getCurrentAuth, signInWithPassword, signOut, 
 import { deleteMonthlyPackage, getMonthlyPackageDownloadUrl, listMonthlyPackages, saveMonthlyPackage } from "./lib/services/monthlyPackageService";
 import { loadSupabasePurchaseState } from "./lib/services/purchaseReadService";
 import { deletePurchase, getPurchaseSaveStatus, migratePurchases, savePurchase, updatePurchase } from "./lib/services/purchaseWriteService";
+import { deleteSale, listSales, saveSale } from "./lib/services/salesService";
 
 declare global {
   interface Window {
@@ -26,6 +27,9 @@ declare global {
       listMonthlyPackages: typeof listMonthlyPackages;
       getMonthlyPackageDownloadUrl: typeof getMonthlyPackageDownloadUrl;
       deleteMonthlyPackage: typeof deleteMonthlyPackage;
+      listSales: typeof listSales;
+      saveSale: typeof saveSale;
+      deleteSale: typeof deleteSale;
     };
   }
 }
@@ -49,7 +53,10 @@ window.ShiireSupabaseWrite = {
   saveMonthlyPackage,
   listMonthlyPackages,
   getMonthlyPackageDownloadUrl,
-  deleteMonthlyPackage
+  deleteMonthlyPackage,
+  listSales,
+  saveSale,
+  deleteSale
 };
 window.dispatchEvent(new Event("shiire:supabase-read-ready"));
 window.dispatchEvent(new Event("shiire:supabase-write-ready"));

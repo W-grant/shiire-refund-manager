@@ -370,6 +370,30 @@
       background: #1f6a4b;
     }
 
+    .sales-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .sales-table {
+      margin-top: 12px;
+      overflow-x: auto;
+    }
+
+    .sales-table table {
+      min-width: 880px;
+    }
+
+    .profit-plus {
+      color: #13734d;
+      font-weight: 700;
+    }
+
+    .profit-minus {
+      color: #b42318;
+      font-weight: 700;
+    }
+
     .metric {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -1000,29 +1024,29 @@
           <section class="panel" aria-labelledby="dashboardTitle">
             <div class="panel-head">
               <h2 id="dashboardTitle">経営ダッシュボード</h2>
-              <span class="status small">販売管理連携準備中</span>
+              <span class="status small">販売管理連携中</span>
             </div>
             <div class="panel-body">
               <div class="dashboard-grid">
                 <div class="dashboard-card">
-                  <span class="muted small">今月仕入</span>
+                  <span class="muted small">今月売上</span>
                   <strong id="dashMonthPurchase">0円</strong>
-                  <span id="dashMonthCount" class="small muted">0件</span>
+                  <span id="dashMonthCount" class="small muted">0件売却</span>
                 </div>
                 <div class="dashboard-card">
-                  <span class="muted small">推定在庫金額</span>
+                  <span class="muted small">今月粗利</span>
                   <strong id="dashInventory">0円</strong>
-                  <span class="small muted">販売管理追加後に精緻化</span>
+                  <span class="small muted">販売価格 - 仕入 - 手数料</span>
                 </div>
                 <div class="dashboard-card">
-                  <span class="muted small">証憑添付率</span>
+                  <span class="muted small">利益率</span>
                   <strong id="dashEvidenceRate">0%</strong>
-                  <span id="dashEvidenceCount" class="small muted">0 / 0件</span>
+                  <span id="dashEvidenceCount" class="small muted">今月売上ベース</span>
                 </div>
                 <div class="dashboard-card">
                   <span class="muted small">未処理</span>
                   <strong id="dashOpenTasks">0</strong>
-                  <span class="small muted">証憑なし・販売先未設定</span>
+                  <span class="small muted">未出品・準備中・証憑なし</span>
                 </div>
               </div>
               <div class="dashboard-split">
@@ -1034,6 +1058,94 @@
                   <strong class="small">販売先準備状況</strong>
                   <div id="dashDestinationBreakdown"></div>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" aria-labelledby="salesTitle">
+            <div class="panel-head">
+              <h2 id="salesTitle">販売管理</h2>
+              <span id="salesStatus" class="status small"></span>
+            </div>
+            <div class="panel-body">
+              <form id="salesForm" class="sales-form">
+                <input id="saleId" name="id" type="hidden">
+                <div class="form-grid">
+                  <label class="wide">仕入商品
+                    <select id="salePurchaseId" name="purchaseId"></select>
+                  </label>
+                  <label>販売先
+                    <select id="saleDestination" name="destination">
+                      <option value="catawiki">CATAWIKI</option>
+                      <option value="ebay">EBAY</option>
+                      <option value="other">その他</option>
+                    </select>
+                  </label>
+                  <label>状態
+                    <select id="saleStatusField" name="status">
+                      <option value="not_listed">未出品</option>
+                      <option value="preparing">準備中</option>
+                      <option value="listed">出品中</option>
+                      <option value="sold">売却済み</option>
+                      <option value="cancelled">キャンセル</option>
+                      <option value="returned">返品</option>
+                      <option value="on_hold">保留</option>
+                    </select>
+                  </label>
+                  <label>出品日
+                    <input id="saleListedAt" name="listedAt" type="date">
+                  </label>
+                  <label>販売日
+                    <input id="saleSoldAt" name="soldAt" type="date">
+                  </label>
+                  <label>販売価格
+                    <input id="salePrice" name="salePrice" type="number" min="0" step="1" inputmode="numeric">
+                  </label>
+                  <label>販売手数料
+                    <input id="salePlatformFee" name="platformFee" type="number" min="0" step="1" inputmode="numeric">
+                  </label>
+                  <label>決済手数料
+                    <input id="salePaymentFee" name="paymentFee" type="number" min="0" step="1" inputmode="numeric">
+                  </label>
+                  <label>国内送料
+                    <input id="saleDomesticShippingFee" name="domesticShippingFee" type="number" min="0" step="1" inputmode="numeric">
+                  </label>
+                  <label>海外送料
+                    <input id="saleInternationalShippingFee" name="internationalShippingFee" type="number" min="0" step="1" inputmode="numeric">
+                  </label>
+                  <label>その他費用
+                    <input id="saleOtherFee" name="otherFee" type="number" min="0" step="1" inputmode="numeric">
+                  </label>
+                  <label>管理番号
+                    <input id="saleListingId" name="listingId" type="text" placeholder="オークションIDなど">
+                  </label>
+                  <label>SKU
+                    <input id="saleSku" name="sku" type="text">
+                  </label>
+                  <label class="wide">メモ
+                    <textarea id="saleMemo" name="memo" rows="2" placeholder="販売時の注意点"></textarea>
+                  </label>
+                </div>
+                <div class="actions">
+                  <button id="saveSaleBtn" class="primary" type="submit">販売情報を保存</button>
+                  <button id="resetSaleBtn" type="button">新規</button>
+                </div>
+              </form>
+              <div class="sales-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>商品</th>
+                      <th>販売先</th>
+                      <th>状態</th>
+                      <th>販売日</th>
+                      <th>販売価格</th>
+                      <th>粗利</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="salesRows"></tbody>
+                </table>
               </div>
             </div>
           </section>
@@ -1291,6 +1403,7 @@
       proofDraft: [],
       aiImages: [],
       aiItems: [],
+      sales: [],
       taxPackages: [],
       currentEvidenceId: "",
       currentEvidenceIndex: 0,
@@ -1726,6 +1839,212 @@
       return true;
     }
 
+    async function loadSales() {
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.listSales || !state.profile) {
+        state.sales = [];
+        renderSalesManagement();
+        return false;
+      }
+      try {
+        state.sales = await service.listSales();
+        render();
+        return true;
+      } catch (error) {
+        console.warn("[Sales] Load failed", error);
+        state.sales = [];
+        renderSalesManagement();
+        $("salesStatus").textContent = "販売情報を読み込めませんでした";
+        return false;
+      }
+    }
+
+    function saleStatusLabel(value) {
+      return {
+        not_listed: "未出品",
+        preparing: "準備中",
+        listed: "出品中",
+        sold: "売却済み",
+        cancelled: "キャンセル",
+        returned: "返品",
+        on_hold: "保留"
+      }[value] || "未出品";
+    }
+
+    function saleDestinationLabel(value) {
+      return {
+        catawiki: "CATAWIKI",
+        ebay: "EBAY",
+        other: "その他"
+      }[value] || "その他";
+    }
+
+    function findPurchase(id) {
+      return state.records.find((record) => record.id === id) || null;
+    }
+
+    function saleCostTotal(sale) {
+      const purchase = findPurchase(sale.purchase_id);
+      return Number(purchase?.amount || 0)
+        + Number(sale.platform_fee || 0)
+        + Number(sale.payment_fee || 0)
+        + Number(sale.domestic_shipping_fee || 0)
+        + Number(sale.international_shipping_fee || 0)
+        + Number(sale.other_fee || 0);
+    }
+
+    function saleRevenueJpy(sale) {
+      return Number(sale.sale_price_jpy || sale.sale_price || 0);
+    }
+
+    function saleProfit(sale) {
+      return saleRevenueJpy(sale) - saleCostTotal(sale);
+    }
+
+    function salePurchaseLabel(record) {
+      if (!record) return "未選択";
+      const date = record.date ? `${record.date} ` : "";
+      const manufacturer = record.manufacturer ? `${record.manufacturer} ` : "";
+      return `${date}${manufacturer}${record.name || "無題"} / ${yen(record.amount || 0)}`;
+    }
+
+    function renderSalePurchaseOptions() {
+      const select = $("salePurchaseId");
+      if (!select) return;
+      const current = select.value;
+      select.innerHTML = "";
+      if (!state.records.length) {
+        select.append(new Option("仕入データがありません", ""));
+        return;
+      }
+      state.records.forEach((record) => {
+        select.append(new Option(salePurchaseLabel(record), record.id));
+      });
+      if (state.records.some((record) => record.id === current)) select.value = current;
+    }
+
+    function resetSaleForm() {
+      const form = $("salesForm");
+      if (!form) return;
+      form.reset();
+      $("saleId").value = "";
+      $("saleDestination").value = "catawiki";
+      $("saleStatusField").value = "not_listed";
+      renderSalePurchaseOptions();
+    }
+
+    function setSaleForm(sale) {
+      renderSalePurchaseOptions();
+      $("saleId").value = sale.id || "";
+      $("salePurchaseId").value = sale.purchase_id || "";
+      $("saleDestination").value = sale.destination || "catawiki";
+      $("saleStatusField").value = sale.status || "not_listed";
+      $("saleListedAt").value = sale.listed_at || "";
+      $("saleSoldAt").value = sale.sold_at || "";
+      $("salePrice").value = sale.sale_price || "";
+      $("salePlatformFee").value = sale.platform_fee || "";
+      $("salePaymentFee").value = sale.payment_fee || "";
+      $("saleDomesticShippingFee").value = sale.domestic_shipping_fee || "";
+      $("saleInternationalShippingFee").value = sale.international_shipping_fee || "";
+      $("saleOtherFee").value = sale.other_fee || "";
+      $("saleListingId").value = sale.listing_id || "";
+      $("saleSku").value = sale.sku || "";
+      $("saleMemo").value = sale.memo || "";
+      $("salesStatus").textContent = "販売情報を編集中";
+    }
+
+    function readSaleForm() {
+      const data = new FormData($("salesForm"));
+      return {
+        id: String(data.get("id") || ""),
+        purchaseId: String(data.get("purchaseId") || ""),
+        destination: String(data.get("destination") || "catawiki"),
+        status: String(data.get("status") || "not_listed"),
+        listingId: String(data.get("listingId") || ""),
+        sku: String(data.get("sku") || ""),
+        listedAt: String(data.get("listedAt") || ""),
+        soldAt: String(data.get("soldAt") || ""),
+        salePrice: Number(data.get("salePrice") || 0),
+        currency: "JPY",
+        platformFee: Number(data.get("platformFee") || 0),
+        paymentFee: Number(data.get("paymentFee") || 0),
+        domesticShippingFee: Number(data.get("domesticShippingFee") || 0),
+        internationalShippingFee: Number(data.get("internationalShippingFee") || 0),
+        otherFee: Number(data.get("otherFee") || 0),
+        memo: String(data.get("memo") || "")
+      };
+    }
+
+    async function saveSaleFromForm() {
+      if (!canWritePurchases()) {
+        $("salesStatus").textContent = "販売情報の保存にはログイン権限が必要です";
+        return false;
+      }
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.saveSale) return false;
+      const input = readSaleForm();
+      if (!input.purchaseId) {
+        $("salesStatus").textContent = "仕入商品を選択してください";
+        return false;
+      }
+      await service.saveSale(input);
+      $("salesStatus").textContent = "販売情報を保存しました";
+      resetSaleForm();
+      await loadSales();
+      return true;
+    }
+
+    async function deleteSaleFromList(id) {
+      if (!isAdmin()) {
+        $("salesStatus").textContent = "販売情報の削除には管理者権限が必要です";
+        return false;
+      }
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.deleteSale) return false;
+      await service.deleteSale(id);
+      $("salesStatus").textContent = "販売情報を削除しました";
+      await loadSales();
+      return true;
+    }
+
+    function renderSalesManagement() {
+      const form = $("salesForm");
+      const rows = $("salesRows");
+      if (!form || !rows) return;
+      renderSalePurchaseOptions();
+      const canWrite = canWritePurchases();
+      form.querySelectorAll("input, select, textarea, button").forEach((element) => {
+        element.disabled = !canWrite;
+      });
+      if (!canWrite) {
+        $("salesStatus").textContent = state.profile ? "閲覧専用です" : "ログインしてください";
+      } else if (!$("salesStatus").textContent) {
+        $("salesStatus").textContent = "販売情報を入力できます";
+      }
+      if (!state.sales.length) {
+        rows.innerHTML = `<tr><td colspan="7" class="muted">販売情報はまだありません</td></tr>`;
+        return;
+      }
+      rows.innerHTML = state.sales.map((sale) => {
+        const purchase = findPurchase(sale.purchase_id);
+        const profit = saleProfit(sale);
+        return `
+          <tr>
+            <td>${escapeHtml(purchase ? `${purchase.name || "無題"}` : "仕入不明")}<br><span class="small muted">${escapeHtml(purchase?.date || "")}</span></td>
+            <td>${escapeHtml(saleDestinationLabel(sale.destination))}</td>
+            <td>${escapeHtml(saleStatusLabel(sale.status))}</td>
+            <td>${escapeHtml(sale.sold_at || sale.listed_at || "")}</td>
+            <td class="money">${yen(saleRevenueJpy(sale))}</td>
+            <td class="${profit >= 0 ? "profit-plus" : "profit-minus"}">${yen(profit)}</td>
+            <td>
+              ${canWrite ? `<button type="button" data-sale-edit="${escapeHtml(sale.id)}">編集</button>` : ""}
+              ${isAdmin() ? `<button class="danger" type="button" data-sale-delete="${escapeHtml(sale.id)}">削除</button>` : ""}
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
     async function loadSupabaseAll() {
       const service = await waitForSupabaseReadService();
       if (!service) return false;
@@ -1743,6 +2062,7 @@
         state.records.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
         render();
         await loadTaxPackageHistory();
+        await loadSales();
         return true;
       } catch (error) {
         console.warn("[Supabase] purchase read failed", error);
@@ -1772,6 +2092,7 @@
       if (state.profile) {
         state.records = [];
         state.images = new Map();
+        state.sales = [];
         render();
         await loadTaxPackageHistory();
         return;
@@ -2262,6 +2583,7 @@
       renderMonths();
       const records = filteredRecords();
       renderDashboard(records);
+      renderSalesManagement();
       renderSummary(records);
       renderRows(records);
       applyRenderedRoleControls();
@@ -2312,22 +2634,25 @@
       const now = new Date();
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const monthRecords = records.filter((record) => monthKey(record) === currentMonth);
-      const monthAmount = monthRecords.reduce((sum, record) => sum + Number(record.amount || 0), 0);
-      const totalAmount = records.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+      const monthSales = state.sales.filter((sale) => sale.status === "sold" && String(sale.sold_at || "").startsWith(currentMonth));
+      const monthRevenue = monthSales.reduce((sum, sale) => sum + saleRevenueJpy(sale), 0);
+      const monthProfit = monthSales.reduce((sum, sale) => sum + saleProfit(sale), 0);
+      const margin = monthRevenue ? Math.round(monthProfit / monthRevenue * 100) : 0;
       const evidenceCount = records.filter((record) => hasRecordImages(record.id)).length;
       const noEvidenceCount = records.length - evidenceCount;
       const missingDestinationCount = records.filter((record) => !record.destination || record.destination === "undecided").length;
-      const evidenceRate = records.length ? Math.round(evidenceCount / records.length * 100) : 0;
+      const unsoldCount = records.filter((record) => !state.sales.some((sale) => sale.purchase_id === record.id && sale.status === "sold")).length;
+      const openTaskCount = noEvidenceCount + missingDestinationCount + unsoldCount;
 
-      $("dashMonthPurchase").textContent = yen(monthAmount);
-      $("dashMonthCount").textContent = `${monthRecords.length}件`;
-      $("dashInventory").textContent = yen(totalAmount);
-      $("dashEvidenceRate").textContent = `${evidenceRate}%`;
-      $("dashEvidenceCount").textContent = `${evidenceCount} / ${records.length}件`;
-      $("dashOpenTasks").textContent = noEvidenceCount + missingDestinationCount;
+      $("dashMonthPurchase").textContent = yen(monthRevenue);
+      $("dashMonthCount").textContent = `${monthSales.length}件売却 / 仕入${monthRecords.length}件`;
+      $("dashInventory").textContent = yen(monthProfit);
+      $("dashEvidenceRate").textContent = `${margin}%`;
+      $("dashEvidenceCount").textContent = `証憑 ${evidenceCount} / ${records.length}件`;
+      $("dashOpenTasks").textContent = openTaskCount;
 
       renderDashboardRanking("dashStaffRanking", sumBy(records, (record) => record.staff || "未設定", (record) => Number(record.amount || 0)));
-      renderDashboardRanking("dashDestinationBreakdown", sumBy(records, destinationLabel, (record) => Number(record.amount || 0)));
+      renderDashboardRanking("dashDestinationBreakdown", sumBy(state.sales, (sale) => saleDestinationLabel(sale.destination), saleRevenueJpy));
     }
 
     function sumBy(records, keyFn, valueFn) {
@@ -3520,6 +3845,7 @@
         state.profile = null;
         state.records = [];
         state.images = new Map();
+        state.sales = [];
         applyRoleControls();
       });
       form.addEventListener("input", updateLiveClassify);
@@ -3561,6 +3887,36 @@
         const bundle = imageBundleFor(record.id, images);
         record.hasImage = bundle.images.length > 0;
         if (await saveRecord(record, bundle)) setForm(defaultRecord());
+      });
+      $("salesForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+          await saveSaleFromForm();
+        } catch (error) {
+          console.error("[Sales] Save failed", error);
+          $("salesStatus").textContent = `販売情報を保存できませんでした: ${formatErrorDetails(error)}`;
+        }
+      });
+      $("resetSaleBtn").addEventListener("click", () => {
+        $("salesStatus").textContent = "";
+        resetSaleForm();
+      });
+      $("salesRows").addEventListener("click", async (event) => {
+        const editId = event.target.closest("[data-sale-edit]")?.dataset.saleEdit;
+        const deleteId = event.target.closest("[data-sale-delete]")?.dataset.saleDelete;
+        if (editId) {
+          const sale = state.sales.find((item) => item.id === editId);
+          if (sale) setSaleForm(sale);
+          return;
+        }
+        if (deleteId && confirm("販売情報を削除しますか？")) {
+          try {
+            await deleteSaleFromList(deleteId);
+          } catch (error) {
+            console.error("[Sales] Delete failed", error);
+            $("salesStatus").textContent = `販売情報を削除できませんでした: ${formatErrorDetails(error)}`;
+          }
+        }
       });
       $("resetBtn").addEventListener("click", () => setForm(defaultRecord()));
       $("proofPreview").addEventListener("click", async (event) => {
