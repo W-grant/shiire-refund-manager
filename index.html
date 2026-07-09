@@ -381,7 +381,37 @@
     }
 
     .sales-table table {
-      min-width: 880px;
+      min-width: 1040px;
+    }
+
+    .sales-tools {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .sales-summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .sales-summary .metric {
+      min-height: 70px;
+      padding: 10px;
+    }
+
+    .sales-summary .metric strong {
+      font-size: 17px;
+    }
+
+    .cost-detail {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
     }
 
     .profit-plus {
@@ -1131,6 +1161,46 @@
                   <button id="resetSaleBtn" type="button">新規</button>
                 </div>
               </form>
+              <div class="sales-summary">
+                <div class="metric">
+                  <span class="muted small">表示中 売上</span>
+                  <strong id="salesSummaryRevenue">0円</strong>
+                </div>
+                <div class="metric">
+                  <span class="muted small">表示中 粗利</span>
+                  <strong id="salesSummaryProfit">0円</strong>
+                </div>
+                <div class="metric">
+                  <span class="muted small">表示中 利益率</span>
+                  <strong id="salesSummaryMargin">0%</strong>
+                </div>
+                <div class="metric">
+                  <span class="muted small">売却済み</span>
+                  <strong id="salesSummarySold">0件</strong>
+                </div>
+              </div>
+              <div class="sales-tools">
+                <label>販売先で絞り込み
+                  <select id="salesFilterDestination">
+                    <option value="">すべて</option>
+                    <option value="catawiki">CATAWIKI</option>
+                    <option value="ebay">EBAY</option>
+                    <option value="other">その他</option>
+                  </select>
+                </label>
+                <label>状態で絞り込み
+                  <select id="salesFilterStatus">
+                    <option value="">すべて</option>
+                    <option value="not_listed">未出品</option>
+                    <option value="preparing">準備中</option>
+                    <option value="listed">出品中</option>
+                    <option value="sold">売却済み</option>
+                    <option value="cancelled">キャンセル</option>
+                    <option value="returned">返品</option>
+                    <option value="on_hold">保留</option>
+                  </select>
+                </label>
+              </div>
               <div class="sales-table">
                 <table>
                   <thead>
@@ -1140,6 +1210,8 @@
                       <th>状態</th>
                       <th>販売日</th>
                       <th>販売価格</th>
+                      <th>仕入原価</th>
+                      <th>手数料・送料</th>
                       <th>粗利</th>
                       <th>操作</th>
                     </tr>
@@ -1404,6 +1476,7 @@
       aiImages: [],
       aiItems: [],
       sales: [],
+      salesFilters: { destination: "", status: "" },
       taxPackages: [],
       currentEvidenceId: "",
       currentEvidenceIndex: 0,
@@ -1893,12 +1966,58 @@
         + Number(sale.other_fee || 0);
     }
 
+    function salePurchaseCost(sale) {
+      const purchase = findPurchase(sale.purchase_id);
+      return Number(purchase?.amount || 0);
+    }
+
+    function saleFeeTotal(sale) {
+      return Number(sale.platform_fee || 0)
+        + Number(sale.payment_fee || 0)
+        + Number(sale.domestic_shipping_fee || 0)
+        + Number(sale.international_shipping_fee || 0)
+        + Number(sale.other_fee || 0);
+    }
+
     function saleRevenueJpy(sale) {
       return Number(sale.sale_price_jpy || sale.sale_price || 0);
     }
 
     function saleProfit(sale) {
       return saleRevenueJpy(sale) - saleCostTotal(sale);
+    }
+
+    function saleMargin(revenue, profit) {
+      return revenue ? Math.round(profit / revenue * 100) : 0;
+    }
+
+    function filteredSales() {
+      return state.sales.filter((sale) => {
+        if (state.salesFilters.destination && sale.destination !== state.salesFilters.destination) return false;
+        if (state.salesFilters.status && sale.status !== state.salesFilters.status) return false;
+        return true;
+      });
+    }
+
+    function saleSummary(sales) {
+      return sales.reduce((acc, sale) => {
+        const revenue = saleRevenueJpy(sale);
+        const profit = saleProfit(sale);
+        acc.count += 1;
+        acc.revenue += revenue;
+        acc.profit += profit;
+        if (sale.status === "sold") acc.sold += 1;
+        return acc;
+      }, { count: 0, revenue: 0, profit: 0, sold: 0 });
+    }
+
+    function renderSalesSummary(sales) {
+      const summary = saleSummary(sales);
+      $("salesSummaryRevenue").textContent = yen(summary.revenue);
+      $("salesSummaryProfit").textContent = yen(summary.profit);
+      $("salesSummaryProfit").className = summary.profit >= 0 ? "profit-plus" : "profit-minus";
+      $("salesSummaryMargin").textContent = `${saleMargin(summary.revenue, summary.profit)}%`;
+      $("salesSummarySold").textContent = `${summary.sold}件`;
     }
 
     function salePurchaseLabel(record) {
@@ -2012,6 +2131,8 @@
       const rows = $("salesRows");
       if (!form || !rows) return;
       renderSalePurchaseOptions();
+      $("salesFilterDestination").value = state.salesFilters.destination;
+      $("salesFilterStatus").value = state.salesFilters.status;
       const canWrite = canWritePurchases();
       form.querySelectorAll("input, select, textarea, button").forEach((element) => {
         element.disabled = !canWrite;
@@ -2021,13 +2142,16 @@
       } else if (!$("salesStatus").textContent) {
         $("salesStatus").textContent = "販売情報を入力できます";
       }
-      if (!state.sales.length) {
-        rows.innerHTML = `<tr><td colspan="7" class="muted">販売情報はまだありません</td></tr>`;
+      const sales = filteredSales();
+      renderSalesSummary(sales);
+      if (!sales.length) {
+        rows.innerHTML = `<tr><td colspan="9" class="muted">販売情報はまだありません</td></tr>`;
         return;
       }
-      rows.innerHTML = state.sales.map((sale) => {
+      rows.innerHTML = sales.map((sale) => {
         const purchase = findPurchase(sale.purchase_id);
         const profit = saleProfit(sale);
+        const feeTotal = saleFeeTotal(sale);
         return `
           <tr>
             <td>${escapeHtml(purchase ? `${purchase.name || "無題"}` : "仕入不明")}<br><span class="small muted">${escapeHtml(purchase?.date || "")}</span></td>
@@ -2035,7 +2159,9 @@
             <td>${escapeHtml(saleStatusLabel(sale.status))}</td>
             <td>${escapeHtml(sale.sold_at || sale.listed_at || "")}</td>
             <td class="money">${yen(saleRevenueJpy(sale))}</td>
-            <td class="${profit >= 0 ? "profit-plus" : "profit-minus"}">${yen(profit)}</td>
+            <td class="money">${yen(salePurchaseCost(sale))}</td>
+            <td class="money">${yen(feeTotal)}<span class="cost-detail">販売 ${yen(sale.platform_fee || 0)} / 決済 ${yen(sale.payment_fee || 0)} / 送料 ${yen(Number(sale.domestic_shipping_fee || 0) + Number(sale.international_shipping_fee || 0))}</span></td>
+            <td class="${profit >= 0 ? "profit-plus" : "profit-minus"}">${yen(profit)}<span class="cost-detail">利益率 ${saleMargin(saleRevenueJpy(sale), profit)}%</span></td>
             <td>
               ${canWrite ? `<button type="button" data-sale-edit="${escapeHtml(sale.id)}">編集</button>` : ""}
               ${isAdmin() ? `<button class="danger" type="button" data-sale-delete="${escapeHtml(sale.id)}">削除</button>` : ""}
@@ -2637,7 +2763,7 @@
       const monthSales = state.sales.filter((sale) => sale.status === "sold" && String(sale.sold_at || "").startsWith(currentMonth));
       const monthRevenue = monthSales.reduce((sum, sale) => sum + saleRevenueJpy(sale), 0);
       const monthProfit = monthSales.reduce((sum, sale) => sum + saleProfit(sale), 0);
-      const margin = monthRevenue ? Math.round(monthProfit / monthRevenue * 100) : 0;
+      const margin = saleMargin(monthRevenue, monthProfit);
       const evidenceCount = records.filter((record) => hasRecordImages(record.id)).length;
       const noEvidenceCount = records.length - evidenceCount;
       const missingDestinationCount = records.filter((record) => !record.destination || record.destination === "undecided").length;
@@ -2652,7 +2778,7 @@
       $("dashOpenTasks").textContent = openTaskCount;
 
       renderDashboardRanking("dashStaffRanking", sumBy(records, (record) => record.staff || "未設定", (record) => Number(record.amount || 0)));
-      renderDashboardRanking("dashDestinationBreakdown", sumBy(state.sales, (sale) => saleDestinationLabel(sale.destination), saleRevenueJpy));
+      renderDashboardRanking("dashDestinationBreakdown", sumBy(state.sales, (sale) => saleDestinationLabel(sale.destination), saleProfit));
     }
 
     function sumBy(records, keyFn, valueFn) {
@@ -3900,6 +4026,14 @@
       $("resetSaleBtn").addEventListener("click", () => {
         $("salesStatus").textContent = "";
         resetSaleForm();
+      });
+      $("salesFilterDestination").addEventListener("change", () => {
+        state.salesFilters.destination = $("salesFilterDestination").value;
+        renderSalesManagement();
+      });
+      $("salesFilterStatus").addEventListener("change", () => {
+        state.salesFilters.status = $("salesFilterStatus").value;
+        renderSalesManagement();
       });
       $("salesRows").addEventListener("click", async (event) => {
         const editId = event.target.closest("[data-sale-edit]")?.dataset.saleEdit;
