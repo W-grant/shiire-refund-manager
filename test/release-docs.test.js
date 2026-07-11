@@ -43,3 +43,25 @@ test("User guide documents sales dashboard and Sheets sync operations", () => {
     assert.match(guide, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `USER_GUIDE.md should include ${text}`);
   }
 });
+
+test("V1 release documents include sales and Sheets release checks", () => {
+  const documents = [
+    ["docs/v1-completion-checklist.md", readProjectFile("docs/v1-completion-checklist.md")],
+    ["docs/v1-final-release-check.md", readProjectFile("docs/v1-final-release-check.md")],
+    ["docs/next-implementation-plan.md", readProjectFile("docs/next-implementation-plan.md")]
+  ];
+  const requiredTexts = [
+    "販売管理",
+    "経営ダッシュボード",
+    "Googleスプレッドシート",
+    "CATAWIKI",
+    "EBAY",
+    "粗利"
+  ];
+
+  for (const [fileName, content] of documents) {
+    for (const text of requiredTexts) {
+      assert.match(content, new RegExp(text), `${fileName} should mention ${text}`);
+    }
+  }
+});
