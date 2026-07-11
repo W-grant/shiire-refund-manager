@@ -580,6 +580,28 @@
       color: var(--red);
     }
 
+    .badge.neutral {
+      background: var(--ink-soft);
+      color: var(--muted);
+    }
+
+    .badge.purple {
+      background: #efe8ff;
+      color: #6042a6;
+    }
+
+    .badge.dark {
+      background: #e7ebe6;
+      color: #263225;
+    }
+
+    .sale-meta {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+
     .thumb {
       width: 46px;
       height: 46px;
@@ -2008,12 +2030,36 @@
       }[value] || "未出品";
     }
 
+    function saleStatusClass(value) {
+      return {
+        not_listed: "neutral",
+        preparing: "orange",
+        listed: "blue",
+        sold: "green",
+        cancelled: "red",
+        returned: "red",
+        on_hold: "purple"
+      }[value] || "neutral";
+    }
+
     function saleDestinationLabel(value) {
       return {
         catawiki: "CATAWIKI",
         ebay: "EBAY",
         other: "その他"
       }[value] || "その他";
+    }
+
+    function saleDestinationClass(value) {
+      return {
+        catawiki: "purple",
+        ebay: "blue",
+        other: "dark"
+      }[value] || "dark";
+    }
+
+    function saleBadge(label, className) {
+      return `<span class="badge ${className}">${escapeHtml(label)}</span>`;
     }
 
     function findPurchase(id) {
@@ -2204,6 +2250,17 @@
       };
     }
 
+    function validateSaleInput(input) {
+      const errors = [];
+      if (!input.purchaseId) errors.push("仕入商品を選択してください");
+      if (input.status === "sold") {
+        if (!input.soldAt) errors.push("売却済みの場合は販売日を入力してください");
+        if (!Number(input.salePrice)) errors.push("売却済みの場合は販売価格を入力してください");
+      }
+      if (Number(input.salePrice || 0) < 0) errors.push("販売価格は0円以上で入力してください");
+      return errors;
+    }
+
     async function saveSaleFromForm() {
       if (!canWritePurchases()) {
         $("salesStatus").textContent = "販売情報の保存にはログイン権限が必要です";
@@ -2212,8 +2269,9 @@
       const service = await waitForSupabaseWriteService();
       if (!service || !service.saveSale) return false;
       const input = readSaleForm();
-      if (!input.purchaseId) {
-        $("salesStatus").textContent = "仕入商品を選択してください";
+      const errors = validateSaleInput(input);
+      if (errors.length) {
+        $("salesStatus").textContent = errors.join(" / ");
         return false;
       }
       await service.saveSale(input);
@@ -2264,16 +2322,26 @@
         const purchase = findPurchase(sale.purchase_id);
         const profit = saleProfit(sale);
         const feeTotal = saleFeeTotal(sale);
+        const revenue = saleRevenueJpy(sale);
+        const dateLabel = sale.sold_at ? `販売 ${sale.sold_at}` : sale.listed_at ? `出品 ${sale.listed_at}` : "";
+        const itemMeta = [purchase?.date, purchase?.staff || "未設定"].filter(Boolean).join(" / ");
         return `
           <tr>
-            <td>${escapeHtml(purchase ? `${purchase.name || "無題"}` : "仕入不明")}<br><span class="small muted">${escapeHtml(purchase?.date || "")}</span></td>
-            <td>${escapeHtml(saleDestinationLabel(sale.destination))}</td>
-            <td>${escapeHtml(saleStatusLabel(sale.status))}</td>
-            <td>${escapeHtml(sale.sold_at || sale.listed_at || "")}</td>
-            <td class="money">${yen(saleRevenueJpy(sale))}</td>
+            <td>
+              <strong>${escapeHtml(purchase ? `${purchase.name || "無題"}` : "仕入不明")}</strong>
+              <br><span class="small muted">${escapeHtml(itemMeta)}</span>
+              <div class="sale-meta">
+                ${sale.listing_id ? saleBadge(`管理 ${sale.listing_id}`, "neutral") : ""}
+                ${sale.sku ? saleBadge(`SKU ${sale.sku}`, "neutral") : ""}
+              </div>
+            </td>
+            <td>${saleBadge(saleDestinationLabel(sale.destination), saleDestinationClass(sale.destination))}</td>
+            <td>${saleBadge(saleStatusLabel(sale.status), saleStatusClass(sale.status))}</td>
+            <td>${escapeHtml(dateLabel || "未設定")}</td>
+            <td class="money">${yen(revenue)}</td>
             <td class="money">${yen(salePurchaseCost(sale))}</td>
             <td class="money">${yen(feeTotal)}<span class="cost-detail">販売 ${yen(sale.platform_fee || 0)} / 決済 ${yen(sale.payment_fee || 0)} / 送料 ${yen(Number(sale.domestic_shipping_fee || 0) + Number(sale.international_shipping_fee || 0))}</span></td>
-            <td class="${profit >= 0 ? "profit-plus" : "profit-minus"}">${yen(profit)}<span class="cost-detail">利益率 ${saleMargin(saleRevenueJpy(sale), profit)}%</span></td>
+            <td class="${profit >= 0 ? "profit-plus" : "profit-minus"}">${yen(profit)}<span class="cost-detail">利益率 ${saleMargin(revenue, profit)}%</span></td>
             <td>
               ${canWrite ? `<button type="button" data-sale-edit="${escapeHtml(sale.id)}">編集</button>` : ""}
               ${isAdmin() ? `<button class="danger" type="button" data-sale-delete="${escapeHtml(sale.id)}">削除</button>` : ""}
