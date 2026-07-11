@@ -370,6 +370,32 @@
       background: #1f6a4b;
     }
 
+    .dashboard-bar span.negative {
+      background: #b42318;
+    }
+
+    .task-list {
+      display: grid;
+      gap: 6px;
+    }
+
+    .task-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      background: #fbfcf9;
+      font-size: 12px;
+    }
+
+    .task-item strong {
+      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+
     .sales-form {
       display: grid;
       gap: 12px;
@@ -1076,18 +1102,22 @@
                 <div class="dashboard-card">
                   <span class="muted small">未処理</span>
                   <strong id="dashOpenTasks">0</strong>
-                  <span class="small muted">未出品・準備中・証憑なし</span>
+                  <span id="dashOpenTasksLabel" class="small muted">未出品・準備中・証憑なし</span>
                 </div>
               </div>
               <div class="dashboard-split">
                 <div class="dashboard-list">
-                  <strong class="small">担当者別 仕入額</strong>
+                  <strong class="small">担当者別 粗利</strong>
                   <div id="dashStaffRanking"></div>
                 </div>
                 <div class="dashboard-list">
-                  <strong class="small">販売先準備状況</strong>
+                  <strong class="small">販売先別 粗利</strong>
                   <div id="dashDestinationBreakdown"></div>
                 </div>
+              </div>
+              <div class="dashboard-list" style="margin-top:10px;">
+                <strong class="small">未処理タスク</strong>
+                <div id="dashTaskBreakdown" class="task-list"></div>
               </div>
             </div>
           </section>
@@ -2000,6 +2030,23 @@
       return revenue ? Math.round(profit / revenue * 100) : 0;
     }
 
+    function salePurchaseStaff(sale) {
+      const purchase = findPurchase(sale.purchase_id);
+      return purchase?.staff || "未設定";
+    }
+
+    function soldSalesForMonth(month) {
+      return state.sales.filter((sale) => sale.status === "sold" && String(sale.sold_at || "").startsWith(month));
+    }
+
+    function hasSoldSale(record) {
+      return state.sales.some((sale) => sale.purchase_id === record.id && sale.status === "sold");
+    }
+
+    function hasActiveSale(record) {
+      return state.sales.some((sale) => sale.purchase_id === record.id && !["cancelled", "returned"].includes(sale.status));
+    }
+
     function filteredSales() {
       return state.sales.filter((sale) => {
         if (state.salesFilters.destination && sale.destination !== state.salesFilters.destination) return false;
@@ -2771,25 +2818,36 @@
       const now = new Date();
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
       const monthRecords = records.filter((record) => monthKey(record) === currentMonth);
-      const monthSales = state.sales.filter((sale) => sale.status === "sold" && String(sale.sold_at || "").startsWith(currentMonth));
+      const monthSales = soldSalesForMonth(currentMonth);
       const monthRevenue = monthSales.reduce((sum, sale) => sum + saleRevenueJpy(sale), 0);
       const monthProfit = monthSales.reduce((sum, sale) => sum + saleProfit(sale), 0);
       const margin = saleMargin(monthRevenue, monthProfit);
       const evidenceCount = records.filter((record) => hasRecordImages(record.id)).length;
       const noEvidenceCount = records.length - evidenceCount;
       const missingDestinationCount = records.filter((record) => !record.destination || record.destination === "undecided").length;
-      const unsoldCount = records.filter((record) => !state.sales.some((sale) => sale.purchase_id === record.id && sale.status === "sold")).length;
-      const openTaskCount = noEvidenceCount + missingDestinationCount + unsoldCount;
+      const unsoldCount = records.filter((record) => !hasSoldSale(record)).length;
+      const notListedCount = records.filter((record) => !hasActiveSale(record)).length;
+      const preparingCount = state.sales.filter((sale) => ["not_listed", "preparing", "on_hold"].includes(sale.status)).length;
+      const openTaskCount = noEvidenceCount + missingDestinationCount + notListedCount + preparingCount;
 
       $("dashMonthPurchase").textContent = yen(monthRevenue);
       $("dashMonthCount").textContent = `${monthSales.length}件売却 / 仕入${monthRecords.length}件`;
       $("dashInventory").textContent = yen(monthProfit);
+      $("dashInventory").className = monthProfit >= 0 ? "profit-plus" : "profit-minus";
       $("dashEvidenceRate").textContent = `${margin}%`;
       $("dashEvidenceCount").textContent = `証憑 ${evidenceCount} / ${records.length}件`;
       $("dashOpenTasks").textContent = openTaskCount;
+      $("dashOpenTasksLabel").textContent = `未売却 ${unsoldCount}件 / 未出品 ${notListedCount}件`;
 
-      renderDashboardRanking("dashStaffRanking", sumBy(records, (record) => record.staff || "未設定", (record) => Number(record.amount || 0)));
-      renderDashboardRanking("dashDestinationBreakdown", sumBy(state.sales, (sale) => saleDestinationLabel(sale.destination), saleProfit));
+      renderDashboardRanking("dashStaffRanking", sumBy(state.sales.filter((sale) => sale.status === "sold"), salePurchaseStaff, saleProfit));
+      renderDashboardRanking("dashDestinationBreakdown", sumBy(state.sales.filter((sale) => sale.status === "sold"), (sale) => saleDestinationLabel(sale.destination), saleProfit));
+      renderTaskBreakdown({
+        "証憑なし": noEvidenceCount,
+        "利用先未定": missingDestinationCount,
+        "未出品": notListedCount,
+        "準備中・保留": preparingCount,
+        "未売却": unsoldCount
+      });
     }
 
     function sumBy(records, keyFn, valueFn) {
@@ -2814,23 +2872,38 @@
     function renderDashboardRanking(id, values) {
       const target = $(id);
       const entries = Object.entries(values).sort((a, b) => b[1] - a[1]).slice(0, 4);
-      const max = Math.max(...entries.map(([, value]) => value), 0);
+      const max = Math.max(...entries.map(([, value]) => Math.abs(value)), 0);
       if (!entries.length) {
         target.innerHTML = `<span class="muted small">データがありません</span>`;
         return;
       }
       target.innerHTML = entries.map(([label, value]) => {
-        const width = max ? Math.max(4, Math.round(value / max * 100)) : 0;
+        const width = max ? Math.max(4, Math.round(Math.abs(value) / max * 100)) : 0;
         return `
           <div class="dashboard-row">
             <div>
               <strong>${escapeHtml(label)}</strong>
-              <div class="dashboard-bar"><span style="width:${width}%"></span></div>
+              <div class="dashboard-bar"><span class="${value < 0 ? "negative" : ""}" style="width:${width}%"></span></div>
             </div>
-            <span class="money">${yen(value)}</span>
+            <span class="${value >= 0 ? "profit-plus" : "profit-minus"}">${yen(value)}</span>
           </div>
         `;
       }).join("");
+    }
+
+    function renderTaskBreakdown(values) {
+      const target = $("dashTaskBreakdown");
+      const entries = Object.entries(values).filter(([, count]) => count > 0);
+      if (!entries.length) {
+        target.innerHTML = `<span class="muted small">現在の未処理タスクはありません</span>`;
+        return;
+      }
+      target.innerHTML = entries.map(([label, count]) => `
+        <div class="task-item">
+          <span>${escapeHtml(label)}</span>
+          <strong>${count}件</strong>
+        </div>
+      `).join("");
     }
 
     function renderSummary(records) {
