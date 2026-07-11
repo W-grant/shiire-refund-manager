@@ -37,3 +37,33 @@ test("Production UI contains Japanese operational status messages", () => {
     assert.equal(indexHtml.includes(message), true, `${message} should be present in the UI`);
   }
 });
+
+test("Sales dashboard and Google Sheets controls stay visible", () => {
+  const requiredControls = [
+    'id="dashboardMonth"',
+    'id="dashTaskBreakdown"',
+    'id="salesFilterStaff"',
+    'id="salesFilterText"',
+    'id="syncSheetsBtn"',
+    "担当者別 粗利",
+    "販売先別 粗利",
+    "未処理タスク",
+    "スプシへ送信"
+  ];
+
+  for (const marker of requiredControls) {
+    assert.equal(indexHtml.includes(marker), true, `${marker} should be present in the production UI`);
+  }
+});
+
+test("Sales input validation prevents incomplete sold records", () => {
+  const requiredMessages = [
+    "売却済みの場合は販売日を入力してください",
+    "売却済みの場合は販売価格を入力してください",
+    "販売価格は0円以上で入力してください"
+  ];
+
+  for (const message of requiredMessages) {
+    assert.equal(indexHtml.includes(message), true, `${message} should be present in sales validation`);
+  }
+});

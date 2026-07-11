@@ -24,3 +24,22 @@ test("Release docs use Cloudflare Pages and current Supabase env names", () => {
     assert.doesNotMatch(content, /SYNC_SECRET/, `${fileName} should not advertise the old sync secret`);
   }
 });
+
+test("User guide documents sales dashboard and Sheets sync operations", () => {
+  const guide = readProjectFile("USER_GUIDE.md");
+  const requiredSections = [
+    "売上・利益を見る",
+    "販売情報を管理する",
+    "Googleスプレッドシートへ送信する",
+    "対象月ごとの売上",
+    "担当者別の粗利",
+    "販売日と販売価格を必ず入力してください",
+    "`CATAWIKI`",
+    "`EBAY`",
+    "`同期ログ`"
+  ];
+
+  for (const text of requiredSections) {
+    assert.match(guide, new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `USER_GUIDE.md should include ${text}`);
+  }
+});
