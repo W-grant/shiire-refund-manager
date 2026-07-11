@@ -300,6 +300,28 @@
       padding: 2px;
     }
 
+    .quick-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 12px;
+    }
+
+    .quick-filter {
+      min-height: 32px;
+      border-radius: 999px;
+      padding: 0 11px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #fff;
+    }
+
+    .quick-filter.active {
+      border-color: #1f6a4b;
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
     .tab {
       min-height: 32px;
       background: transparent;
@@ -1325,6 +1347,7 @@
               <div id="composition" class="composition"></div>
               <div id="staffBreakdown" class="small muted"></div>
 
+              <div id="quickFilters" class="quick-filters" aria-label="クイックフィルタ"></div>
               <div class="filters">
                 <select id="filterStaff" aria-label="担当フィルタ"></select>
                 <select id="filterChannel" aria-label="チャネルフィルタ"></select>
@@ -1557,7 +1580,7 @@
       activeMonth: "all",
       dashboardMonth: "",
       sortOrder: "dateDesc",
-      filters: { staff: "", channel: "", branch: "", kind: "", text: "" },
+      filters: { staff: "", channel: "", branch: "", kind: "", text: "", quick: "" },
       proofDraft: [],
       aiImages: [],
       aiItems: [],
@@ -2875,6 +2898,26 @@
       return state.dashboardMonth || currentMonthKey();
     }
 
+    function recordHasSale(record, status = "") {
+      return state.sales.some((sale) => sale.purchase_id === record.id && (!status || sale.status === status));
+    }
+
+    function matchesQuickFilter(record) {
+      const quick = state.filters.quick;
+      if (!quick) return true;
+      if (quick === "pending") {
+        return !hasRecordImages(record.id)
+          || !record.destination
+          || record.destination === "undecided"
+          || !recordHasSale(record);
+      }
+      if (quick === "catawiki") return record.destination === "catawiki" || record.destination === "both";
+      if (quick === "ebay") return record.destination === "ebay" || record.destination === "both";
+      if (quick === "sold") return recordHasSale(record, "sold");
+      if (quick === "noEvidence") return !hasRecordImages(record.id);
+      return true;
+    }
+
     function filteredRecords() {
       const text = state.filters.text.trim().toLowerCase();
       const records = state.records.filter((record) => {
@@ -2884,8 +2927,9 @@
         if (state.filters.channel && record.channel !== state.filters.channel) return false;
         if (state.filters.branch && record.branch !== state.filters.branch) return false;
         if (state.filters.kind && c.kind !== state.filters.kind) return false;
+        if (!matchesQuickFilter(record)) return false;
         if (text) {
-          const haystack = [record.name, record.seller, record.date, record.amount, record.memo].join(" ").toLowerCase();
+          const haystack = [record.name, record.manufacturer, record.category, record.seller, record.date, record.amount, record.memo, destinationLabel(record)].join(" ").toLowerCase();
           if (!haystack.includes(text)) return false;
         }
         return true;
@@ -2910,6 +2954,7 @@
 
     function render() {
       renderMonths();
+      renderQuickFilters();
       const records = filteredRecords();
       renderDashboard(records);
       renderSalesManagement();
@@ -2957,6 +3002,57 @@
         render();
       });
       return button;
+    }
+
+    function quickFilterDefinitions() {
+      return [
+        { value: "pending", label: "未処理" },
+        { value: "catawiki", label: "CATAWIKI" },
+        { value: "ebay", label: "EBAY" },
+        { value: "sold", label: "売却済み" },
+        { value: "noEvidence", label: "証憑なし" }
+      ];
+    }
+
+    function matchesQuickFilterValue(record, value) {
+      const previous = state.filters.quick;
+      state.filters.quick = value;
+      const matches = matchesQuickFilter(record);
+      state.filters.quick = previous;
+      return matches;
+    }
+
+    function quickFilterCount(value) {
+      return state.records.filter((record) => {
+        if (state.activeMonth !== "all" && monthKey(record) !== state.activeMonth) return false;
+        return matchesQuickFilterValue(record, value);
+      }).length;
+    }
+
+    function renderQuickFilters() {
+      const box = $("quickFilters");
+      if (!box) return;
+      box.innerHTML = "";
+      const allButton = document.createElement("button");
+      allButton.type = "button";
+      allButton.className = "quick-filter" + (!state.filters.quick ? " active" : "");
+      allButton.textContent = "すべて";
+      allButton.addEventListener("click", () => {
+        state.filters.quick = "";
+        render();
+      });
+      box.append(allButton);
+      quickFilterDefinitions().forEach(({ value, label }) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "quick-filter" + (state.filters.quick === value ? " active" : "");
+        button.textContent = `${label} ${quickFilterCount(value)}`;
+        button.addEventListener("click", () => {
+          state.filters.quick = state.filters.quick === value ? "" : value;
+          render();
+        });
+        box.append(button);
+      });
     }
 
     function renderDashboardMonthOptions() {

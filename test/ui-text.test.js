@@ -45,10 +45,13 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     'id="salesFilterStaff"',
     'id="salesFilterText"',
     'id="syncSheetsBtn"',
+    'id="quickFilters"',
     "担当者別 粗利",
     "販売先別 粗利",
     "未処理タスク",
-    "スプシへ送信"
+    "スプシへ送信",
+    "quickFilterDefinitions",
+    "証憑なし"
   ];
 
   for (const marker of requiredControls) {
