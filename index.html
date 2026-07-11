@@ -204,6 +204,19 @@
       border-bottom: 1px solid var(--line);
     }
 
+    .panel-tools {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .panel-tools select {
+      width: auto;
+      min-width: 128px;
+    }
+
     .panel-body {
       padding: 16px;
       min-width: 0;
@@ -1080,7 +1093,12 @@
           <section class="panel" aria-labelledby="dashboardTitle">
             <div class="panel-head">
               <h2 id="dashboardTitle">経営ダッシュボード</h2>
-              <span class="status small">販売管理連携中</span>
+              <div class="panel-tools">
+                <label class="small">対象月
+                  <select id="dashboardMonth"></select>
+                </label>
+                <span class="status small">販売管理連携中</span>
+              </div>
             </div>
             <div class="panel-body">
               <div class="dashboard-grid">
@@ -1229,6 +1247,12 @@
                     <option value="returned">返品</option>
                     <option value="on_hold">保留</option>
                   </select>
+                </label>
+                <label>担当で絞り込み
+                  <select id="salesFilterStaff"></select>
+                </label>
+                <label>販売検索
+                  <input id="salesFilterText" type="search" placeholder="商品名・管理番号・SKU">
                 </label>
               </div>
               <div class="sales-table">
@@ -1509,13 +1533,14 @@
       images: new Map(),
       settings: null,
       activeMonth: "all",
+      dashboardMonth: "",
       sortOrder: "dateDesc",
       filters: { staff: "", channel: "", branch: "", kind: "", text: "" },
       proofDraft: [],
       aiImages: [],
       aiItems: [],
       sales: [],
-      salesFilters: { destination: "", status: "" },
+      salesFilters: { destination: "", status: "", staff: "", text: "" },
       taxPackages: [],
       currentEvidenceId: "",
       currentEvidenceIndex: 0,
@@ -2048,11 +2073,40 @@
     }
 
     function filteredSales() {
+      const text = String(state.salesFilters.text || "").trim().toLowerCase();
       return state.sales.filter((sale) => {
+        const purchase = findPurchase(sale.purchase_id);
         if (state.salesFilters.destination && sale.destination !== state.salesFilters.destination) return false;
         if (state.salesFilters.status && sale.status !== state.salesFilters.status) return false;
+        if (state.salesFilters.staff && salePurchaseStaff(sale) !== state.salesFilters.staff) return false;
+        if (text) {
+          const haystack = [
+            purchase?.name,
+            purchase?.manufacturer,
+            purchase?.category,
+            purchase?.staff,
+            sale.listing_id,
+            sale.sku,
+            sale.memo,
+            saleDestinationLabel(sale.destination),
+            saleStatusLabel(sale.status)
+          ].join(" ").toLowerCase();
+          if (!haystack.includes(text)) return false;
+        }
         return true;
       });
+    }
+
+    function renderSalesFilterOptions() {
+      const staffSelect = $("salesFilterStaff");
+      if (!staffSelect) return;
+      const current = state.salesFilters.staff;
+      const staffNames = [...new Set(state.records.map((record) => record.staff || "未設定"))].sort((a, b) => a.localeCompare(b, "ja"));
+      staffSelect.innerHTML = "";
+      staffSelect.append(new Option("すべて", ""));
+      staffNames.forEach((name) => staffSelect.append(new Option(name, name)));
+      staffSelect.value = staffNames.includes(current) ? current : "";
+      state.salesFilters.staff = staffSelect.value;
     }
 
     function saleSummary(sales) {
@@ -2187,8 +2241,10 @@
       const rows = $("salesRows");
       if (!form || !rows) return;
       renderSalePurchaseOptions();
+      renderSalesFilterOptions();
       $("salesFilterDestination").value = state.salesFilters.destination;
       $("salesFilterStatus").value = state.salesFilters.status;
+      $("salesFilterText").value = state.salesFilters.text;
       const canWrite = canWritePurchases();
       form.querySelectorAll("input, select, textarea, button").forEach((element) => {
         element.disabled = !canWrite;
@@ -2730,6 +2786,27 @@
       return [...new Set(state.records.map(monthKey))].sort().reverse();
     }
 
+    function availableDashboardMonths() {
+      const months = new Set();
+      state.records.forEach((record) => {
+        if (record.date) months.add(record.date.slice(0, 7));
+      });
+      state.sales.forEach((sale) => {
+        const date = sale.sold_at || sale.listed_at || "";
+        if (date) months.add(String(date).slice(0, 7));
+      });
+      return [...months].filter(Boolean).sort().reverse();
+    }
+
+    function currentMonthKey() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    }
+
+    function selectedDashboardMonth() {
+      return state.dashboardMonth || currentMonthKey();
+    }
+
     function filteredRecords() {
       const text = state.filters.text.trim().toLowerCase();
       const records = state.records.filter((record) => {
@@ -2814,11 +2891,26 @@
       return button;
     }
 
+    function renderDashboardMonthOptions() {
+      const select = $("dashboardMonth");
+      if (!select) return;
+      const months = availableDashboardMonths();
+      const currentMonth = currentMonthKey();
+      const values = [...new Set([currentMonth, ...months])];
+      const current = state.dashboardMonth || currentMonth;
+      select.innerHTML = "";
+      values.forEach((month) => {
+        select.append(new Option(month === currentMonth ? `${month}（今月）` : month, month));
+      });
+      select.value = values.includes(current) ? current : currentMonth;
+      state.dashboardMonth = select.value;
+    }
+
     function renderDashboard(records) {
-      const now = new Date();
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const monthRecords = records.filter((record) => monthKey(record) === currentMonth);
-      const monthSales = soldSalesForMonth(currentMonth);
+      renderDashboardMonthOptions();
+      const targetMonth = selectedDashboardMonth();
+      const monthRecords = records.filter((record) => monthKey(record) === targetMonth);
+      const monthSales = soldSalesForMonth(targetMonth);
       const monthRevenue = monthSales.reduce((sum, sale) => sum + saleRevenueJpy(sale), 0);
       const monthProfit = monthSales.reduce((sum, sale) => sum + saleProfit(sale), 0);
       const margin = saleMargin(monthRevenue, monthProfit);
@@ -4244,6 +4336,10 @@
           $("ioStatus").textContent = error.message;
         }
       });
+      $("dashboardMonth").addEventListener("change", () => {
+        state.dashboardMonth = $("dashboardMonth").value;
+        render();
+      });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const record = readForm();
@@ -4276,6 +4372,14 @@
       });
       $("salesFilterStatus").addEventListener("change", () => {
         state.salesFilters.status = $("salesFilterStatus").value;
+        renderSalesManagement();
+      });
+      $("salesFilterStaff").addEventListener("change", () => {
+        state.salesFilters.staff = $("salesFilterStaff").value;
+        renderSalesManagement();
+      });
+      $("salesFilterText").addEventListener("input", () => {
+        state.salesFilters.text = $("salesFilterText").value;
         renderSalesManagement();
       });
       $("salesRows").addEventListener("click", async (event) => {
