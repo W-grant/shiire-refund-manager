@@ -1145,6 +1145,28 @@
               </div>
             </div>
             <div class="panel-body">
+              <div class="dashboard-grid annual-dashboard">
+                <div class="dashboard-card">
+                  <span id="dashYearLabel" class="muted small">年間仕入点数</span>
+                  <strong id="dashYearPurchaseQty">0点</strong>
+                  <span id="dashYearPurchaseCount" class="small muted">0件</span>
+                </div>
+                <div class="dashboard-card">
+                  <span class="muted small">年間仕入金額</span>
+                  <strong id="dashYearPurchaseAmount">0円</strong>
+                  <span class="small muted">税込仕入総額</span>
+                </div>
+                <div class="dashboard-card">
+                  <span class="muted small">年間売上</span>
+                  <strong id="dashYearRevenue">0円</strong>
+                  <span id="dashYearSoldCount" class="small muted">0件売却</span>
+                </div>
+                <div class="dashboard-card">
+                  <span class="muted small">年間粗利</span>
+                  <strong id="dashYearProfit">0円</strong>
+                  <span id="dashYearMargin" class="small muted">利益率 0%</span>
+                </div>
+              </div>
               <div class="dashboard-grid">
                 <div class="dashboard-card">
                   <span class="muted small">今月売上</span>
@@ -2133,6 +2155,10 @@
       return state.sales.filter((sale) => sale.status === "sold" && String(sale.sold_at || "").startsWith(month));
     }
 
+    function soldSalesForYear(year) {
+      return state.sales.filter((sale) => sale.status === "sold" && String(sale.sold_at || "").startsWith(`${year}-`));
+    }
+
     function hasSoldSale(record) {
       return state.sales.some((sale) => sale.purchase_id === record.id && sale.status === "sold");
     }
@@ -3073,6 +3099,13 @@
     function renderDashboard(records) {
       renderDashboardMonthOptions();
       const targetMonth = selectedDashboardMonth();
+      const targetYear = targetMonth.slice(0, 4);
+      const yearRecords = state.records.filter((record) => String(record.date || "").startsWith(`${targetYear}-`));
+      const yearSales = soldSalesForYear(targetYear);
+      const yearPurchaseQty = yearRecords.reduce((sum, record) => sum + Number(record.qty || 0), 0);
+      const yearPurchaseAmount = yearRecords.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+      const yearRevenue = yearSales.reduce((sum, sale) => sum + saleRevenueJpy(sale), 0);
+      const yearProfit = yearSales.reduce((sum, sale) => sum + saleProfit(sale), 0);
       const monthRecords = records.filter((record) => monthKey(record) === targetMonth);
       const monthSales = soldSalesForMonth(targetMonth);
       const monthRevenue = monthSales.reduce((sum, sale) => sum + saleRevenueJpy(sale), 0);
@@ -3085,6 +3118,16 @@
       const notListedCount = records.filter((record) => !hasActiveSale(record)).length;
       const preparingCount = state.sales.filter((sale) => ["not_listed", "preparing", "on_hold"].includes(sale.status)).length;
       const openTaskCount = noEvidenceCount + missingDestinationCount + notListedCount + preparingCount;
+
+      $("dashYearLabel").textContent = `${targetYear}年 仕入点数`;
+      $("dashYearPurchaseQty").textContent = `${yearPurchaseQty}点`;
+      $("dashYearPurchaseCount").textContent = `${yearRecords.length}件`;
+      $("dashYearPurchaseAmount").textContent = yen(yearPurchaseAmount);
+      $("dashYearRevenue").textContent = yen(yearRevenue);
+      $("dashYearSoldCount").textContent = `${yearSales.length}件売却`;
+      $("dashYearProfit").textContent = yen(yearProfit);
+      $("dashYearProfit").className = yearProfit >= 0 ? "profit-plus" : "profit-minus";
+      $("dashYearMargin").textContent = `利益率 ${saleMargin(yearRevenue, yearProfit)}%`;
 
       $("dashMonthPurchase").textContent = yen(monthRevenue);
       $("dashMonthCount").textContent = `${monthSales.length}件売却 / 仕入${monthRecords.length}件`;
