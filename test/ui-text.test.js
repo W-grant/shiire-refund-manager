@@ -41,6 +41,7 @@ test("Production UI contains Japanese operational status messages", () => {
 test("Sales dashboard and Google Sheets controls stay visible", () => {
   const requiredControls = [
     'id="dashboardMonth"',
+    'id="screenNav"',
     'id="dashTaskBreakdown"',
     'id="salesFilterStaff"',
     'id="salesFilterText"',
@@ -55,6 +56,7 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "未処理タスク",
     "スプシへ送信",
     "quickFilterDefinitions",
+    "screenDefinitions",
     "証憑なし"
   ];
 

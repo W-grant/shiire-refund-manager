@@ -300,6 +300,42 @@
       padding: 2px;
     }
 
+    .screen-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0 16px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .screen-tab {
+      min-height: 38px;
+      border-radius: 8px;
+      padding: 0 14px;
+      font-weight: 700;
+      background: transparent;
+    }
+
+    .screen-tab.active {
+      border-color: #1f6a4b;
+      background: var(--green);
+      color: #fff;
+    }
+
+    .layout.page-mode {
+      grid-template-columns: 1fr;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    .app-page-hidden {
+      display: none !important;
+    }
+
     .quick-filters {
       display: flex;
       flex-wrap: wrap;
@@ -940,9 +976,11 @@
     <main id="appMain" class="hidden">
       <div class="notice">最終処理は税理士に確認してください。</div>
 
+      <nav id="screenNav" class="screen-nav" aria-label="主要画面"></nav>
+
       <div class="layout">
         <div class="left-stack">
-        <section class="panel" aria-labelledby="formTitle">
+        <section class="panel" aria-labelledby="formTitle" data-screen-panel="purchase">
           <div class="panel-head">
             <h2 id="formTitle">仕入登録</h2>
             <span id="editingLabel" class="muted small">新規</span>
@@ -1078,7 +1116,7 @@
           </div>
         </section>
 
-        <section class="panel" aria-labelledby="extractTitle">
+        <section class="panel" aria-labelledby="extractTitle" data-screen-panel="purchase">
           <div class="panel-head">
             <h2 id="extractTitle">AI抽出</h2>
             <span id="extractStatus" class="status small"></span>
@@ -1134,7 +1172,7 @@
         </div>
 
         <div class="right-stack">
-          <section class="panel" aria-labelledby="dashboardTitle">
+          <section class="panel" aria-labelledby="dashboardTitle" data-screen-panel="dashboard">
             <div class="panel-head">
               <h2 id="dashboardTitle">経営ダッシュボード</h2>
               <div class="panel-tools">
@@ -1206,7 +1244,7 @@
             </div>
           </section>
 
-          <section class="panel" aria-labelledby="salesTitle">
+          <section class="panel" aria-labelledby="salesTitle" data-screen-panel="sales">
             <div class="panel-head">
               <h2 id="salesTitle">販売管理</h2>
               <span id="salesStatus" class="status small"></span>
@@ -1342,7 +1380,7 @@
             </div>
           </section>
 
-          <section class="panel" aria-labelledby="summaryTitle">
+          <section class="panel" aria-labelledby="summaryTitle" data-screen-panel="list">
             <div class="panel-head">
               <h2 id="summaryTitle">一覧・集計</h2>
               <div id="monthTabs" class="tabs"></div>
@@ -1409,7 +1447,7 @@
             </div>
           </section>
 
-          <section class="panel" aria-labelledby="ioTitle">
+          <section class="panel" aria-labelledby="ioTitle" data-screen-panel="export">
             <div class="panel-head">
               <h2 id="ioTitle">CSV入出力</h2>
               <span id="ioStatus" class="status small"></span>
@@ -1600,6 +1638,7 @@
       images: new Map(),
       settings: null,
       activeMonth: "all",
+      activeScreen: "dashboard",
       dashboardMonth: "",
       sortOrder: "dateDesc",
       filters: { staff: "", channel: "", branch: "", kind: "", text: "", quick: "" },
@@ -2924,6 +2963,43 @@
       return state.dashboardMonth || currentMonthKey();
     }
 
+    function screenDefinitions() {
+      return [
+        { value: "dashboard", label: "ダッシュボード" },
+        { value: "purchase", label: "仕入登録・AI" },
+        { value: "list", label: "一覧・集計" },
+        { value: "sales", label: "販売管理" },
+        { value: "export", label: "出力・設定" }
+      ];
+    }
+
+    function setActiveScreen(screen) {
+      const valid = screenDefinitions().some((item) => item.value === screen);
+      state.activeScreen = valid ? screen : "dashboard";
+      renderScreenNav();
+    }
+
+    function renderScreenNav() {
+      const nav = $("screenNav");
+      if (!nav) return;
+      nav.innerHTML = "";
+      screenDefinitions().forEach(({ value, label }) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "screen-tab" + (state.activeScreen === value ? " active" : "");
+        button.textContent = label;
+        button.addEventListener("click", () => {
+          state.activeScreen = value;
+          render();
+        });
+        nav.append(button);
+      });
+      document.querySelectorAll("[data-screen-panel]").forEach((panel) => {
+        panel.classList.toggle("app-page-hidden", panel.dataset.screenPanel !== state.activeScreen);
+      });
+      document.querySelector(".layout")?.classList.add("page-mode");
+    }
+
     function recordHasSale(record, status = "") {
       return state.sales.some((sale) => sale.purchase_id === record.id && (!status || sale.status === status));
     }
@@ -2979,6 +3055,7 @@
     }
 
     function render() {
+      renderScreenNav();
       renderMonths();
       renderQuickFilters();
       const records = filteredRecords();
@@ -4708,7 +4785,10 @@
         if (evidenceId) openEvidence(evidenceId);
         if (editId) {
           const record = state.records.find((item) => item.id === editId);
-          if (record) setForm(record);
+          if (record) {
+            setForm(record);
+            setActiveScreen("purchase");
+          }
         }
         if (deleteId && confirm("削除しますか？")) {
           await deleteRecord(deleteId);
