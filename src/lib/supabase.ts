@@ -21,6 +21,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    persistSession: true
+    persistSession: true,
+    storageKey: "shiire-refund-auth-v2"
   }
 });

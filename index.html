@@ -1819,6 +1819,14 @@
       window.history.replaceState(null, "", window.location.pathname);
     }
 
+    function authErrorMessage(error) {
+      const message = error?.message || String(error || "");
+      if (message.includes("Failed to fetch")) {
+        return "Supabaseに接続できませんでした。時間を置いて再読み込みしてください。";
+      }
+      return message;
+    }
+
     function canWritePurchases() {
       return state.profile && ["admin", "staff"].includes(state.profile.role);
     }
@@ -1887,9 +1895,9 @@
         state.profile = null;
         applyRoleControls();
         if (state.passwordRecovery) {
-          $("passwordResetStatus").textContent = error.message || "リセットリンクを確認できませんでした。メールを再送してください";
+          $("passwordResetStatus").textContent = authErrorMessage(error) || "リセットリンクを確認できませんでした。メールを再送してください";
         } else {
-          $("loginStatus").textContent = error.message || "ログイン状態を確認できませんでした";
+          $("loginStatus").textContent = authErrorMessage(error) || "ログイン状態を確認できませんでした";
         }
         return false;
       }
@@ -4544,7 +4552,7 @@
         } catch (error) {
           state.profile = null;
           applyRoleControls();
-          $("loginStatus").textContent = error.message || "ログインに失敗しました";
+          $("loginStatus").textContent = authErrorMessage(error) || "ログインに失敗しました";
         } finally {
           $("loginBtn").disabled = false;
         }

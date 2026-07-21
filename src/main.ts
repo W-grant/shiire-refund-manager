@@ -1,4 +1,3 @@
-import "./lib/supabase-connection-check";
 import { completePasswordRecovery, getCurrentAuth, signInWithPassword, signOut, updatePassword } from "./lib/services/authService";
 import { deleteMonthlyPackage, getMonthlyPackageDownloadUrl, listMonthlyPackages, saveMonthlyPackage } from "./lib/services/monthlyPackageService";
 import { loadSupabasePurchaseState } from "./lib/services/purchaseReadService";
@@ -61,3 +60,9 @@ window.ShiireSupabaseWrite = {
 window.dispatchEvent(new Event("shiire:supabase-read-ready"));
 window.dispatchEvent(new Event("shiire:supabase-write-ready"));
 window.dispatchEvent(new Event("shiire:auth-ready"));
+
+void import("./lib/supabase-connection-check").catch((error) => {
+  console.error("[Supabase] connection check bootstrap failed", {
+    message: error instanceof Error ? error.message : String(error)
+  });
+});
