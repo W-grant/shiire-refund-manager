@@ -4928,7 +4928,29 @@
       }
     }
 
-    initApp();
+    function showStartupFallback(error) {
+      console.error("[Startup] App initialization failed", error);
+      state.profile = null;
+      state.passwordRecovery = false;
+      $("passwordResetView")?.classList.add("hidden");
+      $("appMain")?.classList.add("hidden");
+      $("loginView")?.classList.remove("hidden");
+      ["refreshBtn", "sampleBtn", "clearBtn", "settingsBtn", "logoutBtn", "userBadge"].forEach((id) => $(id)?.classList.add("hidden"));
+      if ($("loginStatus")) {
+        $("loginStatus").textContent = "画面の初期化に失敗しました。ブラウザを再読み込みしてください。";
+      }
+    }
+
+    setTimeout(() => {
+      const nothingVisible = $("loginView")?.classList.contains("hidden")
+        && $("passwordResetView")?.classList.contains("hidden")
+        && $("appMain")?.classList.contains("hidden");
+      if (nothingVisible) {
+        showStartupFallback(new Error("startup view timeout"));
+      }
+    }, 3500);
+
+    initApp().catch(showStartupFallback);
   </script>
 </body>
 </html>
