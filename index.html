@@ -1638,7 +1638,7 @@
       images: new Map(),
       settings: null,
       activeMonth: "all",
-      activeScreen: "dashboard",
+      activeScreen: "all",
       dashboardMonth: "",
       sortOrder: "dateDesc",
       filters: { staff: "", channel: "", branch: "", kind: "", text: "", quick: "" },
@@ -2965,6 +2965,7 @@
 
     function screenDefinitions() {
       return [
+        { value: "all", label: "全体表示" },
         { value: "dashboard", label: "ダッシュボード" },
         { value: "purchase", label: "仕入登録・AI" },
         { value: "list", label: "一覧・集計" },
@@ -2975,7 +2976,7 @@
 
     function setActiveScreen(screen) {
       const valid = screenDefinitions().some((item) => item.value === screen);
-      state.activeScreen = valid ? screen : "dashboard";
+      state.activeScreen = valid ? screen : "all";
       renderScreenNav();
     }
 
@@ -2995,9 +2996,9 @@
         nav.append(button);
       });
       document.querySelectorAll("[data-screen-panel]").forEach((panel) => {
-        panel.classList.toggle("app-page-hidden", panel.dataset.screenPanel !== state.activeScreen);
+        panel.classList.toggle("app-page-hidden", state.activeScreen !== "all" && panel.dataset.screenPanel !== state.activeScreen);
       });
-      document.querySelector(".layout")?.classList.add("page-mode");
+      document.querySelector(".layout")?.classList.toggle("page-mode", state.activeScreen !== "all");
     }
 
     function recordHasSale(record, status = "") {
