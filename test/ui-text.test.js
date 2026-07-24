@@ -54,6 +54,7 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "review-card",
     "review-fields",
     "フォームへ反映",
+    "clearExtract",
     "担当者別 粗利",
     "販売先別 粗利",
     "未処理タスク",

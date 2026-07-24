@@ -4711,7 +4711,10 @@
         const images = [...getRecordImages(record.id), ...state.proofDraft];
         const bundle = imageBundleFor(record.id, images);
         record.hasImage = bundle.images.length > 0;
-        if (await saveRecord(record, bundle)) setForm(defaultRecord());
+        if (await saveRecord(record, bundle)) {
+          setForm(defaultRecord());
+          clearExtract();
+        }
       });
       $("salesForm").addEventListener("submit", async (event) => {
         event.preventDefault();
