@@ -700,24 +700,85 @@
     }
 
     .review-table {
-      max-height: 290px;
-      overflow: auto;
+      display: grid;
+      gap: 12px;
+      max-height: none;
+      overflow: visible;
+      border: 0;
+      background: transparent;
+    }
+
+    .review-card {
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fff;
-      max-width: 100%;
+      padding: 14px;
+      display: grid;
+      gap: 12px;
     }
 
-    .review-table table {
-      min-width: 760px;
+    .review-card.review-row-error {
+      border-color: #f2b8ad;
+      background: #fff7f5;
     }
 
-    .review-row-error {
-      background: #fff0ed;
+    .review-card.review-row-warning {
+      border-color: #ecd184;
+      background: #fffaf0;
     }
 
-    .review-row-warning {
-      background: #fff8df;
+    .review-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .review-card-title {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .review-card-title strong {
+      font-size: 16px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .review-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+    }
+
+    .review-field {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .review-field.wide {
+      grid-column: span 2;
+    }
+
+    .review-field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .review-field input,
+    .review-field select {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .review-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .review-flags {
@@ -1138,31 +1199,7 @@
               <button id="clearExtractBtn" type="button">抽出欄をクリア</button>
             </div>
             <div id="reviewWrap" class="review-table hidden">
-              <table>
-                <thead>
-                  <tr>
-                    <th>仕入日</th>
-                    <th>チャネル</th>
-                    <th>商品</th>
-                    <th>メーカー</th>
-                    <th>品目</th>
-                    <th>数量</th>
-                    <th>本体価格</th>
-                    <th>送料手数料</th>
-                    <th>総額</th>
-                    <th>税率</th>
-                    <th>利用先</th>
-                    <th>相手方</th>
-                    <th>古物</th>
-                    <th>棚卸</th>
-                    <th>適格</th>
-                    <th>取引</th>
-                    <th>証憑</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody id="reviewRows"></tbody>
-              </table>
+              <div id="reviewRows"></div>
             </div>
             <div class="actions">
               <button id="addExtractedBtn" type="button">まとめて追加</button>
@@ -3600,6 +3637,24 @@
       return `<select data-review="${index}" data-field="${field}">${normalized.map(([value, label]) => optionHtml(value, label, selected)).join("")}</select>`;
     }
 
+    function reviewInputHtml(index, field, label, type, value, extra = "", wide = false) {
+      return `
+        <div class="review-field ${wide ? "wide" : ""}">
+          <label>${escapeHtml(label)}</label>
+          <input data-review="${index}" data-field="${field}" type="${type}" value="${escapeHtml(value ?? "")}" ${extra}>
+        </div>
+      `;
+    }
+
+    function reviewSelectHtml(index, field, label, options, selected, wide = false) {
+      return `
+        <div class="review-field ${wide ? "wide" : ""}">
+          <label>${escapeHtml(label)}</label>
+          ${selectHtml(index, field, options, selected)}
+        </div>
+      `;
+    }
+
     function reviewValidation(record) {
       const hasSelectedImage = record.imageIndex === "all" || Number(record.imageIndex) >= 0;
       const checkedRecord = { ...record, hasImage: Boolean(hasSelectedImage && state.aiImages.length) };
@@ -3655,30 +3710,42 @@
         const result = reviewValidation(record);
         const rowClass = result.errors.length ? "review-row-error" : result.warnings.length ? "review-row-warning" : "";
         return `
-        <tr class="${rowClass}">
-          <td><input data-review="${index}" data-field="date" type="date" value="${escapeHtml(record.date)}"></td>
-          <td>${selectHtml(index, "channel", channelOptions, record.channel)}</td>
-          <td><input data-review="${index}" data-field="name" type="text" value="${escapeHtml(record.name)}"></td>
-          <td><input data-review="${index}" data-field="manufacturer" type="text" value="${escapeHtml(record.manufacturer || "")}"></td>
-          <td>${selectHtml(index, "category", categoryOptions, record.category)}</td>
-          <td><input data-review="${index}" data-field="qty" type="number" min="1" step="1" value="${escapeHtml(record.qty)}"></td>
-          <td><input data-review="${index}" data-field="itemPrice" type="number" value="${escapeHtml(record.itemPrice ?? record.amount ?? 0)}"></td>
-          <td><input data-review="${index}" data-field="shippingFeeTotal" type="number" value="${escapeHtml(record.shippingFeeTotal ?? 0)}"></td>
-          <td><input data-review="${index}" data-field="amount" type="number" value="${escapeHtml(record.amount)}"></td>
-          <td>${selectHtml(index, "rate", [["10", "10%"], ["8", "8%"]], record.rate)}</td>
-          <td>${selectHtml(index, "destination", destinationOptions, record.destination || "undecided")}</td>
-          <td><input data-review="${index}" data-field="seller" type="text" value="${escapeHtml(record.seller)}"></td>
-          <td>${selectHtml(index, "kind", kindOptions, record.kind)}</td>
-          <td>${selectHtml(index, "stock", stockOptions, record.stock)}</td>
-          <td>${selectHtml(index, "qualified", qualifiedOptions, record.qualified)}</td>
-          <td>${selectHtml(index, "anon", anonOptions, record.anon)}</td>
-          <td><select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select></td>
-          <td>
-            ${reviewFlagsHtml(result)}
-            <button type="button" data-review-apply="${index}">フォーム</button>
-            <button class="danger" type="button" data-review-delete="${index}">×</button>
-          </td>
-        </tr>
+        <article class="review-card ${rowClass}">
+          <div class="review-card-head">
+            <div class="review-card-title">
+              <span class="small muted">抽出 ${index + 1}件目</span>
+              <strong>${escapeHtml(record.name || "商品名未入力")}</strong>
+              <span class="small muted">${escapeHtml([record.date, record.channel, record.category].filter(Boolean).join(" / "))}</span>
+            </div>
+            <div class="review-actions">
+              <button type="button" data-review-apply="${index}">フォームへ反映</button>
+              <button class="danger" type="button" data-review-delete="${index}">削除</button>
+            </div>
+          </div>
+          ${reviewFlagsHtml(result)}
+          <div class="review-fields">
+            ${reviewInputHtml(index, "date", "仕入日", "date", record.date)}
+            ${reviewSelectHtml(index, "channel", "チャネル", channelOptions, record.channel)}
+            ${reviewInputHtml(index, "name", "商品名", "text", record.name, "", true)}
+            ${reviewInputHtml(index, "manufacturer", "メーカー", "text", record.manufacturer || "")}
+            ${reviewSelectHtml(index, "category", "品目", categoryOptions, record.category)}
+            ${reviewInputHtml(index, "qty", "数量", "number", record.qty, 'min="1" step="1"')}
+            ${reviewInputHtml(index, "itemPrice", "本体価格", "number", record.itemPrice ?? record.amount ?? 0, 'min="0" step="1" inputmode="numeric"')}
+            ${reviewInputHtml(index, "shippingFeeTotal", "送料・手数料", "number", record.shippingFeeTotal ?? 0, 'min="0" step="1" inputmode="numeric"')}
+            ${reviewInputHtml(index, "amount", "仕入総額", "number", record.amount, 'min="0" step="1" inputmode="numeric"')}
+            ${reviewSelectHtml(index, "rate", "税率", [["10", "10%"], ["8", "8%"]], record.rate)}
+            ${reviewSelectHtml(index, "destination", "利用先", destinationOptions, record.destination || "undecided")}
+            ${reviewInputHtml(index, "seller", "相手方", "text", record.seller, "", true)}
+            ${reviewSelectHtml(index, "kind", "古物区分", kindOptions, record.kind)}
+            ${reviewSelectHtml(index, "stock", "棚卸資産", stockOptions, record.stock)}
+            ${reviewSelectHtml(index, "qualified", "適格事業者", qualifiedOptions, record.qualified)}
+            ${reviewSelectHtml(index, "anon", "取引形態", anonOptions, record.anon)}
+            <div class="review-field">
+              <label>証憑画像</label>
+              <select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select>
+            </div>
+          </div>
+        </article>
       `;
       }).join("");
     }
