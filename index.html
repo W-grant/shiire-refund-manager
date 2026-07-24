@@ -5016,6 +5016,18 @@
       }
     }
 
+    function showLocalFileWarning() {
+      state.profile = null;
+      state.passwordRecovery = false;
+      $("passwordResetView")?.classList.add("hidden");
+      $("appMain")?.classList.add("hidden");
+      $("loginView")?.classList.remove("hidden");
+      ["refreshBtn", "sampleBtn", "clearBtn", "settingsBtn", "logoutBtn", "userBadge"].forEach((id) => $(id)?.classList.add("hidden"));
+      if ($("loginStatus")) {
+        $("loginStatus").innerHTML = 'PC内のindex.htmlを直接開いています。アプリは公開URL <a href="https://shiire-refund-manager.pages.dev/">https://shiire-refund-manager.pages.dev/</a> から開いてください。';
+      }
+    }
+
     setTimeout(() => {
       const nothingVisible = $("loginView")?.classList.contains("hidden")
         && $("passwordResetView")?.classList.contains("hidden")
@@ -5025,7 +5037,11 @@
       }
     }, 3500);
 
-    initApp().catch(showStartupFallback);
+    if (window.location.protocol === "file:") {
+      showLocalFileWarning();
+    } else {
+      initApp().catch(showStartupFallback);
+    }
   </script>
 </body>
 </html>
