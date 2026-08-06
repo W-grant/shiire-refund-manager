@@ -301,11 +301,11 @@
     }
 
     .screen-nav {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+      gap: 6px;
       margin: 12px 0 16px;
-      padding: 8px;
+      padding: 6px;
       border: 1px solid var(--border);
       border-radius: var(--radius);
       background: #fff;
@@ -315,9 +315,10 @@
     .screen-tab {
       min-height: 38px;
       border-radius: 8px;
-      padding: 0 14px;
+      padding: 0 12px;
       font-weight: 700;
       background: transparent;
+      justify-content: center;
     }
 
     .screen-tab.active {
@@ -1709,7 +1710,7 @@
       images: new Map(),
       settings: null,
       activeMonth: "all",
-      activeScreen: "all",
+      activeScreen: "dashboard",
       dashboardMonth: "",
       sortOrder: "dateDesc",
       filters: { staff: "", channel: "", branch: "", kind: "", text: "", quick: "" },
@@ -3055,31 +3056,53 @@
       ];
     }
 
+    const PAGE_LABELS = {
+      dashboard: "ダッシュボード",
+      purchase: "仕入登録",
+      list: "仕入一覧",
+      sales: "販売管理",
+      export: "出力・設定"
+    };
+
+    function visibleScreenDefinitions() {
+      return screenDefinitions()
+        .filter((item) => item.value !== "all")
+        .map((item) => ({ ...item, label: PAGE_LABELS[item.value] || item.label }));
+    }
+
     function setActiveScreen(screen) {
-      const valid = screenDefinitions().some((item) => item.value === screen);
-      state.activeScreen = valid ? screen : "all";
+      const valid = visibleScreenDefinitions().some((item) => item.value === screen);
+      state.activeScreen = valid ? screen : "dashboard";
+      localStorage.setItem("shiire-refund-active-screen", state.activeScreen);
       renderScreenNav();
+    }
+
+    function restoreActiveScreen() {
+      const saved = localStorage.getItem("shiire-refund-active-screen");
+      const valid = visibleScreenDefinitions().some((item) => item.value === saved);
+      state.activeScreen = valid ? saved : "dashboard";
     }
 
     function renderScreenNav() {
       const nav = $("screenNav");
       if (!nav) return;
       nav.innerHTML = "";
-      screenDefinitions().forEach(({ value, label }) => {
+      visibleScreenDefinitions().forEach(({ value, label }) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "screen-tab" + (state.activeScreen === value ? " active" : "");
         button.textContent = label;
         button.addEventListener("click", () => {
           state.activeScreen = value;
+          localStorage.setItem("shiire-refund-active-screen", state.activeScreen);
           render();
         });
         nav.append(button);
       });
       document.querySelectorAll("[data-screen-panel]").forEach((panel) => {
-        panel.classList.toggle("app-page-hidden", state.activeScreen !== "all" && panel.dataset.screenPanel !== state.activeScreen);
+        panel.classList.toggle("app-page-hidden", panel.dataset.screenPanel !== state.activeScreen);
       });
-      document.querySelector(".layout")?.classList.toggle("page-mode", state.activeScreen !== "all");
+      document.querySelector(".layout")?.classList.add("page-mode");
     }
 
     function recordHasSale(record, status = "") {
@@ -5139,6 +5162,7 @@
       await loadSettings();
       await loadMeta();
       initMeta();
+      restoreActiveScreen();
       bindEvents();
       renderSettingsForm();
       setForm(defaultRecord());
