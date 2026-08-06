@@ -830,6 +830,35 @@
       border-radius: 6px;
     }
 
+    .data-file-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .data-file-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 12px;
+      max-width: 100%;
+    }
+
+    .data-file-chip strong {
+      color: var(--text);
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 260px;
+    }
+
     .drop {
       border: 1px dashed var(--line-strong);
       border-radius: 8px;
@@ -1189,6 +1218,11 @@
                 <input id="extractImages" type="file" accept="image/*" multiple>
               </div>
               <div id="extractThumbs" class="field wide thumb-list"></div>
+              <div class="field wide">
+                <label for="extractDataFiles">CSV/PDFデータ</label>
+                <input id="extractDataFiles" type="file" accept=".csv,text/csv,application/pdf,.pdf" multiple>
+              </div>
+              <div id="extractFileList" class="field wide data-file-list"></div>
               <div class="field wide">
                 <label for="extractText">テキスト/データ</label>
                 <textarea id="extractText" placeholder="明細テキストやCSVの断片を貼り付け"></textarea>
@@ -1681,7 +1715,9 @@
       filters: { staff: "", channel: "", branch: "", kind: "", text: "", quick: "" },
       proofDraft: [],
       aiImages: [],
+      aiDocuments: [],
       aiItems: [],
+      appliedAiId: "",
       sales: [],
       salesFilters: { destination: "", status: "", staff: "", text: "" },
       taxPackages: [],
@@ -1895,7 +1931,7 @@
       Array.from(form.elements).forEach((element) => {
         if (element.id !== "recordId") element.disabled = !canWrite;
       });
-      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn", "taxPackageBtn"], !canWrite);
+      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractDataFiles", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn", "taxPackageBtn"], !canWrite);
       $("sampleBtn").disabled = !canWrite;
       $("clearBtn").disabled = !isAdmin();
       render();
@@ -3428,6 +3464,23 @@
       return { full, thumb, fileName: file.name };
     }
 
+    async function fileToBase64(file) {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const comma = dataUrl.indexOf(",");
+      return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+    }
+
+    function formatFileSize(bytes) {
+      if (!bytes) return "0 KB";
+      if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    }
+
     function resizeImage(src, maxSide, quality) {
       return new Promise((resolve, reject) => {
         const img = new Image();
@@ -3519,6 +3572,58 @@
       `).join("");
     }
 
+    function renderExtractDataFiles() {
+      $("extractFileList").innerHTML = state.aiDocuments.map((file) => `
+        <span class="data-file-chip">
+          <strong>${escapeHtml(file.fileName)}</strong>
+          <span>PDF</span>
+          <span>${formatFileSize(file.size)}</span>
+        </span>
+      `).join("");
+    }
+
+    async function prepareExtractDataFiles(files) {
+      const selectedFiles = Array.from(files || []);
+      const csvParts = [];
+      const pdfDocuments = [];
+      for (const file of selectedFiles) {
+        const name = String(file.name || "");
+        const lowerName = name.toLowerCase();
+        const isCsv = lowerName.endsWith(".csv") || file.type === "text/csv" || file.type.includes("csv");
+        const isPdf = lowerName.endsWith(".pdf") || file.type === "application/pdf";
+        if (isCsv) {
+          const text = await file.text();
+          csvParts.push(`--- ${name} ---\n${text}`);
+        } else if (isPdf) {
+          pdfDocuments.push({
+            fileName: name,
+            mediaType: "application/pdf",
+            data: await fileToBase64(file),
+            size: file.size || 0
+          });
+        }
+      }
+      if (csvParts.length) {
+        const textArea = $("extractText");
+        const current = textArea.value.trim();
+        textArea.value = [current, csvParts.join("\n\n")].filter(Boolean).join("\n\n");
+      }
+      state.aiDocuments = pdfDocuments;
+      renderExtractDataFiles();
+    }
+
+    async function prepareExtractFiles(files) {
+      const selectedFiles = Array.from(files || []);
+      const imageFiles = selectedFiles.filter((file) => file.type.startsWith("image/"));
+      const dataFiles = selectedFiles.filter((file) => {
+        const name = String(file.name || "").toLowerCase();
+        return name.endsWith(".csv") || name.endsWith(".pdf") || file.type === "text/csv" || file.type === "application/pdf" || file.type.includes("csv");
+      });
+      if (imageFiles.length) await prepareExtractImages(imageFiles);
+      if (dataFiles.length) await prepareExtractDataFiles(dataFiles);
+      return { imageCount: imageFiles.length, dataCount: dataFiles.length };
+    }
+
     function fileToAnthropicSource(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -3542,6 +3647,16 @@
       const content = [];
       state.aiImages.forEach((image) => {
         content.push({ type: "image", source: image.source });
+      });
+      state.aiDocuments.forEach((documentFile) => {
+        content.push({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: documentFile.mediaType,
+            data: documentFile.data
+          }
+        });
       });
       content.push({ type: "text", text: text ? `${EXTRACT_PROMPT}\n\n貼付テキスト:\n${text}` : EXTRACT_PROMPT });
       return [{ role: "user", content }];
@@ -3751,7 +3866,7 @@
     }
 
     async function runExtract() {
-      if (!state.aiImages.length && !$("extractText").value.trim()) {
+      if (!state.aiImages.length && !state.aiDocuments.length && !$("extractText").value.trim()) {
         $("extractStatus").textContent = "画像またはテキストを指定してください";
         return;
       }
@@ -3764,12 +3879,32 @@
 
     function clearExtract() {
       state.aiImages = [];
+      state.aiDocuments = [];
       state.aiItems = [];
+      state.appliedAiId = "";
       $("extractImages").value = "";
+      $("extractDataFiles").value = "";
       $("extractText").value = "";
       $("extractThumbs").innerHTML = "";
+      $("extractFileList").innerHTML = "";
       renderReview();
       $("extractStatus").textContent = "";
+    }
+
+    function clearSavedExtractDraft() {
+      if (!state.appliedAiId) {
+        clearExtract();
+        return;
+      }
+      state.aiItems = state.aiItems.filter((record) => record.id !== state.appliedAiId);
+      state.appliedAiId = "";
+      if (!state.aiItems.length) {
+        clearExtract();
+        $("extractStatus").textContent = "保存しました。AI抽出欄をクリアしました";
+        return;
+      }
+      renderReview();
+      $("extractStatus").textContent = `保存しました。残り${state.aiItems.length}件を確認できます`;
     }
 
     async function addExtracted() {
@@ -3804,6 +3939,7 @@
       const { imageIndex, ...record } = sourceRecord;
       const selectedImages = imageIndex === "all" ? state.aiImages : [state.aiImages[Number(imageIndex)]].filter(Boolean);
       setForm({ ...record, id: "", hasImage: selectedImages.length > 0 });
+      state.appliedAiId = sourceRecord.id;
       state.proofDraft = selectedImages.map((image) => ({ ...image }));
       renderProofPreview([]);
       updateLiveClassify();
@@ -4713,7 +4849,7 @@
         record.hasImage = bundle.images.length > 0;
         if (await saveRecord(record, bundle)) {
           setForm(defaultRecord());
-          clearExtract();
+          clearSavedExtractDraft();
         }
       });
       $("salesForm").addEventListener("submit", async (event) => {
@@ -4785,13 +4921,23 @@
           $("extractStatus").textContent = error.message;
         }
       });
+      $("extractDataFiles").addEventListener("change", async (event) => {
+        try {
+          await prepareExtractDataFiles(event.target.files);
+          const csvLoaded = $("extractText").value.trim() ? "CSV" : "";
+          const pdfLoaded = state.aiDocuments.length ? `${state.aiDocuments.length} PDF` : "";
+          $("extractStatus").textContent = [csvLoaded, pdfLoaded].filter(Boolean).join(" / ") || "CSV/PDFを選択してください";
+        } catch (error) {
+          $("extractStatus").textContent = error.message;
+        }
+      });
       ["extractThumbs", "extractText"].forEach((id) => {
         $(id).addEventListener("dragover", (event) => event.preventDefault());
         $(id).addEventListener("drop", async (event) => {
           event.preventDefault();
           try {
-            await prepareExtractImages(event.dataTransfer.files);
-            $("extractStatus").textContent = `${state.aiImages.length}枚を選択しました`;
+            const result = await prepareExtractFiles(event.dataTransfer.files);
+            $("extractStatus").textContent = `画像${result.imageCount}件 / データ${result.dataCount}件を読み込みました`;
           } catch (error) {
             $("extractStatus").textContent = error.message;
           }
@@ -4854,7 +5000,8 @@
         }
         const button = event.target.closest("[data-review-delete]");
         if (!button) return;
-        state.aiItems.splice(Number(button.dataset.reviewDelete), 1);
+        const deleted = state.aiItems.splice(Number(button.dataset.reviewDelete), 1)[0];
+        if (deleted && deleted.id === state.appliedAiId) state.appliedAiId = "";
         renderReview();
       });
       $("recordRows").addEventListener("click", async (event) => {
