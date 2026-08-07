@@ -3304,6 +3304,10 @@
       if (quick === "catawiki") return record.destination === "catawiki" || record.destination === "both";
       if (quick === "ebay") return record.destination === "ebay" || record.destination === "both";
       if (quick === "overseas") return ["catawiki", "ebay", "overseas", "both"].includes(record.destination);
+      if (quick === "overseas_site") return record.destination === "overseas";
+      if (quick === "yahoo") return record.destination === "yahoo";
+      if (quick === "market") return record.destination === "market";
+      if (quick === "domestic_other") return record.destination === "other";
       if (quick === "sold") return recordHasSale(record, "sold");
       if (quick === "noEvidence") return !hasRecordImages(record.id);
       return true;
@@ -3402,6 +3406,10 @@
         { value: "overseas", label: "海外還付対象" },
         { value: "catawiki", label: "CATAWIKI" },
         { value: "ebay", label: "EBAY" },
+        { value: "overseas_site", label: "その他海外" },
+        { value: "yahoo", label: "ヤフオク" },
+        { value: "market", label: "市場" },
+        { value: "domestic_other", label: "その他" },
         { value: "sold", label: "売却済み" },
         { value: "noEvidence", label: "証憑なし" }
       ];
