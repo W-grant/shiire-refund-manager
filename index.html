@@ -1747,7 +1747,7 @@
 判定ルール: メルカリ/ヤフオク/ラクマ等のフリマは通常 適格請求書発行事業者=false、匿名取引=true。市場・業者オークション・店頭買取は相手方氏名が分かれば記載し匿名取引=false。金額は必ず数値（カンマや円記号を除く）。読み取れない値はnull。`;
 
     const EXTRACT_COST_PROMPT = "明細に内訳がある場合は、送料、手数料、手数料消費税をそれぞれJSONキー「送料」「手数料」「手数料消費税」で返してください。内訳が不明で合計だけ分かる場合は従来通り「送料手数料合計」に入れてください。";
-    const EXTRACT_PARTNER_PROMPT = "業者オークション、市場、請求書、仕入明細書、PDFでは、明細行だけでなく書類のヘッダー、発行元、販売者、会社名、登録番号欄も確認してください。複数商品が同じ業者からの一括仕入れの場合は、各itemsの「相手方氏名」に同じ業者名を入れてください。適格請求書発行事業者番号（Tから始まる番号）や登録番号が確認できる場合は「適格請求書発行事業者」をtrueにしてください。相手方氏名が空欄になりそうな場合でも、業者名・市場名・請求元名・発行元名の候補があれば最も確からしい名称を入れてください。";
+    const EXTRACT_PARTNER_PROMPT = "業者オークション、市場、請求書、仕入明細書、PDFでは、明細行だけでなく書類のヘッダー、発行元、販売者、会社名、登録番号、住所、所在地、請求元住所、販売者住所欄も確認してください。複数商品が同じ業者からの一括仕入れの場合は、各itemsの「相手方氏名」に同じ業者名を入れてください。住所または所在地が書類内に見える場合は各itemsの「相手方住所」に同じ住所を入れてください。適格請求書発行事業者番号（Tから始まる番号）や登録番号が確認できる場合は「適格請求書発行事業者」をtrueにしてください。相手方氏名が空欄になりそうな場合でも、業者名・市場名・請求元名・発行元名の候補があれば最も確からしい名称を入れてください。住所が書類内に見当たらない場合だけ「相手方住所」はnullにしてください。";
     const DB_NAME = "shiire-refund-db";
     const STORE_RECORDS = "records";
     const STORE_IMAGES = "images";
@@ -3605,6 +3605,26 @@
       return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
     }
 
+    function aiDocumentToEvidenceData(file) {
+      return {
+        full: `data:${file.mediaType};base64,${file.data}`,
+        thumb: "",
+        fileName: file.fileName,
+        mimeType: file.mediaType,
+        label: "PDF"
+      };
+    }
+
+    function getReviewEvidenceFiles(imageIndex) {
+      const files = [
+        ...state.aiImages,
+        ...state.aiDocuments.map(aiDocumentToEvidenceData)
+      ];
+      if (imageIndex === "all") return files;
+      const index = Number(imageIndex);
+      return Number.isInteger(index) ? [files[index]].filter(Boolean) : [];
+    }
+
     function formatFileSize(bytes) {
       if (!bytes) return "0 KB";
       if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -3875,8 +3895,8 @@
         seller: item["相手方氏名"] || "",
         address: item["相手方住所"] || "",
         memo: "AI抽出",
-        hasImage: state.aiImages.length > 0,
-        imageIndex: state.aiImages.length ? "all" : -1
+        hasImage: Boolean(state.aiImages.length || state.aiDocuments.length),
+        imageIndex: (state.aiImages.length || state.aiDocuments.length) ? "all" : -1
       };
     }
 
@@ -3909,8 +3929,7 @@
     }
 
     function reviewValidation(record) {
-      const hasSelectedImage = record.imageIndex === "all" || Number(record.imageIndex) >= 0;
-      const checkedRecord = { ...record, hasImage: Boolean(hasSelectedImage && state.aiImages.length) };
+      const checkedRecord = { ...record, hasImage: getReviewEvidenceFiles(record.imageIndex).length > 0 };
       const c = classified(checkedRecord);
       const validation = validateRecord(checkedRecord, c);
       return {
@@ -3983,7 +4002,11 @@
       const imageOptions = (selected) => [
         `<option value="all" ${selected === "all" ? "selected" : ""}>すべて</option>`,
         `<option value="-1">なし</option>`,
-        ...state.aiImages.map((_, imageIndex) => `<option value="${imageIndex}" ${Number(selected) === imageIndex ? "selected" : ""}>${imageIndex + 1}枚目</option>`)
+        ...state.aiImages.map((_, imageIndex) => `<option value="${imageIndex}" ${Number(selected) === imageIndex ? "selected" : ""}>${imageIndex + 1}枚目</option>`),
+        ...state.aiDocuments.map((file, fileIndex) => {
+          const evidenceIndex = state.aiImages.length + fileIndex;
+          return `<option value="${evidenceIndex}" ${Number(selected) === evidenceIndex ? "selected" : ""}>PDF ${fileIndex + 1}: ${escapeHtml(file.fileName || "")}</option>`;
+        })
       ].join("");
       const channelOptions = META.channels.map((item) => [item, item]);
       const categoryOptions = META.categories.map((item) => [item, item]);
@@ -4094,7 +4117,7 @@
       for (let index = 0; index < state.aiItems.length; index += 1) {
         const sourceRecord = state.aiItems[index];
         const { imageIndex, ...record } = sourceRecord;
-        const selectedImages = imageIndex === "all" ? state.aiImages : [state.aiImages[Number(imageIndex)]].filter(Boolean);
+        const selectedImages = getReviewEvidenceFiles(imageIndex);
         const bundle = selectedImages.length ? imageBundleFor(record.id, selectedImages) : null;
         record.hasImage = Boolean(bundle && bundle.images.length);
         const saved = await saveRecord(record, bundle);
@@ -4112,7 +4135,7 @@
       const sourceRecord = state.aiItems[index];
       if (!sourceRecord) return;
       const { imageIndex, ...record } = sourceRecord;
-      const selectedImages = imageIndex === "all" ? state.aiImages : [state.aiImages[Number(imageIndex)]].filter(Boolean);
+      const selectedImages = getReviewEvidenceFiles(imageIndex);
       setForm({ ...record, id: "", hasImage: selectedImages.length > 0 });
       state.appliedAiId = sourceRecord.id;
       state.proofDraft = selectedImages.map((image) => ({ ...image }));
@@ -5129,8 +5152,9 @@
         const index = Number(button.dataset.extractImageDelete);
         state.aiImages.splice(index, 1);
         $("extractImages").value = "";
+        const evidenceCount = state.aiImages.length + state.aiDocuments.length;
         state.aiItems.forEach((record) => {
-          if (record.imageIndex === index) record.imageIndex = state.aiImages.length ? 0 : -1;
+          if (record.imageIndex === index) record.imageIndex = evidenceCount ? 0 : -1;
           if (record.imageIndex > index) record.imageIndex -= 1;
         });
         renderExtractThumbs();
