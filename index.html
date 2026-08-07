@@ -1216,6 +1216,10 @@
                   </select>
                 </div>
                 <div class="field">
+                  <label for="invoiceRegistrationNumber">適格事業者番号</label>
+                  <input id="invoiceRegistrationNumber" name="invoiceRegistrationNumber" type="text" placeholder="T1234567890123" autocomplete="off">
+                </div>
+                <div class="field">
                   <label for="anon">取引形態</label>
                   <select id="anon" name="anon">
                     <option value="anon">匿名</option>
@@ -1287,8 +1291,8 @@
             <div id="reviewWrap" class="review-table hidden">
               <div id="reviewBulkTools" class="review-bulk-tools">
                 <span>一括変更</span>
-                <button type="button" data-review-copy-first="channel,destination,seller,address,qualified,anon,kind,stock,rate,imageIndex">先頭行の取引情報を全行へ反映</button>
-                <button type="button" data-review-copy-first="seller,address,qualified,anon">相手方・適格事業者だけ全行へ反映</button>
+                <button type="button" data-review-copy-first="channel,destination,seller,address,qualified,invoiceRegistrationNumber,anon,kind,stock,rate,imageIndex">先頭行の取引情報を全行へ反映</button>
+                <button type="button" data-review-copy-first="seller,address,qualified,invoiceRegistrationNumber,anon">相手方・適格事業者だけ全行へ反映</button>
                 <button type="button" data-review-copy-first="shippingFee,purchaseFee,purchaseFeeTax,rate">手数料・税率だけ全行へ反映</button>
               </div>
               <div id="reviewRows"></div>
@@ -1740,6 +1744,7 @@
 "相手方氏名":"出品者名/店名 または null",
 "相手方住所":"判明すれば文字列 / 通常null",
 "適格請求書発行事業者":true/false/null,
+"適格事業者番号":"Tから始まる13桁の登録番号 または null",
 "匿名取引":true/false,
 "税率":10
 }]}
@@ -1747,13 +1752,14 @@
 判定ルール: メルカリ/ヤフオク/ラクマ等のフリマは通常 適格請求書発行事業者=false、匿名取引=true。市場・業者オークション・店頭買取は相手方氏名が分かれば記載し匿名取引=false。金額は必ず数値（カンマや円記号を除く）。読み取れない値はnull。`;
 
     const EXTRACT_COST_PROMPT = "明細に内訳がある場合は、送料、手数料、手数料消費税をそれぞれJSONキー「送料」「手数料」「手数料消費税」で返してください。内訳が不明で合計だけ分かる場合は従来通り「送料手数料合計」に入れてください。";
-    const EXTRACT_PARTNER_PROMPT = "業者オークション、市場、請求書、仕入明細書、PDFでは、明細行だけでなく書類のヘッダー、発行元、販売者、会社名、登録番号、住所、所在地、請求元住所、販売者住所欄も確認してください。複数商品が同じ業者からの一括仕入れの場合は、各itemsの「相手方氏名」に同じ業者名を入れてください。住所または所在地が書類内に見える場合は各itemsの「相手方住所」に同じ住所を入れてください。適格請求書発行事業者番号（Tから始まる番号）や登録番号が確認できる場合は「適格請求書発行事業者」をtrueにしてください。相手方氏名が空欄になりそうな場合でも、業者名・市場名・請求元名・発行元名の候補があれば最も確からしい名称を入れてください。住所が書類内に見当たらない場合だけ「相手方住所」はnullにしてください。";
+    const EXTRACT_PARTNER_PROMPT = "業者オークション、市場、請求書、仕入明細書、PDFでは、明細行だけでなく書類のヘッダー、発行元、販売者、会社名、登録番号、住所、所在地、請求元住所、販売者住所欄も確認してください。顧客情報・宛先・買手情報は自社情報なので、相手方に入れないでください。発行元・販売者・請求元・市場運営会社を相手方として優先してください。複数商品が同じ業者からの一括仕入れの場合は、各itemsの「相手方氏名」に同じ業者名を入れてください。住所または所在地が書類内に見える場合は各itemsの「相手方住所」に同じ住所を入れてください。適格請求書発行事業者番号（Tから始まる番号）や登録番号が確認できる場合は各itemsの「適格事業者番号」に入れ、「適格請求書発行事業者」をtrueにしてください。相手方氏名が空欄になりそうな場合でも、業者名・市場名・請求元名・発行元名の候補があれば最も確からしい名称を入れてください。住所が書類内に見当たらない場合だけ「相手方住所」はnullにしてください。";
     const DB_NAME = "shiire-refund-db";
     const STORE_RECORDS = "records";
     const STORE_IMAGES = "images";
     const STORE_SETTINGS = "settings";
     const STORE_META = "meta";
     const LOCAL_DELETED_IDS_KEY = "shiire-refund-deleted-ids";
+    const INVOICE_REGISTRATION_MEMO_MARKER = "shiire_invoice_registration:";
 
     const BUILTIN = { proxyUrl: "/extract", syncUrl: "", secret: "", model: "claude-haiku-4-5-20251001" };
 
@@ -2989,6 +2995,7 @@
         kind: "kobutsu",
         stock: "yes",
         qualified: "no",
+        invoiceRegistrationNumber: "",
         rate: 10,
         anon: "anon",
         seller: "",
@@ -3013,10 +3020,33 @@
       };
     }
 
+    function normalizeInvoiceRegistrationNumber(value) {
+      return String(value || "").toUpperCase().replace(/[^T0-9]/g, "").replace(/^([0-9])/, "T$1").slice(0, 14);
+    }
+
+    function splitMemoAndInvoiceRegistration(memo) {
+      const text = String(memo || "");
+      const markerIndex = text.indexOf(INVOICE_REGISTRATION_MEMO_MARKER);
+      if (markerIndex < 0) return { memo: text, invoiceRegistrationNumber: "" };
+      const cleanMemo = text.slice(0, markerIndex).trim();
+      const raw = text.slice(markerIndex + INVOICE_REGISTRATION_MEMO_MARKER.length).trim().split(/\s+/)[0] || "";
+      return { memo: cleanMemo, invoiceRegistrationNumber: normalizeInvoiceRegistrationNumber(raw) };
+    }
+
+    function memoWithInvoiceRegistration(memo, invoiceRegistrationNumber) {
+      const cleanMemo = splitMemoAndInvoiceRegistration(memo).memo.trim();
+      const normalized = normalizeInvoiceRegistrationNumber(invoiceRegistrationNumber);
+      if (!normalized) return cleanMemo;
+      return `${cleanMemo}${cleanMemo ? "\n" : ""}${INVOICE_REGISTRATION_MEMO_MARKER}${normalized}`;
+    }
+
     function setForm(record) {
       const value = { ...defaultRecord(), ...record };
       value.itemPrice = Number(value.itemPrice ?? value.item_price ?? value.amount ?? 0);
       Object.assign(value, costBreakdown(value));
+      const invoiceMemo = splitMemoAndInvoiceRegistration(value.memo);
+      value.memo = invoiceMemo.memo;
+      value.invoiceRegistrationNumber = value.invoiceRegistrationNumber || invoiceMemo.invoiceRegistrationNumber;
       value.destination = value.destination || "undecided";
       for (const key of Object.keys(value)) {
         if (form.elements[key]) form.elements[key].value = value[key];
@@ -3059,11 +3089,12 @@
         kind: data.get("kind"),
         stock: data.get("stock"),
         qualified: data.get("qualified"),
+        invoiceRegistrationNumber: normalizeInvoiceRegistrationNumber(data.get("invoiceRegistrationNumber")),
         rate: Number(data.get("rate") || 10),
         anon: data.get("anon"),
         seller: String(data.get("seller") || "").trim(),
         address: String(data.get("address") || "").trim(),
-        memo: String(data.get("memo") || ""),
+        memo: memoWithInvoiceRegistration(String(data.get("memo") || ""), data.get("invoiceRegistrationNumber")),
         hasImage: Boolean(state.proofDraft.length || hasRecordImages($("recordId").value))
       };
     }
@@ -3105,6 +3136,7 @@
         if (!record.address) warnings.push("1万円以上は相手方住所の確認が必要です");
       }
       if (record.qualified === "yes" && !record.hasImage) warnings.push("適格請求書または確認済み仕入明細書の証憑保存を確認してください");
+      if (record.qualified === "yes" && !record.invoiceRegistrationNumber && !record.hasImage) warnings.push("適格事業者番号または登録番号付き証憑を確認してください");
       if (c.kind === "要確認") warnings.push("控除区分の判定に必要な情報を確認してください");
       return { errors, warnings };
     }
@@ -3862,6 +3894,7 @@
     function extractedToRecord(item) {
       const channel = item["チャネル"] || "その他";
       const qualifiedRaw = item["適格請求書発行事業者"];
+      const invoiceRegistrationNumber = normalizeInvoiceRegistrationNumber(item["適格事業者番号"] || item["インボイス登録番号"] || item["登録番号"]);
       const anonRaw = item["匿名取引"];
       const itemPrice = Number(item["商品本体価格"] ?? item["金額税込"] ?? 0);
       const shippingFee = Number(item["\u9001\u6599"] ?? 0);
@@ -3889,7 +3922,8 @@
         destination: destinationValue(item["利用先"]),
         kind: "kobutsu",
         stock: "yes",
-        qualified: qualifiedRaw === true ? "yes" : qualifiedRaw === null ? "unknown" : "no",
+        qualified: qualifiedRaw === true || invoiceRegistrationNumber ? "yes" : qualifiedRaw === null ? "unknown" : "no",
+        invoiceRegistrationNumber,
         rate: Number(item["税率"] || 10),
         anon: anonRaw === false ? "named" : "anon",
         seller: item["相手方氏名"] || "",
@@ -4052,6 +4086,7 @@
             ${reviewSelectHtml(index, "kind", "古物区分", kindOptions, record.kind)}
             ${reviewSelectHtml(index, "stock", "棚卸資産", stockOptions, record.stock)}
             ${reviewSelectHtml(index, "qualified", "適格事業者", qualifiedOptions, record.qualified)}
+            ${reviewInputHtml(index, "invoiceRegistrationNumber", "\u9069\u683c\u4e8b\u696d\u8005\u756a\u53f7", "text", record.invoiceRegistrationNumber || "")}
             ${reviewSelectHtml(index, "anon", "取引形態", anonOptions, record.anon)}
             <div class="review-field">
               <label>証憑画像</label>
@@ -4148,10 +4183,10 @@
     function exportRows(records, type) {
       if (type === "book") {
         return [
-          ["取引年月日", "相手方の氏名又は名称", "相手方の住所又は所在地", "取引内容（古物の品目）", "取引金額(税込)", "控除対象消費税額", "該当する旨"],
+          ["取引年月日", "相手方の氏名又は名称", "相手方の住所又は所在地", "適格事業者番号", "取引内容（古物の品目）", "取引金額(税込)", "控除対象消費税額", "該当する旨"],
           ...records.map((record) => {
             const c = classified(record);
-            return [record.date, record.seller, record.address, record.category, record.amount, c.tax, c.kind === "要インボイス" ? "適格請求書あり" : c.kind];
+            return [record.date, record.seller, record.address, record.invoiceRegistrationNumber || "", record.category, record.amount, c.tax, c.kind === "要インボイス" ? "適格請求書あり" : c.kind];
           })
         ];
       }
@@ -4165,7 +4200,7 @@
         ];
       }
       return [
-        ["仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
+        ["仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "適格事業者番号", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
         ...records.map((record) => {
           const c = classified(record);
           return [
@@ -4183,10 +4218,11 @@
             c.tax,
             record.seller,
             record.address,
+            record.invoiceRegistrationNumber || "",
             record.anon === "anon" ? "匿名" : "本名判明",
             record.qualified === "yes" ? "登録あり" : record.qualified === "unknown" ? "不明" : "登録なし",
             evidenceNames(record).join(" / "),
-            record.memo,
+            splitMemoAndInvoiceRegistration(record.memo).memo,
             kindLabel(record.kind),
             record.stock === "yes" ? "はい" : "いいえ"
           ];
@@ -4538,6 +4574,7 @@
       const kind = get("古物区分");
       const stock = get("棚卸資産");
       const qualified = get("適格事業者");
+      const invoiceRegistrationNumber = normalizeInvoiceRegistrationNumber(get("適格事業者番号", "インボイス登録番号", "登録番号"));
       const anon = get("取引形態");
       return {
         id: crypto.randomUUID(),
@@ -4552,11 +4589,12 @@
         rate: Number(get("税率") || 10),
         kind: kind.includes("準") ? "jun" : kind.includes("以外") ? "other" : "kobutsu",
         stock: stock === "いいえ" ? "no" : "yes",
-        qualified: qualified.includes("登録あり") ? "yes" : qualified.includes("不明") ? "unknown" : "no",
+        qualified: qualified.includes("登録あり") || invoiceRegistrationNumber ? "yes" : qualified.includes("不明") ? "unknown" : "no",
+        invoiceRegistrationNumber,
         anon: anon.includes("匿名") ? "anon" : "named",
         seller: get("相手方氏名"),
         address: get("相手方住所"),
-        memo: get("メモ"),
+        memo: memoWithInvoiceRegistration(get("メモ"), invoiceRegistrationNumber),
         hasImage: Boolean(get("証憑ファイル名")),
         evidenceFileNames: get("証憑ファイル名").split(/\s*\/\s*/).map((name) => name.trim()).filter(Boolean)
       };

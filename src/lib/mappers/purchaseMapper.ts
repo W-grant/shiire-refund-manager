@@ -22,6 +22,7 @@ export type LegacyRecord = {
   kind: "kobutsu" | "jun" | "other";
   stock: "yes" | "no";
   qualified: "yes" | "no" | "unknown";
+  invoiceRegistrationNumber?: string;
   rate: number;
   anon: "anon" | "named";
   seller: string;
@@ -78,6 +79,7 @@ function optionalText(value: string | null | undefined) {
 }
 
 const COST_MEMO_MARKER = "shiire_cost_breakdown:";
+const INVOICE_REGISTRATION_MEMO_MARKER = "shiire_invoice_registration:";
 
 function numberValue(value: unknown) {
   const number = Number(value || 0);
@@ -99,11 +101,35 @@ function costBreakdown(record: Partial<LegacyRecord>) {
   };
 }
 
+function normalizeInvoiceRegistrationNumber(value: unknown) {
+  return String(value || "").toUpperCase().replace(/[^T0-9]/g, "").replace(/^([0-9])/, "T$1").slice(0, 14);
+}
+
+function splitMemoAndInvoiceRegistration(memo: string | null | undefined) {
+  const text = String(memo || "");
+  const markerIndex = text.indexOf(INVOICE_REGISTRATION_MEMO_MARKER);
+  if (markerIndex < 0) return { memo: text, invoiceRegistrationNumber: "" };
+  const cleanMemo = text.slice(0, markerIndex).trim();
+  const raw = text.slice(markerIndex + INVOICE_REGISTRATION_MEMO_MARKER.length).trim().split(/\s+/)[0] || "";
+  return { memo: cleanMemo, invoiceRegistrationNumber: normalizeInvoiceRegistrationNumber(raw) };
+}
+
+function memoWithInvoiceRegistration(memo: string | null | undefined, invoiceRegistrationNumber: string | null | undefined) {
+  const cleanMemo = splitMemoAndInvoiceRegistration(memo).memo.trim();
+  const normalized = normalizeInvoiceRegistrationNumber(invoiceRegistrationNumber);
+  if (!normalized) return cleanMemo;
+  return `${cleanMemo}${cleanMemo ? "\n" : ""}${INVOICE_REGISTRATION_MEMO_MARKER}${normalized}`;
+}
+
 function memoWithCostBreakdown(memo: string | null | undefined, record: LegacyRecord) {
   const cleanMemo = String(memo || "").replace(new RegExp(`\\n?${COST_MEMO_MARKER}.*$`, "s"), "").trim();
   const costs = costBreakdown(record);
   if (!costs.shippingFee && !costs.purchaseFee && !costs.purchaseFeeTax) return cleanMemo;
   return `${cleanMemo}${cleanMemo ? "\n" : ""}${COST_MEMO_MARKER}${JSON.stringify(costs)}`;
+}
+
+function memoWithInternalMarkers(memo: string | null | undefined, record: LegacyRecord) {
+  return memoWithCostBreakdown(memoWithInvoiceRegistration(memo, record.invoiceRegistrationNumber), record);
 }
 
 function splitMemoAndCosts(memo: string | null | undefined) {
@@ -146,7 +172,7 @@ export function legacyRecordToPurchaseInsert(
     transaction_type: record.anon,
     seller_name: optionalText(record.seller),
     seller_address: optionalText(record.address),
-    memo: optionalText(memoWithCostBreakdown(record.memo, record)),
+    memo: optionalText(memoWithInternalMarkers(record.memo, record)),
     deduction_kind: classification.kind || null,
     deduction_ratio: typeof classification.ratio === "number" ? classification.ratio : null,
     deduction_tax: typeof classification.tax === "number" ? classification.tax : null,
@@ -181,6 +207,7 @@ export function purchasesToLegacyRecords(rows: PurchaseRow[], evidenceRows: Evid
 
 export function purchaseToLegacyRecord(row: PurchaseRow, evidenceRows: EvidenceWithUrl[]): LegacyRecord {
   const memoParts = splitMemoAndCosts(row.memo);
+  const invoiceParts = splitMemoAndInvoiceRegistration(memoParts.memo);
   const costs = costBreakdown({ shippingFeeTotal: Number(row.shipping_fee_total || 0), ...(memoParts.costs || {}) });
   return {
     id: row.id,
@@ -202,11 +229,12 @@ export function purchaseToLegacyRecord(row: PurchaseRow, evidenceRows: EvidenceW
     kind: row.kind,
     stock: row.stock,
     qualified: row.qualified,
+    invoiceRegistrationNumber: invoiceParts.invoiceRegistrationNumber,
     rate: Number(row.tax_rate || 10),
     anon: row.transaction_type,
     seller: row.seller_name || "",
     address: row.seller_address || "",
-    memo: memoParts.memo,
+    memo: invoiceParts.memo,
     hasImage: evidenceRows.length > 0,
     updatedAt: row.updated_at
   };
