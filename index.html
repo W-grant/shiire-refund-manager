@@ -1126,9 +1126,21 @@
                   <label for="itemPrice">商品本体価格</label>
                   <input id="itemPrice" name="itemPrice" type="number" min="0" step="1">
                 </div>
+                                <div class="field">
+                  <label for="shippingFee">&#36865;&#26009;</label>
+                  <input id="shippingFee" name="shippingFee" type="number" min="0" step="1" value="0">
+                </div>
                 <div class="field">
+                  <label for="purchaseFee">&#25163;&#25968;&#26009;</label>
+                  <input id="purchaseFee" name="purchaseFee" type="number" min="0" step="1" value="0">
+                </div>
+                <div class="field">
+                  <label for="purchaseFeeTax">&#25163;&#25968;&#26009;&#28040;&#36027;&#31246;</label>
+                  <input id="purchaseFeeTax" name="purchaseFeeTax" type="number" min="0" step="1" value="0">
+                </div>
+<div class="field">
                   <label for="shippingFeeTotal">送料・手数料合計</label>
-                  <input id="shippingFeeTotal" name="shippingFeeTotal" type="number" min="0" step="1" value="0">
+                  <input id="shippingFeeTotal" name="shippingFeeTotal" type="number" min="0" step="1" value="0" readonly>
                 </div>
                 <div class="field">
                   <label for="amount">仕入総額（税込）</label>
@@ -1689,6 +1701,7 @@
 
 判定ルール: メルカリ/ヤフオク/ラクマ等のフリマは通常 適格請求書発行事業者=false、匿名取引=true。市場・業者オークション・店頭買取は相手方氏名が分かれば記載し匿名取引=false。金額は必ず数値（カンマや円記号を除く）。読み取れない値はnull。`;
 
+    const EXTRACT_COST_PROMPT = "明細に内訳がある場合は、送料、手数料、手数料消費税をそれぞれJSONキー「送料」「手数料」「手数料消費税」で返してください。内訳が不明で合計だけ分かる場合は従来通り「送料手数料合計」に入れてください。";
     const DB_NAME = "shiire-refund-db";
     const STORE_RECORDS = "records";
     const STORE_IMAGES = "images";
@@ -2911,6 +2924,9 @@
         qty: 1,
         branch: META.branches[0] || "未設定",
         itemPrice: 0,
+        shippingFee: 0,
+        purchaseFee: 0,
+        purchaseFeeTax: 0,
         shippingFeeTotal: 0,
         amount: 0,
         destination: "undecided",
@@ -2926,10 +2942,25 @@
       };
     }
 
+    function costBreakdown(record) {
+      const oldTotal = Number(record.shippingFeeTotal ?? record.shipping_fee_total ?? 0);
+      const shippingFee = Number(record.shippingFee ?? record.shipping_fee ?? 0);
+      const purchaseFeeTax = Number(record.purchaseFeeTax ?? record.purchase_fee_tax ?? 0);
+      const hasBreakdown = Boolean(record.shippingFee || record.shipping_fee || record.purchaseFee || record.purchase_fee || record.purchaseFeeTax || record.purchase_fee_tax);
+      const purchaseFee = Number(record.purchaseFee ?? record.purchase_fee ?? (hasBreakdown ? 0 : oldTotal));
+      const total = shippingFee + purchaseFee + purchaseFeeTax;
+      return {
+        shippingFee: Number.isFinite(shippingFee) ? Math.round(shippingFee) : 0,
+        purchaseFee: Number.isFinite(purchaseFee) ? Math.round(purchaseFee) : 0,
+        purchaseFeeTax: Number.isFinite(purchaseFeeTax) ? Math.round(purchaseFeeTax) : 0,
+        shippingFeeTotal: Number.isFinite(total) && total > 0 ? Math.round(total) : Math.round(oldTotal || 0)
+      };
+    }
+
     function setForm(record) {
       const value = { ...defaultRecord(), ...record };
       value.itemPrice = Number(value.itemPrice ?? value.item_price ?? value.amount ?? 0);
-      value.shippingFeeTotal = Number(value.shippingFeeTotal ?? value.shipping_fee_total ?? 0);
+      Object.assign(value, costBreakdown(value));
       value.destination = value.destination || "undecided";
       for (const key of Object.keys(value)) {
         if (form.elements[key]) form.elements[key].value = value[key];
@@ -2945,7 +2976,10 @@
     function readForm() {
       const data = new FormData(form);
       const itemPrice = Number(data.get("itemPrice") || 0);
-      const shippingFeeTotal = Number(data.get("shippingFeeTotal") || 0);
+      const shippingFee = Number(data.get("shippingFee") || 0);
+      const purchaseFee = Number(data.get("purchaseFee") || 0);
+      const purchaseFeeTax = Number(data.get("purchaseFeeTax") || 0);
+      const shippingFeeTotal = shippingFee + purchaseFee + purchaseFeeTax;
       const amountInput = Number(data.get("amount") || 0);
       const calculatedAmount = Number(itemPrice || 0) + Number(shippingFeeTotal || 0);
       const amount = calculatedAmount > 0 ? calculatedAmount : amountInput;
@@ -2960,6 +2994,9 @@
         qty: Number(data.get("qty") || 1),
         branch: data.get("branch"),
         itemPrice: Number.isFinite(itemPrice) ? Math.round(itemPrice) : 0,
+        shippingFee: Number.isFinite(shippingFee) ? Math.round(shippingFee) : 0,
+        purchaseFee: Number.isFinite(purchaseFee) ? Math.round(purchaseFee) : 0,
+        purchaseFeeTax: Number.isFinite(purchaseFeeTax) ? Math.round(purchaseFeeTax) : 0,
         shippingFeeTotal: Number.isFinite(shippingFeeTotal) ? Math.round(shippingFeeTotal) : 0,
         amount: Number.isFinite(amount) ? Math.round(amount) : 0,
         destination: data.get("destination") || "undecided",
@@ -3681,7 +3718,8 @@
           }
         });
       });
-      content.push({ type: "text", text: text ? `${EXTRACT_PROMPT}\n\n貼付テキスト:\n${text}` : EXTRACT_PROMPT });
+      const prompt = `${EXTRACT_PROMPT}\n\n${EXTRACT_COST_PROMPT}`;
+      content.push({ type: "text", text: text ? `${prompt}\n\n貼付テキスト:\n${text}` : prompt });
       return [{ role: "user", content }];
     }
 
@@ -3736,7 +3774,11 @@
       const qualifiedRaw = item["適格請求書発行事業者"];
       const anonRaw = item["匿名取引"];
       const itemPrice = Number(item["商品本体価格"] ?? item["金額税込"] ?? 0);
-      const shippingFeeTotal = Number(item["送料手数料合計"] ?? 0);
+      const shippingFee = Number(item["\u9001\u6599"] ?? 0);
+      const purchaseFeeTax = Number(item["\u624b\u6570\u6599\u6d88\u8cbb\u7a0e"] ?? 0);
+      const hasFeeBreakdown = Boolean(item["\u9001\u6599"] || item["\u624b\u6570\u6599"] || item["\u624b\u6570\u6599\u6d88\u8cbb\u7a0e"]);
+      const purchaseFee = Number(item["\u624b\u6570\u6599"] ?? (hasFeeBreakdown ? 0 : item["\u9001\u6599\u624b\u6570\u6599\u5408\u8a08"] ?? 0));
+      const shippingFeeTotal = Number(item["\u9001\u6599\u624b\u6570\u6599\u5408\u8a08"] ?? (shippingFee + purchaseFee + purchaseFeeTax));
       const amount = Number(item["金額税込"] ?? (itemPrice + shippingFeeTotal));
       return {
         id: crypto.randomUUID(),
@@ -3749,6 +3791,9 @@
         qty: Number(item["数量"] || 1),
         branch: META.branches[0] || "未設定",
         itemPrice,
+        shippingFee,
+        purchaseFee,
+        purchaseFeeTax,
         shippingFeeTotal,
         amount,
         destination: destinationValue(item["利用先"]),
@@ -3806,7 +3851,11 @@
 
     function syncAmountFields() {
       const itemPrice = Number($("itemPrice").value || 0);
-      const shippingFeeTotal = Number($("shippingFeeTotal").value || 0);
+      const shippingFee = Number($("shippingFee").value || 0);
+      const purchaseFee = Number($("purchaseFee").value || 0);
+      const purchaseFeeTax = Number($("purchaseFeeTax").value || 0);
+      const shippingFeeTotal = shippingFee + purchaseFee + purchaseFeeTax;
+      $("shippingFeeTotal").value = String(Math.round(shippingFeeTotal));
       const total = Number(itemPrice || 0) + Number(shippingFeeTotal || 0);
       if (total > 0) $("amount").value = String(Math.round(total));
       updateLiveClassify();
@@ -3869,6 +3918,9 @@
             ${reviewSelectHtml(index, "category", "品目", categoryOptions, record.category)}
             ${reviewInputHtml(index, "qty", "数量", "number", record.qty, 'min="1" step="1"')}
             ${reviewInputHtml(index, "itemPrice", "本体価格", "number", record.itemPrice ?? record.amount ?? 0, 'min="0" step="1" inputmode="numeric"')}
+            ${reviewInputHtml(index, "shippingFee", "\u9001\u6599", "number", record.shippingFee ?? 0, 'min="0" step="1" inputmode="numeric"')}
+            ${reviewInputHtml(index, "purchaseFee", "\u624b\u6570\u6599", "number", record.purchaseFee ?? 0, 'min="0" step="1" inputmode="numeric"')}
+            ${reviewInputHtml(index, "purchaseFeeTax", "\u624b\u6570\u6599\u6d88\u8cbb\u7a0e", "number", record.purchaseFeeTax ?? 0, 'min="0" step="1" inputmode="numeric"')}
             ${reviewInputHtml(index, "shippingFeeTotal", "送料・手数料", "number", record.shippingFeeTotal ?? 0, 'min="0" step="1" inputmode="numeric"')}
             ${reviewInputHtml(index, "amount", "仕入総額", "number", record.amount, 'min="0" step="1" inputmode="numeric"')}
             ${reviewSelectHtml(index, "rate", "税率", [["10", "10%"], ["8", "8%"]], record.rate)}
@@ -4830,7 +4882,7 @@
       });
       form.addEventListener("input", updateLiveClassify);
       form.addEventListener("change", updateLiveClassify);
-      ["itemPrice", "shippingFeeTotal"].forEach((id) => {
+      ["itemPrice", "shippingFee", "purchaseFee", "purchaseFeeTax", "shippingFeeTotal"].forEach((id) => {
         $(id).addEventListener("input", syncAmountFields);
         $(id).addEventListener("change", syncAmountFields);
       });
@@ -4999,8 +5051,11 @@
         if (!target) return;
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
-        state.aiItems[index][field] = ["amount", "itemPrice", "shippingFeeTotal", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
-        if (field === "itemPrice" || field === "shippingFeeTotal") {
+        state.aiItems[index][field] = ["amount", "itemPrice", "shippingFee", "purchaseFee", "purchaseFeeTax", "shippingFeeTotal", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        if (["shippingFee", "purchaseFee", "purchaseFeeTax"].includes(field)) {
+          state.aiItems[index].shippingFeeTotal = Number(state.aiItems[index].shippingFee || 0) + Number(state.aiItems[index].purchaseFee || 0) + Number(state.aiItems[index].purchaseFeeTax || 0);
+        }
+        if (["itemPrice", "shippingFee", "purchaseFee", "purchaseFeeTax", "shippingFeeTotal"].includes(field)) {
           state.aiItems[index].amount = Number(state.aiItems[index].itemPrice || 0) + Number(state.aiItems[index].shippingFeeTotal || 0);
         }
       });
@@ -5009,8 +5064,11 @@
         if (!target) return;
         const index = Number(target.dataset.review);
         const field = target.dataset.field;
-        state.aiItems[index][field] = ["amount", "itemPrice", "shippingFeeTotal", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
-        if (field === "itemPrice" || field === "shippingFeeTotal") {
+        state.aiItems[index][field] = ["amount", "itemPrice", "shippingFee", "purchaseFee", "purchaseFeeTax", "shippingFeeTotal", "qty", "rate"].includes(field) ? Number(target.value || 0) : target.value;
+        if (["shippingFee", "purchaseFee", "purchaseFeeTax"].includes(field)) {
+          state.aiItems[index].shippingFeeTotal = Number(state.aiItems[index].shippingFee || 0) + Number(state.aiItems[index].purchaseFee || 0) + Number(state.aiItems[index].purchaseFeeTax || 0);
+        }
+        if (["itemPrice", "shippingFee", "purchaseFee", "purchaseFeeTax", "shippingFeeTotal"].includes(field)) {
           state.aiItems[index].amount = Number(state.aiItems[index].itemPrice || 0) + Number(state.aiItems[index].shippingFeeTotal || 0);
         }
         renderReview();

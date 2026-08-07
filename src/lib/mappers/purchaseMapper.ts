@@ -13,6 +13,9 @@ export type LegacyRecord = {
   qty: number;
   branch: string;
   itemPrice?: number;
+  shippingFee?: number;
+  purchaseFee?: number;
+  purchaseFeeTax?: number;
   shippingFeeTotal?: number;
   amount: number;
   destination?: "catawiki" | "ebay" | "both" | "undecided" | "other";
@@ -73,6 +76,48 @@ function optionalText(value: string | null | undefined) {
   return text || null;
 }
 
+const COST_MEMO_MARKER = "shiire_cost_breakdown:";
+
+function numberValue(value: unknown) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? Math.round(number) : 0;
+}
+
+function costBreakdown(record: Partial<LegacyRecord>) {
+  const shippingFee = numberValue(record.shippingFee);
+  const purchaseFeeTax = numberValue(record.purchaseFeeTax);
+  const oldTotal = numberValue(record.shippingFeeTotal);
+  const hasBreakdown = Boolean(record.shippingFee || record.purchaseFee || record.purchaseFeeTax);
+  const purchaseFee = numberValue(record.purchaseFee ?? (hasBreakdown ? 0 : oldTotal));
+  const total = shippingFee + purchaseFee + purchaseFeeTax;
+  return {
+    shippingFee,
+    purchaseFee,
+    purchaseFeeTax,
+    shippingFeeTotal: total > 0 ? total : oldTotal
+  };
+}
+
+function memoWithCostBreakdown(memo: string | null | undefined, record: LegacyRecord) {
+  const cleanMemo = String(memo || "").replace(new RegExp(`\\n?${COST_MEMO_MARKER}.*$`, "s"), "").trim();
+  const costs = costBreakdown(record);
+  if (!costs.shippingFee && !costs.purchaseFee && !costs.purchaseFeeTax) return cleanMemo;
+  return `${cleanMemo}${cleanMemo ? "\n" : ""}${COST_MEMO_MARKER}${JSON.stringify(costs)}`;
+}
+
+function splitMemoAndCosts(memo: string | null | undefined) {
+  const text = String(memo || "");
+  const markerIndex = text.indexOf(COST_MEMO_MARKER);
+  if (markerIndex < 0) return { memo: text, costs: null };
+  const cleanMemo = text.slice(0, markerIndex).trim();
+  const raw = text.slice(markerIndex + COST_MEMO_MARKER.length).trim();
+  try {
+    return { memo: cleanMemo, costs: JSON.parse(raw) as Partial<LegacyRecord> };
+  } catch {
+    return { memo: cleanMemo, costs: null };
+  }
+}
+
 export function legacyRecordToPurchaseInsert(
   record: LegacyRecord,
   classification: LegacyClassification,
@@ -90,7 +135,7 @@ export function legacyRecordToPurchaseInsert(
     manufacturer: optionalText(record.manufacturer),
     quantity: Number(record.qty || 1),
     item_price: Number(record.itemPrice ?? record.amount ?? 0),
-    shipping_fee_total: Number(record.shippingFeeTotal || 0),
+    shipping_fee_total: costBreakdown(record).shippingFeeTotal,
     amount: Number(record.amount || 0),
     destination: record.destination || "undecided",
     tax_rate: Number(record.rate || 10),
@@ -100,7 +145,7 @@ export function legacyRecordToPurchaseInsert(
     transaction_type: record.anon,
     seller_name: optionalText(record.seller),
     seller_address: optionalText(record.address),
-    memo: optionalText(record.memo),
+    memo: optionalText(memoWithCostBreakdown(record.memo, record)),
     deduction_kind: classification.kind || null,
     deduction_ratio: typeof classification.ratio === "number" ? classification.ratio : null,
     deduction_tax: typeof classification.tax === "number" ? classification.tax : null,
@@ -134,6 +179,8 @@ export function purchasesToLegacyRecords(rows: PurchaseRow[], evidenceRows: Evid
 }
 
 export function purchaseToLegacyRecord(row: PurchaseRow, evidenceRows: EvidenceWithUrl[]): LegacyRecord {
+  const memoParts = splitMemoAndCosts(row.memo);
+  const costs = costBreakdown({ shippingFeeTotal: Number(row.shipping_fee_total || 0), ...(memoParts.costs || {}) });
   return {
     id: row.id,
     date: row.purchase_date,
@@ -145,7 +192,10 @@ export function purchaseToLegacyRecord(row: PurchaseRow, evidenceRows: EvidenceW
     qty: Number(row.quantity || 1),
     branch: row.branch?.name || "",
     itemPrice: Number(row.item_price ?? row.amount ?? 0),
-    shippingFeeTotal: Number(row.shipping_fee_total || 0),
+    shippingFee: costs.shippingFee,
+    purchaseFee: costs.purchaseFee,
+    purchaseFeeTax: costs.purchaseFeeTax,
+    shippingFeeTotal: costs.shippingFeeTotal,
     amount: Number(row.amount || 0),
     destination: row.destination || "undecided",
     kind: row.kind,
@@ -155,7 +205,7 @@ export function purchaseToLegacyRecord(row: PurchaseRow, evidenceRows: EvidenceW
     anon: row.transaction_type,
     seller: row.seller_name || "",
     address: row.seller_address || "",
-    memo: row.memo || "",
+    memo: memoParts.memo,
     hasImage: evidenceRows.length > 0,
     updatedAt: row.updated_at
   };
