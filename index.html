@@ -1249,7 +1249,7 @@
             <div class="form-grid">
               <div class="field wide">
                 <label for="extractImages">スクショ/明細画像</label>
-                <input id="extractImages" type="file" accept="image/*" multiple>
+                <input id="extractImages" type="file" accept="image/*,.csv,text/csv,application/pdf,.pdf" multiple>
               </div>
               <div id="extractThumbs" class="field wide thumb-list"></div>
               <div class="field wide">
@@ -5040,8 +5040,8 @@
       });
       $("extractImages").addEventListener("change", async (event) => {
         try {
-          await prepareExtractImages(event.target.files);
-          $("extractStatus").textContent = `${state.aiImages.length}枚を選択しました`;
+          const result = await prepareExtractFiles(event.target.files);
+          $("extractStatus").textContent = `\u753b\u50cf${result.imageCount}\u4ef6 / \u30c7\u30fc\u30bf${result.dataCount}\u4ef6\u3092\u8aad\u307f\u8fbc\u307f\u307e\u3057\u305f`;
         } catch (error) {
           $("extractStatus").textContent = error.message;
         }
@@ -5062,7 +5062,7 @@
           event.preventDefault();
           try {
             const result = await prepareExtractFiles(event.dataTransfer.files);
-            $("extractStatus").textContent = `画像${result.imageCount}件 / データ${result.dataCount}件を読み込みました`;
+            $("extractStatus").textContent = `\u753b\u50cf${result.imageCount}\u4ef6 / \u30c7\u30fc\u30bf${result.dataCount}\u4ef6\u3092\u8aad\u307f\u8fbc\u307f\u307e\u3057\u305f`;
           } catch (error) {
             $("extractStatus").textContent = error.message;
           }
