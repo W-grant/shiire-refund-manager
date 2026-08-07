@@ -37,6 +37,7 @@ function sanitizePathPart(value: string, fallback: string) {
 }
 
 function extensionFromMime(mimeType: string) {
+  if (mimeType === "application/pdf") return ".pdf";
   if (mimeType === "image/png") return ".png";
   if (mimeType === "image/webp") return ".webp";
   if (mimeType === "image/heic") return ".heic";
@@ -59,7 +60,7 @@ async function dataUrlToBlob(dataUrl: string) {
 export function evidenceStoragePath(record: LegacyRecord, image: LegacyImage, index: number, mimeType = "image/jpeg") {
   const [year = "unknown", month = "unknown"] = String(record.date || "").split("-");
   const order = String(index + 1).padStart(3, "0");
-  const label = sanitizePathPart(image.label || "evidence", "evidence");
+  const label = sanitizePathPart(image.label || (mimeType === "application/pdf" ? "pdf" : "evidence"), "evidence");
   const fileName = fileNameForStorage(image.fileName || `evidence_${order}`, mimeType);
   return `purchases/${year}/${month}/${record.id}/${order}_${label}_${fileName}`;
 }
@@ -92,7 +93,7 @@ export async function uploadEvidenceImages(
     try {
       console.log("[Storage] Upload start", { id: record.id, fileName });
       const blob = await dataUrlToBlob(source);
-      const mimeType = blob.type || "image/jpeg";
+      const mimeType = image.mimeType || blob.type || "image/jpeg";
       const sortOrder = startIndex + index;
       const storagePath = evidenceStoragePath(record, image, sortOrder, mimeType);
       const { error } = await supabase.storage

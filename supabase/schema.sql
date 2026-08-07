@@ -557,7 +557,7 @@ with check (public.can_read_app_data());
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values
-  ('evidence', 'evidence', false, 52428800, array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']),
+  ('evidence', 'evidence', false, 52428800, array['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf']),
   ('tax-packages', 'tax-packages', false, 104857600, array['application/zip', 'application/x-zip-compressed']),
   ('imports', 'imports', false, 104857600, array['application/json', 'text/csv', 'application/zip', 'application/x-zip-compressed'])
 on conflict (id) do update

@@ -948,6 +948,27 @@
       background: #f7f8f5;
     }
 
+    .evidence-pdf {
+      width: 100%;
+      height: min(72vh, 760px);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .document-thumb {
+      width: 70px;
+      height: 70px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f8faf7;
+      color: var(--green);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
     @media (max-width: 1100px) {
       .layout {
         grid-template-columns: 1fr;
@@ -1192,8 +1213,8 @@
                   <input id="address" name="address" type="text" autocomplete="off">
                 </div>
                 <div class="field wide">
-                  <label for="proof">証憑画像</label>
-                  <input id="proof" name="proof" type="file" accept="image/*" multiple>
+                  <label for="proof">証憑ファイル</label>
+                  <input id="proof" name="proof" type="file" accept="image/*,application/pdf,.pdf" multiple>
                 </div>
                 <div id="proofPreview" class="field wide hidden"></div>
                 <div class="field wide">
@@ -1568,8 +1589,8 @@
                     <div class="collapsed-body">
                       <label for="importFile">仕入CSV</label>
                       <input id="importFile" type="file" accept=".csv,text/csv">
-                      <label for="importEvidenceFiles">証憑画像</label>
-                      <input id="importEvidenceFiles" type="file" accept="image/*" multiple>
+                      <label for="importEvidenceFiles">証憑ファイル</label>
+                      <input id="importEvidenceFiles" type="file" accept="image/*,application/pdf,.pdf" multiple>
                       <button id="downloadTemplateBtn" type="button">テンプレート</button>
                       <label for="restoreFile">バックアップ復元</label>
                       <input id="restoreFile" type="file" accept="application/json,.json">
@@ -1657,7 +1678,7 @@
       <button id="closeEvidenceBtn" type="button">閉じる</button>
     </div>
     <div class="dialog-body">
-      <img id="evidenceFull" class="evidence-full" alt="証憑画像">
+      <div id="evidenceViewer"></div>
       <div id="evidenceCounter" class="small muted"></div>
       <div id="evidenceThumbs" class="thumb-list"></div>
     </div>
@@ -1836,7 +1857,7 @@
     function imageBundleFor(id, images, removedImages = []) {
       return {
         id,
-        images: (images || []).filter((image) => image && image.full && image.thumb),
+        images: (images || []).filter((image) => image && image.full),
         removedEvidenceIds: (removedImages || []).map((image) => image && image.evidenceId).filter(Boolean),
         removedStoragePaths: (removedImages || []).map((image) => image && image.storagePath).filter(Boolean)
       };
@@ -1853,6 +1874,16 @@
 
     function hasRecordImages(id) {
       return getRecordImages(id).length > 0;
+    }
+
+    function isPdfEvidence(file) {
+      return String(file?.mimeType || file?.mediaType || file?.type || "").includes("pdf")
+        || String(file?.fileName || "").toLowerCase().endsWith(".pdf");
+    }
+
+    function evidenceThumbHtml(file, attrs = "") {
+      if (isPdfEvidence(file)) return `<span class="document-thumb" ${attrs}>PDF</span>`;
+      return `<img class="thumb" src="${file.thumb || file.full}" alt="" ${attrs}>`;
     }
 
     function localDeletedIds() {
@@ -3478,7 +3509,7 @@
         const imageCount = getRecordImages(record.id).length;
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>${image ? `<img class="thumb" src="${image.thumb}" alt="" data-evidence="${record.id}"><span class="muted small">${imageCount}枚</span>` : `<span class="empty-thumb">なし</span>`}</td>
+          <td>${image ? `${evidenceThumbHtml(image, `data-evidence="${record.id}"`)}<span class="muted small">${imageCount}枚</span>` : `<span class="empty-thumb">なし</span>`}</td>
           <td><strong>${escapeHtml(record.date || "")}</strong><br><span class="muted small">${escapeHtml(record.branch || "")}</span></td>
           <td>${escapeHtml(record.channel || "")}</td>
           <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.manufacturer || record.category || "")} / ${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
@@ -3521,7 +3552,21 @@
       });
       const full = await resizeImage(dataUrl, 1600, 0.72);
       const thumb = await resizeImage(dataUrl, 160, 0.72);
-      return { full, thumb, fileName: file.name };
+      return { full, thumb, fileName: file.name, mimeType: "image/jpeg" };
+    }
+
+    async function fileToEvidenceData(file) {
+      if (!file) return null;
+      if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+        const full = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+        return { full, thumb: "", fileName: file.name, mimeType: "application/pdf", label: "PDF" };
+      }
+      return fileToImageData(file);
     }
 
     async function fileToBase64(file) {
@@ -3572,7 +3617,7 @@
       box.classList.remove("hidden");
       box.innerHTML = current.map(({ image, index, source }) => `
         <div class="inline">
-          <img class="thumb" src="${image.thumb}" alt="">
+          ${evidenceThumbHtml(image)}
           <span class="muted small">${escapeHtml(image.fileName || "証憑画像")}</span>
           ${source === "draft" || isAdmin() ? `<button class="danger" type="button" data-proof-remove="${source}:${index}">削除</button>` : ""}
         </div>
@@ -4228,9 +4273,11 @@
 
     function evidenceName(record, image, index = 0) {
       if (!record.hasImage && !image) return "";
+      if (image?.fileName) return image.fileName;
       const seller = (record.seller || "取引先").replace(/[\\/:*?"<>|]/g, "");
       const suffix = index > 0 ? `_${index + 1}` : "";
-      return `証憑_${record.date || "未日付"}_${seller}_${record.amount || 0}${suffix}.jpg`;
+      const ext = isPdfEvidence(image) ? ".pdf" : ".jpg";
+      return `証憑_${record.date || "未日付"}_${seller}_${record.amount || 0}${suffix}${ext}`;
     }
 
     function evidenceNames(record) {
@@ -4241,13 +4288,15 @@
       const images = getRecordImages(state.currentEvidenceId);
       const image = images[state.currentEvidenceIndex];
       if (!image) return;
-      $("evidenceFull").src = image.full;
+      $("evidenceViewer").innerHTML = isPdfEvidence(image)
+        ? `<iframe class="evidence-pdf" src="${image.full}" title="${escapeHtml(image.fileName || "PDF証憑")}"></iframe>`
+        : `<img class="evidence-full" src="${image.full}" alt="証憑画像">`;
       $("evidenceCounter").textContent = `${state.currentEvidenceIndex + 1} / ${images.length}枚 ${image.fileName || ""}`;
       $("prevEvidenceBtn").disabled = images.length <= 1;
       $("nextEvidenceBtn").disabled = images.length <= 1;
       $("evidenceThumbs").innerHTML = images.map((item, index) => `
         <button type="button" class="${index === state.currentEvidenceIndex ? "primary" : ""}" data-evidence-index="${index}">
-          <img class="thumb" src="${item.thumb}" alt="">
+          ${evidenceThumbHtml(item)}
         </button>
       `).join("");
     }
@@ -4268,7 +4317,7 @@
       if (!image || !record) return;
       const a = document.createElement("a");
       a.href = image.full;
-      a.download = evidenceName(record, image, state.currentEvidenceIndex) || "証憑.jpg";
+      a.download = evidenceName(record, image, state.currentEvidenceIndex) || (isPdfEvidence(image) ? "証憑.pdf" : "証憑.jpg");
       a.click();
     }
 
@@ -4364,7 +4413,7 @@
       }
       const used = new Set();
       const files = targets.map(({ record, image, imageIndex }, index) => ({
-        name: uniqueZipName(evidenceName(record, image, imageIndex) || `証憑_${index + 1}.jpg`, used),
+        name: uniqueZipName(evidenceName(record, image, imageIndex) || `証憑_${index + 1}${isPdfEvidence(image) ? ".pdf" : ".jpg"}`, used),
         bytes: dataUrlBytes(image.full)
       }));
       const blob = createZip(files);
@@ -4448,7 +4497,7 @@
         delete record.evidenceFileNames;
         const images = [];
         for (const evidenceFile of matchedFiles) {
-          images.push(await fileToImageData(evidenceFile));
+          images.push(await fileToEvidenceData(evidenceFile));
         }
         const bundle = images.length ? imageBundleFor(record.id, images) : null;
         record.hasImage = Boolean(bundle && bundle.images.length);
@@ -4674,7 +4723,8 @@
       const item = sanitizeFilePart(record.name || record.category || "商品").slice(0, 32);
       const base = `${String(recordIndex + 1).padStart(3, "0")}_${record.date || "未日付"}_${item}_${record.amount || 0}`;
       const label = sanitizeFilePart(image.fileName ? image.fileName.replace(/\.[^.]+$/, "") : (imageIndex === 0 ? "明細" : `証憑${imageIndex + 1}`)).slice(0, 24);
-      return `${base}_${label}.jpg`;
+      const ext = isPdfEvidence(image) ? ".pdf" : ".jpg";
+      return `${base}_${label}${ext}`;
     }
 
     function addPackageFile(files, root, name, bytes) {
@@ -4982,7 +5032,7 @@
       $("proof").addEventListener("change", async (event) => {
         const images = [];
         for (const file of Array.from(event.target.files || []).filter((item) => item.type.startsWith("image/"))) {
-          images.push(await fileToImageData(file));
+          images.push(await fileToEvidenceData(file));
         }
         state.proofDraft.push(...images);
         renderProofPreview(getRecordImages($("recordId").value));

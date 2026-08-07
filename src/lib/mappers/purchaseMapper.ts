@@ -35,6 +35,7 @@ export type LegacyImage = {
   full: string;
   thumb: string;
   fileName: string;
+  mimeType?: string;
   label?: string;
   evidenceId?: string;
   storageBucket?: string;
@@ -219,6 +220,7 @@ export function evidenceToLegacyImageBundles(rows: EvidenceWithUrl[]) {
       full: row.url,
       thumb: row.url,
       fileName: row.file_name,
+      mimeType: row.mime_type,
       label: row.label || undefined,
       evidenceId: row.id,
       storageBucket: row.storage_bucket,
