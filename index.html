@@ -1503,6 +1503,7 @@
                   <strong id="salesSummarySold">0件</strong>
                 </div>
               </div>
+              <div id="salesQuickFilters" class="quick-filters" aria-label="販売先クイックフィルタ"></div>
               <div class="sales-tools">
                 <label>販売先で絞り込み
                   <select id="salesFilterDestination">
@@ -2438,6 +2439,51 @@
       });
     }
 
+    function salesDestinationFilterDefinitions() {
+      return [
+        { value: "ebay", label: "EBAY" },
+        { value: "catawiki", label: "CATAWIKI" },
+        { value: "overseas", label: "その他海外" },
+        { value: "yahoo", label: "ヤフオク" },
+        { value: "market", label: "市場" },
+        { value: "other", label: "その他" }
+      ];
+    }
+
+    function salesDestinationCount(value) {
+      const previous = state.salesFilters.destination;
+      state.salesFilters.destination = value;
+      const count = filteredSales().length;
+      state.salesFilters.destination = previous;
+      return count;
+    }
+
+    function renderSalesQuickFilters() {
+      const box = $("salesQuickFilters");
+      if (!box) return;
+      box.innerHTML = "";
+      const allButton = document.createElement("button");
+      allButton.type = "button";
+      allButton.className = "quick-filter" + (!state.salesFilters.destination ? " active" : "");
+      allButton.textContent = "すべて";
+      allButton.addEventListener("click", () => {
+        state.salesFilters.destination = "";
+        renderSalesManagement();
+      });
+      box.append(allButton);
+      salesDestinationFilterDefinitions().forEach(({ value, label }) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "quick-filter" + (state.salesFilters.destination === value ? " active" : "");
+        button.textContent = `${label} ${salesDestinationCount(value)}`;
+        button.addEventListener("click", () => {
+          state.salesFilters.destination = state.salesFilters.destination === value ? "" : value;
+          renderSalesManagement();
+        });
+        box.append(button);
+      });
+    }
+
     function renderSalesFilterOptions() {
       const staffSelect = $("salesFilterStaff");
       if (!staffSelect) return;
@@ -2598,6 +2644,7 @@
       $("salesFilterDestination").value = state.salesFilters.destination;
       $("salesFilterStatus").value = state.salesFilters.status;
       $("salesFilterText").value = state.salesFilters.text;
+      renderSalesQuickFilters();
       const canWrite = canWritePurchases();
       form.querySelectorAll("input, select, textarea, button").forEach((element) => {
         element.disabled = !canWrite;
