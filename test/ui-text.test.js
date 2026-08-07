@@ -42,6 +42,10 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
   const requiredControls = [
     'id="dashboardMonth"',
     'id="screenNav"',
+    'id="manualEntryDetails"',
+    "manual-entry-details",
+    "ai-extract-panel",
+    "openManualEntryForm",
     'id="dashTaskBreakdown"',
     'id="salesFilterStaff"',
     'id="salesFilterText"',

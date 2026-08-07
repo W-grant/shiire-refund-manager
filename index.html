@@ -195,6 +195,10 @@
       max-width: 100%;
     }
 
+    .ai-extract-panel {
+      order: -1;
+    }
+
     .panel-head {
       display: flex;
       align-items: center;
@@ -202,6 +206,35 @@
       gap: 12px;
       padding: 14px 16px;
       border-bottom: 1px solid var(--line);
+    }
+
+    .manual-entry-details {
+      display: block;
+    }
+
+    .manual-entry-summary {
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .manual-entry-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .manual-entry-summary::after {
+      content: "開く";
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .manual-entry-details[open] > .manual-entry-summary::after {
+      content: "閉じる";
+    }
+
+    .manual-entry-details:not([open]) > .manual-entry-summary {
+      border-bottom: 0;
     }
 
     .panel-tools {
@@ -1111,10 +1144,11 @@
       <div class="layout">
         <div class="left-stack">
         <section class="panel" aria-labelledby="formTitle" data-screen-panel="purchase">
-          <div class="panel-head">
+          <details id="manualEntryDetails" class="manual-entry-details">
+          <summary class="panel-head manual-entry-summary">
             <h2 id="formTitle">仕入登録</h2>
             <span id="editingLabel" class="muted small">新規</span>
-          </div>
+          </summary>
           <div class="panel-body">
             <form id="recordForm">
               <input id="recordId" type="hidden">
@@ -1260,9 +1294,10 @@
               </div>
             </form>
           </div>
+          </details>
         </section>
 
-        <section class="panel" aria-labelledby="extractTitle" data-screen-panel="purchase">
+        <section class="panel ai-extract-panel" aria-labelledby="extractTitle" data-screen-panel="purchase">
           <div class="panel-head">
             <h2 id="extractTitle">AI抽出</h2>
             <span id="extractStatus" class="status small"></span>
@@ -3059,6 +3094,14 @@
       updateLiveClassify();
     }
 
+    function openManualEntryForm() {
+      $("manualEntryDetails").open = true;
+    }
+
+    function closeManualEntryForm() {
+      $("manualEntryDetails").open = false;
+    }
+
     function readForm() {
       const data = new FormData(form);
       const itemPrice = Number(data.get("itemPrice") || 0);
@@ -4172,6 +4215,7 @@
       const { imageIndex, ...record } = sourceRecord;
       const selectedImages = getReviewEvidenceFiles(imageIndex);
       setForm({ ...record, id: "", hasImage: selectedImages.length > 0 });
+      openManualEntryForm();
       state.appliedAiId = sourceRecord.id;
       state.proofDraft = selectedImages.map((image) => ({ ...image }));
       renderProofPreview([]);
@@ -5090,6 +5134,7 @@
         record.hasImage = bundle.images.length > 0;
         if (await saveRecord(record, bundle)) {
           setForm(defaultRecord());
+          closeManualEntryForm();
           clearSavedExtractDraft();
         }
       });
@@ -5139,7 +5184,10 @@
           }
         }
       });
-      $("resetBtn").addEventListener("click", () => setForm(defaultRecord()));
+      $("resetBtn").addEventListener("click", () => {
+        setForm(defaultRecord());
+        openManualEntryForm();
+      });
       $("proofPreview").addEventListener("click", async (event) => {
         const button = event.target.closest("[data-proof-remove]");
         if (!button) return;
@@ -5255,6 +5303,7 @@
           const record = state.records.find((item) => item.id === editId);
           if (record) {
             setForm(record);
+            openManualEntryForm();
             setActiveScreen("purchase");
           }
         }
