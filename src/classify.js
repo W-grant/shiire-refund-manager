@@ -73,6 +73,12 @@
     };
   }
 
+  function refundDestinationEligible(destination) {
+    const value = normalizeChoice(destination, "", "", "");
+    if (!value || value === "undecided") return true;
+    return value === "catawiki" || value === "ebay" || value === "overseas" || value === "both";
+  }
+
   function keikaResult(date, baseTax, note, flags) {
     const ratio = keikaRatio(date);
     return result(keikaKind(ratio), ratio, baseTax, note, flags);
@@ -89,6 +95,16 @@
     const anon = normalizeChoice(source.anon, "anon", "named", "");
     const seller = typeof source.seller === "string" ? source.seller.trim() : "";
     const date = source.date;
+
+    if (!refundDestinationEligible(source.destination)) {
+      return result(
+        NO_DEDUCTION,
+        0,
+        baseTax,
+        "国内販売先のため仕入れ還付対象外",
+        []
+      );
+    }
 
     if (qualified === "yes") {
       return result(

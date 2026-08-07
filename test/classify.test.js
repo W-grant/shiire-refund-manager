@@ -91,3 +91,41 @@ test("登録事業者の判定は他条件より優先される", () => {
   assert.equal(actual.ratio, 1);
   assert.equal(actual.tax, 4545);
 });
+
+test("国内販売先は仕入れ還付対象外になる", () => {
+  for (const destination of ["yahoo", "market", "other"]) {
+    const actual = classify({
+      date: "2026-06-21",
+      rate: 10,
+      kind: "kobutsu",
+      stock: "yes",
+      qualified: "yes",
+      anon: "named",
+      amount: 50000,
+      seller: "A商店",
+      destination
+    });
+
+    assert.equal(actual.ratio, 0, `${destination}: 控除割合`);
+    assert.equal(actual.tax, 0, `${destination}: 控除税額`);
+  }
+});
+
+test("海外販売先は仕入れ還付対象になる", () => {
+  for (const destination of ["ebay", "catawiki", "overseas"]) {
+    const actual = classify({
+      date: "2026-06-21",
+      rate: 10,
+      kind: "kobutsu",
+      stock: "yes",
+      qualified: "yes",
+      anon: "named",
+      amount: 50000,
+      seller: "A商店",
+      destination
+    });
+
+    assert.equal(actual.ratio, 1, `${destination}: 控除割合`);
+    assert.equal(actual.tax, 4545, `${destination}: 控除税額`);
+  }
+});

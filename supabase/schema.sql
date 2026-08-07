@@ -62,7 +62,7 @@ create table if not exists public.purchases (
   item_price integer,
   shipping_fee_total integer not null default 0 check (shipping_fee_total >= 0),
   amount integer not null check (amount >= 0),
-  destination text not null default 'undecided' check (destination in ('catawiki', 'ebay', 'both', 'undecided', 'other')),
+  destination text not null default 'undecided' check (destination in ('catawiki', 'ebay', 'overseas', 'yahoo', 'market', 'both', 'undecided', 'other')),
   tax_rate integer not null default 10 check (tax_rate in (8, 10)),
   kind text not null check (kind in ('kobutsu', 'jun', 'other')),
   stock text not null check (stock in ('yes', 'no')),
@@ -99,16 +99,10 @@ begin
     alter table public.purchases
       add constraint purchases_shipping_fee_total_check check (shipping_fee_total >= 0);
   end if;
-
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'purchases_destination_check'
-      and conrelid = 'public.purchases'::regclass
-  ) then
-    alter table public.purchases
-      add constraint purchases_destination_check check (destination in ('catawiki', 'ebay', 'both', 'undecided', 'other'));
-  end if;
+  alter table public.purchases
+    drop constraint if exists purchases_destination_check;
+  alter table public.purchases
+    add constraint purchases_destination_check check (destination in ('catawiki', 'ebay', 'overseas', 'yahoo', 'market', 'both', 'undecided', 'other'));
 end;
 $$;
 
@@ -147,7 +141,7 @@ create table if not exists public.monthly_packages (
 create table if not exists public.sales (
   id uuid primary key default gen_random_uuid(),
   purchase_id uuid not null references public.purchases(id) on delete cascade,
-  destination text not null check (destination in ('catawiki', 'ebay', 'other')),
+  destination text not null check (destination in ('catawiki', 'ebay', 'overseas', 'yahoo', 'market', 'other')),
   status text not null default 'not_listed'
     check (status in ('not_listed', 'preparing', 'listed', 'sold', 'cancelled', 'returned', 'on_hold')),
   listing_id text,
@@ -171,6 +165,11 @@ create table if not exists public.sales (
   updated_at timestamptz not null default now(),
   deleted_at timestamptz
 );
+
+alter table public.sales
+  drop constraint if exists sales_destination_check;
+alter table public.sales
+  add constraint sales_destination_check check (destination in ('catawiki', 'ebay', 'overseas', 'yahoo', 'market', 'other'));
 
 create table if not exists public.audit_logs (
   id bigint primary key generated always as identity,

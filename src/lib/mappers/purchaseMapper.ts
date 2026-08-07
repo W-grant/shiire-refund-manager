@@ -18,7 +18,7 @@ export type LegacyRecord = {
   purchaseFeeTax?: number;
   shippingFeeTotal?: number;
   amount: number;
-  destination?: "catawiki" | "ebay" | "both" | "undecided" | "other";
+  destination?: "catawiki" | "ebay" | "overseas" | "yahoo" | "market" | "both" | "undecided" | "other";
   kind: "kobutsu" | "jun" | "other";
   stock: "yes" | "no";
   qualified: "yes" | "no" | "unknown";

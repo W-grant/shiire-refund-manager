@@ -13,7 +13,7 @@ export type PurchaseRow = {
   item_price: number | null;
   shipping_fee_total: number;
   amount: number;
-  destination: "catawiki" | "ebay" | "both" | "undecided" | "other";
+  destination: "catawiki" | "ebay" | "overseas" | "yahoo" | "market" | "both" | "undecided" | "other";
   tax_rate: number;
   kind: "kobutsu" | "jun" | "other";
   stock: "yes" | "no";
@@ -48,7 +48,7 @@ export type PurchaseInsert = {
   item_price: number | null;
   shipping_fee_total: number;
   amount: number;
-  destination: "catawiki" | "ebay" | "both" | "undecided" | "other";
+  destination: "catawiki" | "ebay" | "overseas" | "yahoo" | "market" | "both" | "undecided" | "other";
   tax_rate: number;
   kind: "kobutsu" | "jun" | "other";
   stock: "yes" | "no";

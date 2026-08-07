@@ -1,7 +1,7 @@
 import { supabase } from "../supabase";
 
 export type SaleStatus = "not_listed" | "preparing" | "listed" | "sold" | "cancelled" | "returned" | "on_hold";
-export type SaleDestination = "catawiki" | "ebay" | "other";
+export type SaleDestination = "catawiki" | "ebay" | "overseas" | "yahoo" | "market" | "other";
 
 export type SaleRow = {
   id: string;
