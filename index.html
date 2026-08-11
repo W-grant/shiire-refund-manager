@@ -782,6 +782,28 @@
       width: 100%;
     }
 
+    .review-selection-tools {
+      width: 100%;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding-top: 4px;
+      border-top: 1px solid var(--line);
+    }
+
+    .review-check {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      font-weight: 800;
+    }
+
+    .review-check input {
+      width: 18px;
+      height: 18px;
+    }
+
     .review-card {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -1369,6 +1391,13 @@
                   </label>
                   <button id="applyReviewSupplierPreset" type="button">全行へ適用</button>
                 </div>
+                <div class="review-selection-tools">
+                  <label class="review-check">
+                    <input id="reviewSelectAll" type="checkbox" checked>
+                    全選択
+                  </label>
+                  <span id="reviewSelectionCount">0件選択中</span>
+                </div>
                 <button type="button" data-review-copy-first="channel,destination,seller,address,qualified,invoiceRegistrationNumber,anon,kind,stock,rate,imageIndex">先頭行の取引情報を全行へ反映</button>
                 <button type="button" data-review-copy-first="seller,address,qualified,invoiceRegistrationNumber,anon">相手方・適格事業者だけ全行へ反映</button>
                 <button type="button" data-review-copy-first="shippingFee,purchaseFee,purchaseFeeTax,rate">手数料・税率だけ全行へ反映</button>
@@ -1868,6 +1897,7 @@
       aiImages: [],
       aiDocuments: [],
       aiItems: [],
+      reviewSelectedIds: new Set(),
       appliedAiId: "",
       sales: [],
       salesFilters: { destination: "", status: "", staff: "", text: "" },
@@ -4396,8 +4426,53 @@
       $("extractStatus").textContent = `${state.aiItems.length}件に仕入先情報を反映しました`;
     }
 
+    function selectAllReviewItems() {
+      state.reviewSelectedIds = new Set(state.aiItems.map((record) => record.id));
+      updateReviewSelectionControls();
+    }
+
+    function clearReviewSelection() {
+      state.reviewSelectedIds = new Set();
+      updateReviewSelectionControls();
+    }
+
+    function syncReviewSelectionWithItems() {
+      const existingIds = new Set(state.aiItems.map((record) => record.id));
+      state.reviewSelectedIds = new Set([...state.reviewSelectedIds].filter((id) => existingIds.has(id)));
+    }
+
+    function setAllReviewSelection(checked) {
+      if (checked) selectAllReviewItems();
+      else clearReviewSelection();
+      renderReview();
+    }
+
+    function toggleReviewSelection(id, checked) {
+      if (checked) state.reviewSelectedIds.add(id);
+      else state.reviewSelectedIds.delete(id);
+      updateReviewSelectionControls();
+    }
+
+    function selectedReviewItems() {
+      return state.aiItems
+        .map((record, index) => ({ record, index }))
+        .filter((item) => state.reviewSelectedIds.has(item.record.id));
+    }
+
+    function updateReviewSelectionControls() {
+      const count = selectedReviewItems().length;
+      const total = state.aiItems.length;
+      if ($("reviewSelectionCount")) $("reviewSelectionCount").textContent = `${count} / ${total}件選択中`;
+      if ($("addExtractedBtn")) $("addExtractedBtn").textContent = count ? `選択した${count}件を仕入れ一覧へ追加` : "選択した行を仕入れ一覧へ追加";
+      if ($("reviewSelectAll")) {
+        $("reviewSelectAll").checked = total > 0 && count === total;
+        $("reviewSelectAll").indeterminate = count > 0 && count < total;
+      }
+    }
+
     function renderReview() {
       $("reviewWrap").classList.toggle("hidden", state.aiItems.length === 0);
+      syncReviewSelectionWithItems();
       const imageOptions = (selected) => [
         `<option value="all" ${selected === "all" ? "selected" : ""}>すべて</option>`,
         `<option value="-1">なし</option>`,
@@ -4421,6 +4496,10 @@
         <article class="review-card ${rowClass}">
           <div class="review-card-head">
             <div class="review-card-title">
+              <label class="review-check">
+                <input type="checkbox" data-review-select="${record.id}" ${state.reviewSelectedIds.has(record.id) ? "checked" : ""}>
+                登録対象
+              </label>
               <span class="small muted">抽出 ${index + 1}件目</span>
               <strong>${escapeHtml(record.name || "商品名未入力")}</strong>
               <span class="small muted">${escapeHtml([record.date, record.channel, record.category].filter(Boolean).join(" / "))}</span>
@@ -4461,6 +4540,7 @@
         </article>
       `;
       }).join("");
+      updateReviewSelectionControls();
     }
 
     async function runExtract() {
@@ -4472,6 +4552,7 @@
         const csvRecords = parseKnownCsvExtractText($("extractText").value);
         if (csvRecords.length) {
           state.aiItems = csvRecords;
+          selectAllReviewItems();
           renderReview();
           $("extractStatus").textContent = `${state.aiItems.length}件をCSVから抽出しました`;
           return;
@@ -4480,6 +4561,7 @@
       $("extractStatus").textContent = "読み取り中...";
       const items = await callExtract(buildExtractMessages());
       state.aiItems = items.map(extractedToRecord);
+      selectAllReviewItems();
       renderReview();
       $("extractStatus").textContent = `${state.aiItems.length}件を抽出しました`;
     }
@@ -4488,6 +4570,7 @@
       state.aiImages = [];
       state.aiDocuments = [];
       state.aiItems = [];
+      state.reviewSelectedIds = new Set();
       state.appliedAiId = "";
       $("extractImages").value = "";
       $("extractDataFiles").value = "";
@@ -4515,29 +4598,43 @@
     }
 
     async function addExtracted() {
-      const invalidRows = state.aiItems
-        .map((record, index) => ({ index, result: reviewValidation(record) }))
+      const targets = selectedReviewItems();
+      if (!targets.length) {
+        $("extractStatus").textContent = "仕入れ一覧へ追加する行を選択してください";
+        return;
+      }
+      const invalidRows = targets
+        .map((item) => ({ index: item.index, result: reviewValidation(item.record) }))
         .filter((item) => item.result.errors.length);
       if (invalidRows.length) {
         renderReview();
-        $("extractStatus").textContent = `要修正の行があります: ${invalidRows.map((item) => item.index + 1).join(", ")}行目`;
+        $("extractStatus").textContent = `要修正の選択行があります: ${invalidRows.map((item) => item.index + 1).join(", ")}件目`;
         return;
       }
-      for (let index = 0; index < state.aiItems.length; index += 1) {
-        const sourceRecord = state.aiItems[index];
+      const savedIds = [];
+      for (let targetIndex = 0; targetIndex < targets.length; targetIndex += 1) {
+        const { record: sourceRecord } = targets[targetIndex];
         const { imageIndex, ...record } = sourceRecord;
         const selectedImages = getReviewEvidenceFiles(imageIndex);
         const bundle = selectedImages.length ? imageBundleFor(record.id, selectedImages) : null;
         record.hasImage = Boolean(bundle && bundle.images.length);
         const saved = await saveRecord(record, bundle);
         if (!saved) {
-          $("extractStatus").textContent = `${index + 1}行目の保存に失敗しました`;
+          $("extractStatus").textContent = `${targetIndex + 1}件目の保存に失敗しました`;
           return;
         }
+        savedIds.push(sourceRecord.id);
       }
-      const count = state.aiItems.length;
-      clearExtract();
-      $("extractStatus").textContent = `${count}件を追加しました`;
+      const count = savedIds.length;
+      const savedIdSet = new Set(savedIds);
+      state.aiItems = state.aiItems.filter((record) => !savedIdSet.has(record.id));
+      state.reviewSelectedIds = new Set([...state.reviewSelectedIds].filter((id) => !savedIdSet.has(id)));
+      if (!state.aiItems.length) {
+        clearExtract();
+      } else {
+        renderReview();
+      }
+      $("extractStatus").textContent = `${count}件を仕入れ一覧へ追加しました`;
     }
 
     function applyExtractedToForm(index) {
@@ -5598,6 +5695,7 @@
         const fields = button.dataset.reviewCopyFirst.split(",").map((field) => field.trim()).filter(Boolean);
         copyFirstReviewFieldsToAll(fields);
       });
+      $("reviewSelectAll").addEventListener("change", (event) => setAllReviewSelection(event.target.checked));
       $("reviewSupplierPreset").addEventListener("change", updateSupplierPresetInputs);
       $("applyReviewSupplierPreset").addEventListener("click", applySupplierToAllReviewItems);
       $("reviewRows").addEventListener("input", (event) => {
@@ -5608,6 +5706,11 @@
         updateReviewItem(index, field, target.value);
       });
       $("reviewRows").addEventListener("change", (event) => {
+        const selectTarget = event.target.closest("[data-review-select]");
+        if (selectTarget) {
+          toggleReviewSelection(selectTarget.dataset.reviewSelect, selectTarget.checked);
+          return;
+        }
         const target = event.target.closest("[data-review]");
         if (!target) return;
         const index = Number(target.dataset.review);
