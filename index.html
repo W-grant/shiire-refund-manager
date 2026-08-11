@@ -760,6 +760,28 @@
       margin-right: 4px;
     }
 
+    .review-supplier-tools {
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(140px, 180px) minmax(160px, 1fr) minmax(220px, 2fr) auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .review-supplier-tools label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .review-supplier-tools input,
+    .review-supplier-tools select {
+      min-width: 0;
+      width: 100%;
+    }
+
     .review-card {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -1051,7 +1073,8 @@
       .filters,
       .io-grid,
       .dashboard-grid,
-      .summary-grid {
+      .summary-grid,
+      .review-supplier-tools {
         grid-template-columns: 1fr;
       }
 
@@ -1327,6 +1350,25 @@
             <div id="reviewWrap" class="review-table hidden">
               <div id="reviewBulkTools" class="review-bulk-tools">
                 <span>一括変更</span>
+                <div class="review-supplier-tools" aria-label="仕入先一括反映">
+                  <label>仕入先
+                    <select id="reviewSupplierPreset">
+                      <option value="">選択してください</option>
+                      <option value="ecoring">エコリング</option>
+                      <option value="daikichi">大吉</option>
+                      <option value="dealer_auction">業者オークション</option>
+                      <option value="market">市場</option>
+                      <option value="custom">カスタム</option>
+                    </select>
+                  </label>
+                  <label>相手方
+                    <input id="reviewSupplierName" type="text" placeholder="例: エコリング">
+                  </label>
+                  <label>相手方住所
+                    <input id="reviewSupplierAddress" type="text" placeholder="住所が分かる場合だけ入力">
+                  </label>
+                  <button id="applyReviewSupplierPreset" type="button">全行へ適用</button>
+                </div>
                 <button type="button" data-review-copy-first="channel,destination,seller,address,qualified,invoiceRegistrationNumber,anon,kind,stock,rate,imageIndex">先頭行の取引情報を全行へ反映</button>
                 <button type="button" data-review-copy-first="seller,address,qualified,invoiceRegistrationNumber,anon">相手方・適格事業者だけ全行へ反映</button>
                 <button type="button" data-review-copy-first="shippingFee,purchaseFee,purchaseFeeTax,rate">手数料・税率だけ全行へ反映</button>
@@ -4319,6 +4361,41 @@
       $("extractStatus").textContent = "\u5148\u982d\u884c\u306e\u5185\u5bb9\u3092\u5168\u884c\u3078\u53cd\u6620\u3057\u307e\u3057\u305f";
     }
 
+    const SUPPLIER_PRESETS = {
+      ecoring: { seller: "エコリング", address: "" },
+      daikichi: { seller: "大吉", address: "" },
+      dealer_auction: { seller: "業者オークション", address: "" },
+      market: { seller: "市場", address: "" }
+    };
+
+    function updateSupplierPresetInputs() {
+      const preset = SUPPLIER_PRESETS[$("reviewSupplierPreset").value] || { seller: "", address: "" };
+      if ($("reviewSupplierPreset").value !== "custom") {
+        $("reviewSupplierName").value = preset.seller;
+        $("reviewSupplierAddress").value = preset.address;
+      }
+    }
+
+    function applySupplierToAllReviewItems() {
+      if (!state.aiItems.length) {
+        $("extractStatus").textContent = "一括変更できる抽出行がありません";
+        return;
+      }
+      const seller = $("reviewSupplierName").value.trim();
+      const address = $("reviewSupplierAddress").value.trim();
+      if (!seller && !address) {
+        $("extractStatus").textContent = "仕入先または住所を入力してください";
+        return;
+      }
+      state.aiItems.forEach((record, index) => {
+        if (seller) updateReviewItem(index, "seller", seller);
+        if (address) updateReviewItem(index, "address", address);
+        if (seller) updateReviewItem(index, "anon", "named");
+      });
+      renderReview();
+      $("extractStatus").textContent = `${state.aiItems.length}件に仕入先情報を反映しました`;
+    }
+
     function renderReview() {
       $("reviewWrap").classList.toggle("hidden", state.aiItems.length === 0);
       const imageOptions = (selected) => [
@@ -5521,6 +5598,8 @@
         const fields = button.dataset.reviewCopyFirst.split(",").map((field) => field.trim()).filter(Boolean);
         copyFirstReviewFieldsToAll(fields);
       });
+      $("reviewSupplierPreset").addEventListener("change", updateSupplierPresetInputs);
+      $("applyReviewSupplierPreset").addEventListener("click", applySupplierToAllReviewItems);
       $("reviewRows").addEventListener("input", (event) => {
         const target = event.target.closest("[data-review]");
         if (!target) return;
