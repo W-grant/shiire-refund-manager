@@ -3892,7 +3892,7 @@
         const isCsv = lowerName.endsWith(".csv") || file.type === "text/csv" || file.type.includes("csv");
         const isPdf = lowerName.endsWith(".pdf") || file.type === "application/pdf";
         if (isCsv) {
-          const text = await file.text();
+          const text = await readTextFileWithEncoding(file);
           csvParts.push(`--- ${name} ---\n${text}`);
         } else if (isPdf) {
           pdfDocuments.push({
@@ -3910,6 +3910,32 @@
       }
       state.aiDocuments = pdfDocuments;
       renderExtractDataFiles();
+    }
+
+    async function readTextFileWithEncoding(file) {
+      const buffer = await file.arrayBuffer();
+      const encodings = ["utf-8", "shift_jis", "euc-jp"];
+      const candidates = encodings.map((encoding) => {
+        try {
+          return {
+            encoding,
+            text: new TextDecoder(encoding).decode(buffer)
+          };
+        } catch (_) {
+          return null;
+        }
+      }).filter(Boolean);
+      candidates.sort((a, b) => scoreDecodedText(a.text) - scoreDecodedText(b.text));
+      return candidates[0]?.text || "";
+    }
+
+    function scoreDecodedText(text) {
+      const source = String(text || "");
+      const replacementCount = (source.match(/\uFFFD/g) || []).length;
+      const mojibakeCount = (source.match(/[縺繧蜿譁髯逕螟謇莠邱驥諞]/g) || []).length;
+      const japaneseCount = (source.match(/[\u3040-\u30ff\u3400-\u9fff]/g) || []).length;
+      const csvHeaderBonus = source.includes("item_name") || source.includes("buy_total") ? 200 : 0;
+      return replacementCount * 1000 + mojibakeCount * 25 - Math.min(japaneseCount, 500) * 2 - csvHeaderBonus;
     }
 
     async function prepareExtractFiles(files) {
