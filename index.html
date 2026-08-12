@@ -270,6 +270,17 @@
       grid-column: 1 / -1;
     }
 
+    .field-inline {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .field-inline input {
+      flex: 1;
+      min-width: 0;
+    }
+
     label {
       color: var(--muted);
       font-size: 12px;
@@ -1200,7 +1211,10 @@
               <div class="form-grid">
                 <div class="field">
                   <label for="managementNumber">管理番号</label>
-                  <input id="managementNumber" name="managementNumber" type="text" placeholder="例: 001DCgZ06 / 0016ER" autocomplete="off">
+                  <div class="field-inline">
+                    <input id="managementNumber" name="managementNumber" type="text" placeholder="例: 001DCgZ06 / 0016ER" autocomplete="off">
+                    <button id="generateManagementNumberBtn" type="button">自動生成</button>
+                  </div>
                 </div>
                 <div class="field">
                   <label for="date">仕入日</label>
@@ -1405,6 +1419,7 @@
                 <button type="button" data-review-copy-first="channel,destination,seller,address,qualified,invoiceRegistrationNumber,anon,kind,stock,rate,imageIndex">先頭行の取引情報を全行へ反映</button>
                 <button type="button" data-review-copy-first="seller,address,qualified,invoiceRegistrationNumber,anon">相手方・適格事業者だけ全行へ反映</button>
                 <button type="button" data-review-copy-first="shippingFee,purchaseFee,purchaseFeeTax,rate">手数料・税率だけ全行へ反映</button>
+                <button id="assignReviewManagementNumbers" type="button">選択行へ管理番号を自動採番</button>
               </div>
               <div id="reviewRows"></div>
             </div>
@@ -2610,6 +2625,87 @@
       if (!record) return "";
       const memoMetadata = splitMemoMetadata(record.memo || "");
       return normalizeManagementNumber(record.managementNumber || record.management_number || memoMetadata.managementNumber);
+    }
+
+    const MANAGEMENT_MONTH_CODES = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
+    const MANAGEMENT_DEFAULTS = {
+      yahooLocationCode: "D",
+      photographerCode: "g",
+      buyerCode: "Z",
+      packingSize: "06"
+    };
+
+    function managementMonthCode(date) {
+      const month = Number(String(date || "").slice(5, 7));
+      return MANAGEMENT_MONTH_CODES[Math.max(0, Math.min(11, month - 1))] || "A";
+    }
+
+    function managementYearCode(date) {
+      const year = String(date || today()).slice(0, 4);
+      return year ? year.slice(-1) : String(new Date().getFullYear()).slice(-1);
+    }
+
+    function managementCodeChar(value, fallback) {
+      const ascii = String(value || "").match(/[A-Za-z0-9]/);
+      return ascii ? ascii[0].toUpperCase() : fallback;
+    }
+
+    function managementFormatForDestination(destination) {
+      if (destination === "yahoo") return "yahoo";
+      if (["ebay", "catawiki", "overseas"].includes(destination)) return "overseas";
+      return "yahoo";
+    }
+
+    function existingManagementSerials(format) {
+      return state.records
+        .map((record) => managementNumberFor(record))
+        .filter(Boolean)
+        .filter((number) => managementFormatForNumber(number) === format)
+        .map((number) => Number(number.slice(0, 3)))
+        .filter((number) => Number.isFinite(number));
+    }
+
+    function managementFormatForNumber(number) {
+      const value = String(number || "");
+      if (/^\d{3}\d[A-Z][A-Z](?:-\d+)?$/i.test(value)) return "overseas";
+      if (/^\d{3}[A-Z0-9][A-Z][A-Z0-9][A-Z0-9]\d{2}$/i.test(value)) return "yahoo";
+      return "unknown";
+    }
+
+    function nextManagementSerial(format, extraNumbers = []) {
+      const serials = [
+        ...existingManagementSerials(format),
+        ...extraNumbers
+          .filter((number) => managementFormatForNumber(number) === format)
+          .map((number) => Number(String(number).slice(0, 3)))
+          .filter((number) => Number.isFinite(number))
+      ];
+      return Math.max(0, ...serials) + 1;
+    }
+
+    function formatManagementSerial(number) {
+      return String(Math.max(1, Number(number || 1))).padStart(3, "0").slice(-3);
+    }
+
+    function buildManagementNumber(record, serial) {
+      const format = managementFormatForDestination(record.destination);
+      const prefix = formatManagementSerial(serial);
+      if (format === "overseas") {
+        return `${prefix}${managementYearCode(record.date)}${managementMonthCode(record.date)}${managementCodeChar(record.staff, MANAGEMENT_DEFAULTS.buyerCode)}`;
+      }
+      return [
+        prefix,
+        MANAGEMENT_DEFAULTS.yahooLocationCode,
+        managementMonthCode(record.date),
+        MANAGEMENT_DEFAULTS.photographerCode,
+        managementCodeChar(record.staff, MANAGEMENT_DEFAULTS.buyerCode),
+        MANAGEMENT_DEFAULTS.packingSize
+      ].join("");
+    }
+
+    function generateManagementNumberForRecord(record, extraNumbers = []) {
+      const format = managementFormatForDestination(record.destination);
+      return buildManagementNumber(record, nextManagementSerial(format, extraNumbers));
     }
 
     function renderSalePurchaseOptions() {
@@ -4240,6 +4336,7 @@
             date: today(),
             channel: findMetaLabel(META.channels, ["業者", "auction"], META.channels[0] || ""),
             staff: META.staff[0] || "",
+            managementNumber: "",
             name,
             manufacturer: inferManufacturerFromName(name),
             category: inferCategoryFromText(`${name} ${memo}`),
@@ -4343,6 +4440,7 @@
         date: item["仕入日"] || today(),
         channel,
         staff: META.staff[0] || "未設定",
+        managementNumber: normalizeManagementNumber(item["管理番号"] || ""),
         name: item["商品名"] || "",
         manufacturer: item["メーカー名"] || "",
         category: item["品目"] || "その他",
@@ -4416,6 +4514,12 @@
       $("shippingFeeTotal").value = String(Math.round(shippingFeeTotal));
       const total = Number(itemPrice || 0) + Number(shippingFeeTotal || 0);
       if (total > 0) $("amount").value = String(Math.round(total));
+      updateLiveClassify();
+    }
+
+    function generateFormManagementNumber() {
+      const record = readForm();
+      $("managementNumber").value = generateManagementNumberForRecord(record);
       updateLiveClassify();
     }
 
@@ -4504,6 +4608,25 @@
       $("extractStatus").textContent = `${state.aiItems.length}件に仕入先情報を反映しました`;
     }
 
+    function assignManagementNumbersToSelectedReviewItems() {
+      const targets = selectedReviewItems();
+      if (!targets.length) {
+        $("extractStatus").textContent = "管理番号を付ける行を選択してください";
+        return;
+      }
+      const usedNumbers = [
+        ...state.records.map((record) => managementNumberFor(record)).filter(Boolean),
+        ...state.aiItems.map((record) => managementNumberFor(record)).filter(Boolean)
+      ];
+      targets.forEach(({ record, index }) => {
+        const number = generateManagementNumberForRecord(record, usedNumbers);
+        usedNumbers.push(number);
+        updateReviewItem(index, "managementNumber", number);
+      });
+      renderReview();
+      $("extractStatus").textContent = `${targets.length}件に管理番号を自動採番しました`;
+    }
+
     function selectAllReviewItems() {
       state.reviewSelectedIds = new Set(state.aiItems.map((record) => record.id));
       updateReviewSelectionControls();
@@ -4589,6 +4712,7 @@
           </div>
           ${reviewFlagsHtml(result)}
           <div class="review-fields">
+            ${reviewInputHtml(index, "managementNumber", "管理番号", "text", managementNumberFor(record))}
             ${reviewInputHtml(index, "date", "仕入日", "date", record.date)}
             ${reviewSelectHtml(index, "channel", "チャネル", channelOptions, record.channel)}
             ${reviewInputHtml(index, "name", "商品名", "text", record.name, "", true)}
@@ -5606,6 +5730,7 @@
         $(id).addEventListener("input", syncAmountFields);
         $(id).addEventListener("change", syncAmountFields);
       });
+      $("generateManagementNumberBtn").addEventListener("click", generateFormManagementNumber);
       $("settingsBtn").addEventListener("click", () => {
         renderSettingsForm();
         $("settingsDialog").showModal();
@@ -5781,6 +5906,7 @@
       $("reviewSelectAll").addEventListener("change", (event) => setAllReviewSelection(event.target.checked));
       $("reviewSupplierPreset").addEventListener("change", updateSupplierPresetInputs);
       $("applyReviewSupplierPreset").addEventListener("click", applySupplierToAllReviewItems);
+      $("assignReviewManagementNumbers").addEventListener("click", assignManagementNumbersToSelectedReviewItems);
       $("reviewRows").addEventListener("input", (event) => {
         const target = event.target.closest("[data-review]");
         if (!target) return;
