@@ -1562,7 +1562,10 @@
                     <input id="saleOtherFee" name="otherFee" type="number" min="0" step="1" inputmode="numeric">
                   </label>
                   <label>管理番号
-                    <input id="saleListingId" name="listingId" type="text" placeholder="オークションIDなど">
+                    <div class="field-inline">
+                      <input id="saleListingId" name="listingId" type="text" placeholder="例: 0016ER-1">
+                      <button id="generateSaleListingIdBtn" type="button">自動生成</button>
+                    </div>
                   </label>
                   <label>SKU
                     <input id="saleSku" name="sku" type="text">
@@ -1810,6 +1813,22 @@
           <div class="field wide">
             <label for="sheetSyncUrl">スプシ送信URL</label>
             <input id="sheetSyncUrl" name="sheetSyncUrl" type="text" placeholder="/sheets-sync">
+          </div>
+          <div class="field">
+            <label for="managementYahooLocationCode">ヤフオク 店舗/棚コード</label>
+            <input id="managementYahooLocationCode" name="managementYahooLocationCode" type="text" maxlength="2" placeholder="D">
+          </div>
+          <div class="field">
+            <label for="managementPhotographerCode">撮影者コード</label>
+            <input id="managementPhotographerCode" name="managementPhotographerCode" type="text" maxlength="2" placeholder="g">
+          </div>
+          <div class="field">
+            <label for="managementBuyerCode">担当者コード初期値</label>
+            <input id="managementBuyerCode" name="managementBuyerCode" type="text" maxlength="2" placeholder="Z">
+          </div>
+          <div class="field">
+            <label for="managementPackingSize">梱包サイズ初期値</label>
+            <input id="managementPackingSize" name="managementPackingSize" type="text" maxlength="3" placeholder="06">
           </div>
           <div class="field wide">
             <label for="branchesText">支店</label>
@@ -2635,6 +2654,16 @@
       packingSize: "06"
     };
 
+    function managementSettings() {
+      const settings = state.settings || defaultSettings();
+      return {
+        yahooLocationCode: managementCodeChar(settings.managementYahooLocationCode, MANAGEMENT_DEFAULTS.yahooLocationCode),
+        photographerCode: managementCodeChar(settings.managementPhotographerCode, MANAGEMENT_DEFAULTS.photographerCode).toLowerCase(),
+        buyerCode: managementCodeChar(settings.managementBuyerCode, MANAGEMENT_DEFAULTS.buyerCode),
+        packingSize: String(settings.managementPackingSize || MANAGEMENT_DEFAULTS.packingSize).replace(/\D/g, "").padStart(2, "0").slice(-2)
+      };
+    }
+
     function managementMonthCode(date) {
       const month = Number(String(date || "").slice(5, 7));
       return MANAGEMENT_MONTH_CODES[Math.max(0, Math.min(11, month - 1))] || "A";
@@ -2690,22 +2719,62 @@
     function buildManagementNumber(record, serial) {
       const format = managementFormatForDestination(record.destination);
       const prefix = formatManagementSerial(serial);
+      const codes = managementSettings();
       if (format === "overseas") {
-        return `${prefix}${managementYearCode(record.date)}${managementMonthCode(record.date)}${managementCodeChar(record.staff, MANAGEMENT_DEFAULTS.buyerCode)}`;
+        return `${prefix}${managementYearCode(record.date)}${managementMonthCode(record.date)}${managementCodeChar(record.staff, codes.buyerCode)}`;
       }
       return [
         prefix,
-        MANAGEMENT_DEFAULTS.yahooLocationCode,
+        codes.yahooLocationCode,
         managementMonthCode(record.date),
-        MANAGEMENT_DEFAULTS.photographerCode,
-        managementCodeChar(record.staff, MANAGEMENT_DEFAULTS.buyerCode),
-        MANAGEMENT_DEFAULTS.packingSize
+        codes.photographerCode,
+        managementCodeChar(record.staff, codes.buyerCode),
+        codes.packingSize
       ].join("");
     }
 
     function generateManagementNumberForRecord(record, extraNumbers = []) {
       const format = managementFormatForDestination(record.destination);
       return buildManagementNumber(record, nextManagementSerial(format, extraNumbers));
+    }
+
+    function nextSaleBranchNumber(baseNumber, purchaseId, currentSaleId = "") {
+      const base = normalizeManagementNumber(baseNumber);
+      const branches = state.sales
+        .filter((sale) => sale.purchase_id === purchaseId && sale.id !== currentSaleId)
+        .map((sale) => String(sale.listing_id || ""))
+        .map((listingId) => listingId.match(new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-(\\d+)$`))?.[1])
+        .filter(Boolean)
+        .map(Number)
+        .filter((number) => Number.isFinite(number));
+      return Math.max(0, ...branches) + 1;
+    }
+
+    function generateSaleListingId() {
+      const purchase = findPurchase($("salePurchaseId").value);
+      if (!purchase) {
+        $("salesStatus").textContent = "仕入商品を選択してください";
+        return;
+      }
+      const baseNumber = managementNumberFor(purchase);
+      if (!baseNumber) {
+        $("salesStatus").textContent = "先に仕入商品の管理番号を設定してください";
+        return;
+      }
+      const destination = $("saleDestination").value || "ebay";
+      if (destination === "ebay") {
+        $("saleListingId").value = `${baseNumber}-${nextSaleBranchNumber(baseNumber, purchase.id, $("saleId").value)}`;
+      } else {
+        $("saleListingId").value = baseNumber;
+      }
+      $("salesStatus").textContent = "販売管理番号を自動生成しました";
+    }
+
+    function suggestSaleListingIdIfEmpty() {
+      if ($("saleListingId").value.trim()) return;
+      const purchase = findPurchase($("salePurchaseId").value);
+      if (!purchase || !managementNumberFor(purchase)) return;
+      generateSaleListingId();
     }
 
     function renderSalePurchaseOptions() {
@@ -2962,7 +3031,11 @@
         syncMode: "none",
         syncUrl: "",
         syncSecret: "",
-        sheetSyncUrl: "/sheets-sync"
+        sheetSyncUrl: "/sheets-sync",
+        managementYahooLocationCode: "D",
+        managementPhotographerCode: "g",
+        managementBuyerCode: "Z",
+        managementPackingSize: "06"
       };
       if (BUILTIN.proxyUrl) {
         settings.proxyUrl = BUILTIN.proxyUrl;
@@ -3237,7 +3310,7 @@
 
     function renderSettingsForm() {
       const settings = state.settings || defaultSettings();
-      ["aiMode", "proxyUrl", "model", "syncMode", "syncUrl", "syncSecret", "sheetSyncUrl"].forEach((key) => {
+      ["aiMode", "proxyUrl", "model", "syncMode", "syncUrl", "syncSecret", "sheetSyncUrl", "managementYahooLocationCode", "managementPhotographerCode", "managementBuyerCode", "managementPackingSize"].forEach((key) => {
         if ($(key)) $(key).value = settings[key] || "";
       });
       $("branchesText").value = META.branches.join("\n");
@@ -3264,7 +3337,11 @@
         syncMode: data.get("syncMode"),
         syncUrl: String(data.get("syncUrl") || ""),
         syncSecret: String(data.get("syncSecret") || ""),
-        sheetSyncUrl: String(data.get("sheetSyncUrl") || "/sheets-sync")
+        sheetSyncUrl: String(data.get("sheetSyncUrl") || "/sheets-sync"),
+        managementYahooLocationCode: managementCodeChar(data.get("managementYahooLocationCode"), "D"),
+        managementPhotographerCode: managementCodeChar(data.get("managementPhotographerCode"), "g").toLowerCase(),
+        managementBuyerCode: managementCodeChar(data.get("managementBuyerCode"), "Z"),
+        managementPackingSize: String(data.get("managementPackingSize") || "06").replace(/\D/g, "").padStart(2, "0").slice(-2)
       };
       META.branches = listFromTextarea("branchesText", META.branches);
       META.channels = listFromTextarea("channelsText", META.channels);
@@ -5803,6 +5880,9 @@
         renderSalesManagement();
       });
       $("salePurchaseSearch").addEventListener("input", renderSalePurchaseOptions);
+      $("salePurchaseId").addEventListener("change", suggestSaleListingIdIfEmpty);
+      $("saleDestination").addEventListener("change", suggestSaleListingIdIfEmpty);
+      $("generateSaleListingIdBtn").addEventListener("click", generateSaleListingId);
       $("salesRows").addEventListener("click", async (event) => {
         const editId = event.target.closest("[data-sale-edit]")?.dataset.saleEdit;
         const deleteId = event.target.closest("[data-sale-delete]")?.dataset.saleDelete;
