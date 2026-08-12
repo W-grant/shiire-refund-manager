@@ -1199,6 +1199,10 @@
               <input id="recordId" type="hidden">
               <div class="form-grid">
                 <div class="field">
+                  <label for="managementNumber">管理番号</label>
+                  <input id="managementNumber" name="managementNumber" type="text" placeholder="例: 001DCgZ06 / 0016ER" autocomplete="off">
+                </div>
+                <div class="field">
                   <label for="date">仕入日</label>
                   <input id="date" name="date" type="date" required>
                 </div>
@@ -1494,6 +1498,7 @@
                 <input id="saleId" name="id" type="hidden">
                 <div class="form-grid">
                   <label class="wide">仕入商品
+                    <input id="salePurchaseSearch" type="search" placeholder="管理番号・商品名・メーカーで検索">
                     <select id="salePurchaseId" name="purchaseId"></select>
                   </label>
                   <label>販売先
@@ -1668,7 +1673,7 @@
                   <option value="taxDesc">控除税額 高い順</option>
                   <option value="taxAsc">控除税額 低い順</option>
                 </select>
-                <input id="filterText" type="search" placeholder="商品名・相手方・日付・金額" aria-label="検索">
+                <input id="filterText" type="search" placeholder="管理番号・商品名・相手方・日付・金額" aria-label="検索">
               </div>
 
               <div class="table-wrap">
@@ -1677,6 +1682,7 @@
                     <tr>
                       <th>証憑</th>
                       <th>仕入日</th>
+                      <th>管理番号</th>
                       <th>チャネル</th>
                       <th>商品</th>
                       <th>相手方</th>
@@ -1874,6 +1880,7 @@
     const STORE_META = "meta";
     const LOCAL_DELETED_IDS_KEY = "shiire-refund-deleted-ids";
     const INVOICE_REGISTRATION_MEMO_MARKER = "shiire_invoice_registration:";
+    const MANAGEMENT_NUMBER_MEMO_MARKER = "shiire_management_number:";
 
     const BUILTIN = { proxyUrl: "/extract", syncUrl: "", secret: "", model: "claude-haiku-4-5-20251001" };
 
@@ -2498,6 +2505,7 @@
             purchase?.name,
             purchase?.manufacturer,
             purchase?.category,
+            managementNumberFor(purchase),
             purchase?.staff,
             sale.listing_id,
             sale.sku,
@@ -2591,24 +2599,50 @@
 
     function salePurchaseLabel(record) {
       if (!record) return "未選択";
+      const management = managementNumberFor(record);
       const date = record.date ? `${record.date} ` : "";
       const manufacturer = record.manufacturer ? `${record.manufacturer} ` : "";
-      return `${date}${manufacturer}${record.name || "無題"} / ${yen(record.amount || 0)}`;
+      const prefix = management ? `[${management}] ` : "";
+      return `${prefix}${date}${manufacturer}${record.name || "無題"} / ${yen(record.amount || 0)}`;
+    }
+
+    function managementNumberFor(record) {
+      if (!record) return "";
+      const memoMetadata = splitMemoMetadata(record.memo || "");
+      return normalizeManagementNumber(record.managementNumber || record.management_number || memoMetadata.managementNumber);
     }
 
     function renderSalePurchaseOptions() {
       const select = $("salePurchaseId");
       if (!select) return;
       const current = select.value;
+      const query = String($("salePurchaseSearch")?.value || "").trim().toLowerCase();
       select.innerHTML = "";
+      const records = query ? state.records.filter((record) => {
+        const haystack = [
+          managementNumberFor(record),
+          record.name,
+          record.manufacturer,
+          record.category,
+          record.date,
+          record.staff,
+          record.channel,
+          record.amount
+        ].join(" ").toLowerCase();
+        return haystack.includes(query);
+      }) : state.records;
       if (!state.records.length) {
         select.append(new Option("仕入データがありません", ""));
         return;
       }
-      state.records.forEach((record) => {
+      if (!records.length) {
+        select.append(new Option("該当する仕入商品がありません", ""));
+        return;
+      }
+      records.forEach((record) => {
         select.append(new Option(salePurchaseLabel(record), record.id));
       });
-      if (state.records.some((record) => record.id === current)) select.value = current;
+      if (records.some((record) => record.id === current)) select.value = current;
     }
 
     function resetSaleForm() {
@@ -2616,12 +2650,14 @@
       if (!form) return;
       form.reset();
       $("saleId").value = "";
+      $("salePurchaseSearch").value = "";
       $("saleDestination").value = "ebay";
       $("saleStatusField").value = "not_listed";
       renderSalePurchaseOptions();
     }
 
     function setSaleForm(sale) {
+      $("salePurchaseSearch").value = "";
       renderSalePurchaseOptions();
       $("saleId").value = sale.id || "";
       $("salePurchaseId").value = sale.purchase_id || "";
@@ -2745,6 +2781,7 @@
               <strong>${escapeHtml(purchase ? `${purchase.name || "無題"}` : "仕入不明")}</strong>
               <br><span class="small muted">${escapeHtml(itemMeta)}</span>
               <div class="sale-meta">
+                ${managementNumberFor(purchase) ? saleBadge(`仕入管理 ${managementNumberFor(purchase)}`, "neutral") : ""}
                 ${sale.listing_id ? saleBadge(`管理 ${sale.listing_id}`, "neutral") : ""}
                 ${sale.sku ? saleBadge(`SKU ${sale.sku}`, "neutral") : ""}
               </div>
@@ -3149,6 +3186,7 @@
         date: today(),
         channel: META.channels[0] || "その他",
         staff: META.staff[0] || "未設定",
+        managementNumber: "",
         name: "",
         manufacturer: "",
         category: META.categories[0] || "その他",
@@ -3202,6 +3240,31 @@
       return { memo: cleanMemo, invoiceRegistrationNumber: normalizeInvoiceRegistrationNumber(raw) };
     }
 
+    function normalizeManagementNumber(value) {
+      return String(value || "").trim().replace(/\s+/g, "");
+    }
+
+    function stripMemoMarker(text, marker) {
+      const source = String(text || "");
+      const markerIndex = source.indexOf(marker);
+      if (markerIndex < 0) return { memo: source, value: "" };
+      const before = source.slice(0, markerIndex).trim();
+      const rest = source.slice(markerIndex + marker.length).trim();
+      const raw = rest.split(/\s+/)[0] || "";
+      const after = rest.slice(raw.length).trim();
+      return { memo: [before, after].filter(Boolean).join("\n").trim(), value: raw };
+    }
+
+    function splitMemoMetadata(memo) {
+      const invoice = stripMemoMarker(memo, INVOICE_REGISTRATION_MEMO_MARKER);
+      const management = stripMemoMarker(invoice.memo, MANAGEMENT_NUMBER_MEMO_MARKER);
+      return {
+        memo: management.memo,
+        invoiceRegistrationNumber: normalizeInvoiceRegistrationNumber(invoice.value),
+        managementNumber: normalizeManagementNumber(management.value)
+      };
+    }
+
     function memoWithInvoiceRegistration(memo, invoiceRegistrationNumber) {
       const cleanMemo = splitMemoAndInvoiceRegistration(memo).memo.trim();
       const normalized = normalizeInvoiceRegistrationNumber(invoiceRegistrationNumber);
@@ -3209,13 +3272,25 @@
       return `${cleanMemo}${cleanMemo ? "\n" : ""}${INVOICE_REGISTRATION_MEMO_MARKER}${normalized}`;
     }
 
+    function memoWithMetadata(memo, invoiceRegistrationNumber, managementNumber) {
+      const cleanMemo = splitMemoMetadata(memo).memo.trim();
+      const normalizedInvoice = normalizeInvoiceRegistrationNumber(invoiceRegistrationNumber);
+      const normalizedManagement = normalizeManagementNumber(managementNumber);
+      return [
+        cleanMemo,
+        normalizedInvoice ? `${INVOICE_REGISTRATION_MEMO_MARKER}${normalizedInvoice}` : "",
+        normalizedManagement ? `${MANAGEMENT_NUMBER_MEMO_MARKER}${normalizedManagement}` : ""
+      ].filter(Boolean).join("\n");
+    }
+
     function setForm(record) {
       const value = { ...defaultRecord(), ...record };
       value.itemPrice = Number(value.itemPrice ?? value.item_price ?? value.amount ?? 0);
       Object.assign(value, costBreakdown(value));
-      const invoiceMemo = splitMemoAndInvoiceRegistration(value.memo);
-      value.memo = invoiceMemo.memo;
-      value.invoiceRegistrationNumber = value.invoiceRegistrationNumber || invoiceMemo.invoiceRegistrationNumber;
+      const memoMetadata = splitMemoMetadata(value.memo);
+      value.memo = memoMetadata.memo;
+      value.invoiceRegistrationNumber = value.invoiceRegistrationNumber || memoMetadata.invoiceRegistrationNumber;
+      value.managementNumber = value.managementNumber || value.management_number || memoMetadata.managementNumber;
       value.destination = value.destination || "ebay";
       for (const key of Object.keys(value)) {
         if (form.elements[key]) form.elements[key].value = value[key];
@@ -3251,6 +3326,7 @@
         date: data.get("date"),
         channel: data.get("channel"),
         staff: data.get("staff"),
+        managementNumber: normalizeManagementNumber(data.get("managementNumber")),
         name: String(data.get("name") || "").trim(),
         manufacturer: String(data.get("manufacturer") || "").trim(),
         category: data.get("category"),
@@ -3271,7 +3347,7 @@
         anon: data.get("anon"),
         seller: String(data.get("seller") || "").trim(),
         address: String(data.get("address") || "").trim(),
-        memo: memoWithInvoiceRegistration(String(data.get("memo") || ""), data.get("invoiceRegistrationNumber")),
+        memo: memoWithMetadata(String(data.get("memo") || ""), data.get("invoiceRegistrationNumber"), data.get("managementNumber")),
         hasImage: Boolean(state.proofDraft.length || hasRecordImages($("recordId").value))
       };
     }
@@ -3443,7 +3519,7 @@
         if (state.filters.kind && c.kind !== state.filters.kind) return false;
         if (!matchesQuickFilter(record)) return false;
         if (text) {
-          const haystack = [record.name, record.manufacturer, record.category, record.seller, record.date, record.amount, record.memo, destinationLabel(record)].join(" ").toLowerCase();
+          const haystack = [managementNumberFor(record), record.name, record.manufacturer, record.category, record.seller, record.date, record.amount, record.memo, destinationLabel(record)].join(" ").toLowerCase();
           if (!haystack.includes(text)) return false;
         }
         return true;
@@ -3754,10 +3830,12 @@
         const c = classified(record);
         const image = representativeImage(record.id);
         const imageCount = getRecordImages(record.id).length;
+        const managementNumber = managementNumberFor(record);
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${image ? `${evidenceThumbHtml(image, `data-evidence="${record.id}"`)}<span class="muted small">${imageCount}枚</span>` : `<span class="empty-thumb">なし</span>`}</td>
           <td><strong>${escapeHtml(record.date || "")}</strong><br><span class="muted small">${escapeHtml(record.branch || "")}</span></td>
+          <td><strong>${escapeHtml(managementNumber || "未設定")}</strong></td>
           <td>${escapeHtml(record.channel || "")}</td>
           <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.manufacturer || record.category || "")} / ${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
           <td>${escapeHtml(record.seller || "")}<br><span class="muted small">${escapeHtml(flagText(c))}</span></td>
@@ -4672,10 +4750,11 @@
         ];
       }
       return [
-        ["仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "適格事業者番号", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
+        ["管理番号", "仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "適格事業者番号", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
         ...records.map((record) => {
           const c = classified(record);
           return [
+            managementNumberFor(record),
             record.date,
             record.channel,
             record.branch,
@@ -4694,7 +4773,7 @@
             record.anon === "anon" ? "匿名" : "本名判明",
             record.qualified === "yes" ? "登録あり" : record.qualified === "unknown" ? "不明" : "登録なし",
             evidenceNames(record).join(" / "),
-            splitMemoAndInvoiceRegistration(record.memo).memo,
+            splitMemoMetadata(record.memo).memo,
             kindLabel(record.kind),
             record.stock === "yes" ? "はい" : "いいえ"
           ];
@@ -4705,7 +4784,7 @@
     function saleExportRows(sales, type = "list") {
       if (type === "profit") {
         return [
-          ["販売先", "状態", "商品名", "メーカー", "仕入日", "販売日", "仕入原価", "販売価格", "販売手数料", "決済手数料", "国内送料", "海外送料", "その他費用", "費用合計", "粗利", "利益率", "担当", "管理番号", "SKU", "メモ"],
+          ["販売先", "状態", "商品名", "メーカー", "仕入日", "販売日", "仕入原価", "販売価格", "販売手数料", "決済手数料", "国内送料", "海外送料", "その他費用", "費用合計", "粗利", "利益率", "担当", "仕入管理番号", "管理番号", "SKU", "メモ"],
           ...sales.map((sale) => {
             const purchase = findPurchase(sale.purchase_id) || {};
             const revenue = saleRevenueJpy(sale);
@@ -4729,6 +4808,7 @@
               profit,
               `${saleMargin(revenue, profit)}%`,
               purchase.staff || "",
+              managementNumberFor(purchase),
               sale.listing_id || "",
               sale.sku || "",
               sale.memo || ""
@@ -4737,7 +4817,7 @@
         ];
       }
       return [
-        ["販売先", "状態", "商品名", "仕入日", "出品日", "販売日", "販売価格", "粗利", "利益率", "管理番号", "SKU", "メモ"],
+        ["販売先", "状態", "商品名", "仕入日", "出品日", "販売日", "販売価格", "粗利", "利益率", "仕入管理番号", "管理番号", "SKU", "メモ"],
         ...sales.map((sale) => {
           const purchase = findPurchase(sale.purchase_id) || {};
           const revenue = saleRevenueJpy(sale);
@@ -4752,6 +4832,7 @@
             revenue,
             profit,
             `${saleMargin(revenue, profit)}%`,
+            managementNumberFor(purchase),
             sale.listing_id || "",
             sale.sku || "",
             sale.memo || ""
@@ -5054,6 +5135,7 @@
         channel: get("チャネル") || "その他",
         branch: get("支店") || "東京",
         staff: get("担当") || "未設定",
+        managementNumber: normalizeManagementNumber(get("管理番号")),
         name: get("商品名"),
         category: get("品目") || "その他",
         qty: Number(get("数量") || 1),
@@ -5066,14 +5148,14 @@
         anon: anon.includes("匿名") ? "anon" : "named",
         seller: get("相手方氏名"),
         address: get("相手方住所"),
-        memo: memoWithInvoiceRegistration(get("メモ"), invoiceRegistrationNumber),
+        memo: memoWithMetadata(get("メモ"), invoiceRegistrationNumber, get("管理番号")),
         hasImage: Boolean(get("証憑ファイル名")),
         evidenceFileNames: get("証憑ファイル名").split(/\s*\/\s*/).map((name) => name.trim()).filter(Boolean)
       };
     }
 
     async function importCsv(file) {
-      const text = await file.text();
+      const text = await readTextFileWithEncoding(file);
       const rows = parseCsv(text);
       if (rows.length < 2) throw new Error("CSVに明細行がありません。");
       const headers = rows[0].map((header) => header.trim());
@@ -5595,6 +5677,7 @@
         state.salesFilters.text = $("salesFilterText").value;
         renderSalesManagement();
       });
+      $("salePurchaseSearch").addEventListener("input", renderSalePurchaseOptions);
       $("salesRows").addEventListener("click", async (event) => {
         const editId = event.target.closest("[data-sale-edit]")?.dataset.saleEdit;
         const deleteId = event.target.closest("[data-sale-delete]")?.dataset.saleDelete;
