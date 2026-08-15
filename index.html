@@ -1778,6 +1778,7 @@
                       <th>証憑</th>
                       <th>仕入日</th>
                       <th>管理番号</th>
+                      <th>在庫状態</th>
                       <th>チャネル</th>
                       <th>商品</th>
                       <th>相手方</th>
@@ -3863,6 +3864,24 @@
       return state.sales.some((sale) => sale.purchase_id === record.id && (!status || sale.status === status));
     }
 
+    function recordSales(record) {
+      return state.sales.filter((sale) => sale.purchase_id === record.id);
+    }
+
+    function recordInventoryInfo(record) {
+      const sales = recordSales(record);
+      if (sales.some((sale) => sale.status === "listed")) {
+        return { value: "listed", label: "出品中在庫", className: "blue" };
+      }
+      if (sales.some((sale) => sale.status === "sold")) {
+        return { value: "sold", label: "在庫なし", className: "dark" };
+      }
+      if (sales.some((sale) => ["preparing", "on_hold"].includes(sale.status))) {
+        return { value: "stock", label: "在庫あり", className: "orange" };
+      }
+      return { value: "stock", label: "在庫あり", className: "green" };
+    }
+
     function matchesQuickFilter(record) {
       const quick = state.filters.quick;
       if (!quick) return true;
@@ -3879,6 +3898,9 @@
       if (quick === "yahoo") return record.destination === "yahoo";
       if (quick === "market") return record.destination === "market";
       if (quick === "domestic_other") return record.destination === "other";
+      if (quick === "inventory_stock") return recordInventoryInfo(record).value === "stock";
+      if (quick === "inventory_listed") return recordInventoryInfo(record).value === "listed";
+      if (quick === "inventory_sold") return recordInventoryInfo(record).value === "sold";
       if (quick === "sold") return recordHasSale(record, "sold");
       if (quick === "noEvidence") return !hasRecordImages(record.id);
       return true;
@@ -3981,7 +4003,9 @@
         { value: "yahoo", label: "ヤフオク" },
         { value: "market", label: "市場" },
         { value: "domestic_other", label: "その他" },
-        { value: "sold", label: "売却済み" },
+        { value: "inventory_stock", label: "在庫あり" },
+        { value: "inventory_listed", label: "出品中在庫" },
+        { value: "inventory_sold", label: "在庫なし" },
         { value: "noEvidence", label: "証憑なし" }
       ];
     }
@@ -4207,11 +4231,13 @@
         const image = representativeImage(record.id);
         const imageCount = getRecordImages(record.id).length;
         const managementNumber = managementNumberFor(record);
+        const inventory = recordInventoryInfo(record);
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${image ? `${evidenceThumbHtml(image, `data-evidence="${record.id}"`)}<span class="muted small">${imageCount}枚</span>` : `<span class="empty-thumb">なし</span>`}</td>
           <td><strong>${escapeHtml(record.date || "")}</strong><br><span class="muted small">${escapeHtml(record.branch || "")}</span></td>
           <td><strong>${escapeHtml(managementNumber || "未設定")}</strong></td>
+          <td>${saleBadge(inventory.label, inventory.className)}</td>
           <td>${escapeHtml(record.channel || "")}</td>
           <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.manufacturer || record.category || "")} / ${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
           <td>${escapeHtml(record.seller || "")}<br><span class="muted small">${escapeHtml(flagText(c))}</span></td>
@@ -5154,11 +5180,12 @@
         ];
       }
       return [
-        ["管理番号", "仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "適格事業者番号", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
+        ["管理番号", "在庫状態", "仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "適格事業者番号", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
         ...records.map((record) => {
           const c = classified(record);
           return [
             managementNumberFor(record),
+            recordInventoryInfo(record).label,
             record.date,
             record.channel,
             record.branch,
