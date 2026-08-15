@@ -183,6 +183,14 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "未処理タスク",
     "スプシへ送信",
     "quickFilterDefinitions",
+    'id="purchaseSuggestion"',
+    "purchase-suggestion",
+    "過去データから候補を見つけました",
+    "空欄を補完",
+    "buildPurchaseSuggestion",
+    "applyPurchaseSuggestion",
+    "similarityScore",
+    "normalizePredictText",
     "screenDefinitions",
     "証憑なし"
   ];

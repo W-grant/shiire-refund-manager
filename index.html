@@ -311,6 +311,60 @@
       align-items: center;
     }
 
+    .purchase-suggestion {
+      margin-top: -2px;
+      display: grid;
+      gap: 10px;
+      background: #f7faf6;
+      border: 1px solid #cfe1d4;
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .purchase-suggestion.hidden {
+      display: none;
+    }
+
+    .purchase-suggestion-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .purchase-suggestion-title {
+      font-weight: 760;
+    }
+
+    .purchase-suggestion-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .purchase-suggestion-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      min-width: 0;
+    }
+
+    .purchase-suggestion-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .purchase-suggestion-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
     .money {
       font-variant-numeric: tabular-nums;
       font-weight: 760;
@@ -1152,7 +1206,8 @@
       .dashboard-grid,
       .summary-grid,
       .sales-insights,
-      .review-supplier-tools {
+      .review-supplier-tools,
+      .purchase-suggestion-grid {
         grid-template-columns: 1fr;
       }
 
@@ -1281,6 +1336,7 @@
                   <label for="name">商品名</label>
                   <input id="name" name="name" type="text" required autocomplete="off">
                 </div>
+                <div id="purchaseSuggestion" class="field wide purchase-suggestion hidden"></div>
                 <div class="field">
                   <label for="manufacturer">メーカー名</label>
                   <input id="manufacturer" name="manufacturer" type="text" autocomplete="off">
@@ -2047,7 +2103,8 @@
       currentEvidenceId: "",
       currentEvidenceIndex: 0,
       profile: null,
-      passwordRecovery: false
+      passwordRecovery: false,
+      currentPurchaseSuggestion: null
     };
 
     const $ = (id) => document.getElementById(id);
@@ -3898,6 +3955,177 @@
       $("liveTax").textContent = yen(c.tax);
       $("liveNote").textContent = c.note || "";
       $("liveFlags").textContent = [...validation.errors, ...validation.warnings, ...(c.flags || [])].join(" / ");
+      renderPurchaseSuggestion(record);
+    }
+
+    function normalizePredictText(value) {
+      return String(value || "")
+        .normalize("NFKC")
+        .toLowerCase()
+        .replace(/[０-９]/g, (char) => String.fromCharCode(char.charCodeAt(0) - 0xfee0))
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .trim();
+    }
+
+    function predictionTokens(value) {
+      const normalized = normalizePredictText(value);
+      const tokens = new Set(normalized.split(/\s+/).filter((token) => token.length >= 2));
+      const compact = normalized.replace(/\s+/g, "");
+      for (let index = 0; index < compact.length - 1; index += 1) {
+        tokens.add(compact.slice(index, index + 2));
+      }
+      return tokens;
+    }
+
+    function similarityScore(query, record) {
+      const queryText = normalizePredictText(query);
+      const recordText = normalizePredictText([record.name, record.manufacturer, record.category].filter(Boolean).join(" "));
+      if (!queryText || !recordText) return 0;
+      let score = 0;
+      if (recordText.includes(queryText) || queryText.includes(recordText)) score += 0.45;
+      const queryTokens = predictionTokens(queryText);
+      const recordTokens = predictionTokens(recordText);
+      if (!queryTokens.size || !recordTokens.size) return score;
+      let matched = 0;
+      queryTokens.forEach((token) => {
+        if (recordTokens.has(token)) matched += 1;
+      });
+      return score + matched / Math.max(queryTokens.size, recordTokens.size);
+    }
+
+    function averageNumber(items, valueFn) {
+      const values = items.map(valueFn).map(Number).filter((value) => Number.isFinite(value) && value > 0);
+      if (!values.length) return 0;
+      return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+    }
+
+    function mostCommonValue(items, valueFn) {
+      const counts = new Map();
+      items.forEach((item) => {
+        const value = String(valueFn(item) || "").trim();
+        if (!value) return;
+        counts.set(value, (counts.get(value) || 0) + 1);
+      });
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"))
+        .map(([value, count]) => ({ value, count }))[0] || { value: "", count: 0 };
+    }
+
+    function buildPurchaseSuggestion(record) {
+      const query = normalizePredictText(record.name);
+      if (query.length < 2) return null;
+      const currentId = $("recordId").value || "";
+      const matches = state.records
+        .filter((item) => item.id !== currentId && item.name)
+        .map((item) => ({ record: item, score: similarityScore(record.name, item) }))
+        .filter((item) => item.score >= 0.18)
+        .sort((a, b) => b.score - a.score || String(b.record.date || "").localeCompare(String(a.record.date || "")))
+        .slice(0, 8);
+      if (!matches.length) return null;
+      const records = matches.map((item) => item.record);
+      const sales = records.flatMap((item) => recordSales(item)).filter((sale) => sale.status === "sold");
+      return {
+        count: records.length,
+        examples: records.slice(0, 3),
+        manufacturer: mostCommonValue(records, (item) => item.manufacturer),
+        category: mostCommonValue(records, (item) => item.category),
+        destination: mostCommonValue(records, (item) => item.destination),
+        seller: mostCommonValue(records, (item) => item.seller),
+        address: mostCommonValue(records, (item) => item.address),
+        channel: mostCommonValue(records, (item) => item.channel),
+        kind: mostCommonValue(records, (item) => item.kind),
+        qualified: mostCommonValue(records, (item) => item.qualified),
+        anon: mostCommonValue(records, (item) => item.anon),
+        stock: mostCommonValue(records, (item) => item.stock),
+        rate: mostCommonValue(records, (item) => item.rate),
+        averageItemPrice: averageNumber(records, (item) => item.itemPrice),
+        averageShippingFee: averageNumber(records, (item) => item.shippingFee),
+        averagePurchaseFee: averageNumber(records, (item) => item.purchaseFee),
+        averagePurchaseFeeTax: averageNumber(records, (item) => item.purchaseFeeTax),
+        averageAmount: averageNumber(records, (item) => item.amount),
+        averageSalePrice: averageNumber(sales, saleRevenueJpy),
+        averageProfit: averageNumber(sales, saleProfit)
+      };
+    }
+
+    function renderPurchaseSuggestion(record) {
+      const target = $("purchaseSuggestion");
+      if (!target) return;
+      const suggestion = buildPurchaseSuggestion(record);
+      state.currentPurchaseSuggestion = suggestion;
+      if (!suggestion) {
+        target.classList.add("hidden");
+        target.innerHTML = "";
+        return;
+      }
+      const destination = suggestion.destination.value ? destinationLabel({ destination: suggestion.destination.value }) : "未設定";
+      const examples = suggestion.examples.map((item) => escapeHtml(item.name)).join(" / ");
+      target.classList.remove("hidden");
+      target.innerHTML = `
+        <div class="purchase-suggestion-head">
+          <div>
+            <div class="purchase-suggestion-title">過去データから候補を見つけました</div>
+            <div class="small muted">${suggestion.count}件: ${examples}</div>
+          </div>
+          <span class="badge green">予測</span>
+        </div>
+        <div class="purchase-suggestion-grid">
+          <div class="purchase-suggestion-card"><span>平均仕入</span><strong>${yen(suggestion.averageAmount)}</strong></div>
+          <div class="purchase-suggestion-card"><span>平均販売</span><strong>${suggestion.averageSalePrice ? yen(suggestion.averageSalePrice) : "未売却"}</strong></div>
+          <div class="purchase-suggestion-card"><span>平均粗利</span><strong>${suggestion.averageProfit ? yen(suggestion.averageProfit) : "未集計"}</strong></div>
+          <div class="purchase-suggestion-card"><span>よく使う販売先</span><strong>${escapeHtml(destination)}</strong></div>
+        </div>
+        <div class="small muted">
+          メーカー: ${escapeHtml(suggestion.manufacturer.value || "未設定")} / 品目: ${escapeHtml(suggestion.category.value || "未設定")} / 相手方: ${escapeHtml(suggestion.seller.value || "未設定")}
+        </div>
+        <div class="purchase-suggestion-actions">
+          <button id="applyPurchaseSuggestionBtn" type="button">空欄を補完</button>
+          <span class="small muted">商品名は変更せず、メーカー・品目・販売先・相手方などを補完します。</span>
+        </div>
+      `;
+      $("applyPurchaseSuggestionBtn")?.addEventListener("click", applyPurchaseSuggestion);
+    }
+
+    function setSelectValueIfExists(name, value) {
+      const element = form.elements[name];
+      if (!element || value === undefined || value === null || value === "") return;
+      element.value = String(value);
+    }
+
+    function fillEmptyFormValue(name, value) {
+      const element = form.elements[name];
+      if (!element || value === undefined || value === null || value === "") return;
+      if (String(element.value || "").trim()) return;
+      element.value = String(value);
+    }
+
+    function fillZeroFormValue(name, value) {
+      const element = form.elements[name];
+      if (!element || !Number(value)) return;
+      if (Number(element.value || 0) > 0) return;
+      element.value = String(value);
+    }
+
+    function applyPurchaseSuggestion() {
+      const suggestion = state.currentPurchaseSuggestion;
+      if (!suggestion) return;
+      fillEmptyFormValue("manufacturer", suggestion.manufacturer.value);
+      fillEmptyFormValue("seller", suggestion.seller.value);
+      fillEmptyFormValue("address", suggestion.address.value);
+      setSelectValueIfExists("category", suggestion.category.value);
+      setSelectValueIfExists("destination", suggestion.destination.value);
+      setSelectValueIfExists("channel", suggestion.channel.value);
+      setSelectValueIfExists("kind", suggestion.kind.value);
+      setSelectValueIfExists("qualified", suggestion.qualified.value);
+      setSelectValueIfExists("anon", suggestion.anon.value);
+      setSelectValueIfExists("stock", suggestion.stock.value);
+      setSelectValueIfExists("rate", suggestion.rate.value);
+      fillZeroFormValue("itemPrice", suggestion.averageItemPrice);
+      fillZeroFormValue("shippingFee", suggestion.averageShippingFee);
+      fillZeroFormValue("purchaseFee", suggestion.averagePurchaseFee);
+      fillZeroFormValue("purchaseFeeTax", suggestion.averagePurchaseFeeTax);
+      syncAmountFields();
+      updateLiveClassify();
     }
 
     function validateRecord(record, c) {
