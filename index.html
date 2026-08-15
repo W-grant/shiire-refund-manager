@@ -4244,7 +4244,9 @@
       const unsoldCount = records.filter((record) => !hasSoldSale(record)).length;
       const notListedCount = records.filter((record) => !hasActiveSale(record)).length;
       const preparingCount = state.sales.filter((sale) => ["not_listed", "preparing", "on_hold"].includes(sale.status)).length;
-      const openTaskCount = noEvidenceCount + missingDestinationCount + notListedCount + preparingCount;
+      const staleStockCount = records.filter(isStaleStockRecord).length;
+      const staleListedCount = records.filter(isStaleListedRecord).length;
+      const openTaskCount = noEvidenceCount + missingDestinationCount + notListedCount + preparingCount + staleStockCount + staleListedCount;
 
       $("dashYearLabel").textContent = `${targetYear}年 仕入点数`;
       $("dashYearPurchaseQty").textContent = `${yearPurchaseQty}点`;
@@ -4263,7 +4265,7 @@
       $("dashEvidenceRate").textContent = `${margin}%`;
       $("dashEvidenceCount").textContent = `証憑 ${evidenceCount} / ${records.length}件`;
       $("dashOpenTasks").textContent = openTaskCount;
-      $("dashOpenTasksLabel").textContent = `未売却 ${unsoldCount}件 / 未出品 ${notListedCount}件`;
+      $("dashOpenTasksLabel").textContent = `未売却 ${unsoldCount}件 / 長期 ${staleStockCount + staleListedCount}件`;
 
       renderDashboardRanking("dashStaffRanking", sumBy(state.sales.filter((sale) => sale.status === "sold"), salePurchaseStaff, saleProfit));
       renderDashboardRanking("dashDestinationBreakdown", sumBy(state.sales.filter((sale) => sale.status === "sold"), (sale) => saleDestinationLabel(sale.destination), saleProfit));
@@ -4272,6 +4274,8 @@
         "利用先未定": missingDestinationCount,
         "未出品": notListedCount,
         "準備中・保留": preparingCount,
+        "仕入30日超": staleStockCount,
+        "出品30日超": staleListedCount,
         "未売却": unsoldCount
       });
     }

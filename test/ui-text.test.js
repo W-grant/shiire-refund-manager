@@ -176,6 +176,8 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "在庫経過日数",
     "長期在庫",
     "長期出品",
+    "staleStockCount",
+    "staleListedCount",
     "販売状況",
     "出品中在庫",
     "未処理タスク",
