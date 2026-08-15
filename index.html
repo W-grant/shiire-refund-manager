@@ -1559,6 +1559,12 @@
                 <div class="form-grid">
                   <label class="wide">仕入商品
                     <input id="salePurchaseSearch" type="search" placeholder="管理番号・商品名・メーカーで検索">
+                    <select id="salePurchaseInventoryFilter" aria-label="仕入商品在庫フィルタ">
+                      <option value="stock">在庫ありを表示</option>
+                      <option value="listed">出品中在庫を表示</option>
+                      <option value="sold">在庫なしを表示</option>
+                      <option value="">すべて表示</option>
+                    </select>
                     <select id="salePurchaseId" name="purchaseId"></select>
                   </label>
                   <label>販売先
@@ -2838,7 +2844,7 @@
       const date = record.date ? `${record.date} ` : "";
       const manufacturer = record.manufacturer ? `${record.manufacturer} ` : "";
       const prefix = management ? `[${management}] ` : "";
-      return `${prefix}${date}${manufacturer}${record.name || "無題"} / ${yen(record.amount || 0)}`;
+      return `${prefix}${recordInventoryInfo(record).label} / ${date}${manufacturer}${record.name || "無題"} / ${yen(record.amount || 0)}`;
     }
 
     function managementNumberFor(record) {
@@ -2983,10 +2989,14 @@
       if (!select) return;
       const current = select.value;
       const query = String($("salePurchaseSearch")?.value || "").trim().toLowerCase();
+      const inventoryFilter = $("salePurchaseInventoryFilter")?.value || "";
       select.innerHTML = "";
-      const records = query ? state.records.filter((record) => {
+      const records = state.records.filter((record) => {
+        if (inventoryFilter && recordInventoryInfo(record).value !== inventoryFilter) return false;
+        if (!query) return true;
         const haystack = [
           managementNumberFor(record),
+          recordInventoryInfo(record).label,
           record.name,
           record.manufacturer,
           record.category,
@@ -2996,7 +3006,7 @@
           record.amount
         ].join(" ").toLowerCase();
         return haystack.includes(query);
-      }) : state.records;
+      });
       if (!state.records.length) {
         select.append(new Option("仕入データがありません", ""));
         return;
@@ -3017,6 +3027,7 @@
       form.reset();
       $("saleId").value = "";
       $("salePurchaseSearch").value = "";
+      $("salePurchaseInventoryFilter").value = "stock";
       $("saleDestination").value = "ebay";
       $("saleStatusField").value = "not_listed";
       renderSalePurchaseOptions();
@@ -3024,6 +3035,7 @@
 
     function setSaleForm(sale) {
       $("salePurchaseSearch").value = "";
+      $("salePurchaseInventoryFilter").value = "";
       renderSalePurchaseOptions();
       $("saleId").value = sale.id || "";
       $("salePurchaseId").value = sale.purchase_id || "";
@@ -6110,6 +6122,7 @@
         renderSalesManagement();
       });
       $("salePurchaseSearch").addEventListener("input", renderSalePurchaseOptions);
+      $("salePurchaseInventoryFilter").addEventListener("change", renderSalePurchaseOptions);
       $("salePurchaseId").addEventListener("change", suggestSaleListingIdIfEmpty);
       $("saleDestination").addEventListener("change", suggestSaleListingIdIfEmpty);
       $("generateSaleListingIdBtn").addEventListener("click", generateSaleListingId);
