@@ -5341,12 +5341,18 @@
         ];
       }
       return [
-        ["管理番号", "在庫状態", "仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "適格事業者番号", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
+        ["管理番号", "在庫状態", "在庫経過日数", "長期在庫", "仕入日", "チャネル", "支店", "担当", "商品名", "品目", "数量", "金額(税込)", "税率", "控除区分", "控除割合", "控除税額", "相手方氏名", "相手方住所", "適格事業者番号", "取引形態", "適格事業者", "証憑ファイル名", "メモ", "古物区分", "棚卸資産"],
         ...records.map((record) => {
           const c = classified(record);
+          const inventory = recordInventoryInfo(record);
+          const ageDate = inventory.value === "listed"
+            ? (recordSales(record).find((sale) => sale.status === "listed")?.listed_at || record.date)
+            : record.date;
           return [
             managementNumberFor(record),
-            recordInventoryInfo(record).label,
+            inventory.label,
+            daysSince(ageDate),
+            isStaleStockRecord(record) || isStaleListedRecord(record) ? "はい" : "いいえ",
             record.date,
             record.channel,
             record.branch,
@@ -5376,7 +5382,7 @@
     function saleExportRows(sales, type = "list") {
       if (type === "profit") {
         return [
-          ["販売先", "状態", "商品名", "メーカー", "仕入日", "販売日", "仕入原価", "販売価格", "販売手数料", "決済手数料", "国内送料", "海外送料", "その他費用", "費用合計", "粗利", "利益率", "担当", "仕入管理番号", "管理番号", "SKU", "メモ"],
+          ["販売先", "在庫状態", "販売状況", "長期出品", "商品名", "メーカー", "仕入日", "販売日", "仕入原価", "販売価格", "販売手数料", "決済手数料", "国内送料", "海外送料", "その他費用", "費用合計", "粗利", "利益率", "担当", "仕入管理番号", "管理番号", "SKU", "メモ"],
           ...sales.map((sale) => {
             const purchase = findPurchase(sale.purchase_id) || {};
             const revenue = saleRevenueJpy(sale);
@@ -5384,7 +5390,9 @@
             const profit = saleProfit(sale);
             return [
               saleDestinationLabel(sale.destination),
+              saleInventoryLabel(sale.status),
               saleStatusLabel(sale.status),
+              sale.status === "listed" && daysSince(sale.listed_at) >= 30 ? "はい" : "いいえ",
               purchase.name || "",
               purchase.manufacturer || "",
               purchase.date || "",
@@ -5409,14 +5417,16 @@
         ];
       }
       return [
-        ["販売先", "状態", "商品名", "仕入日", "出品日", "販売日", "販売価格", "粗利", "利益率", "仕入管理番号", "管理番号", "SKU", "メモ"],
+        ["販売先", "在庫状態", "販売状況", "長期出品", "商品名", "仕入日", "出品日", "販売日", "販売価格", "粗利", "利益率", "仕入管理番号", "管理番号", "SKU", "メモ"],
         ...sales.map((sale) => {
           const purchase = findPurchase(sale.purchase_id) || {};
           const revenue = saleRevenueJpy(sale);
           const profit = saleProfit(sale);
           return [
             saleDestinationLabel(sale.destination),
+            saleInventoryLabel(sale.status),
             saleStatusLabel(sale.status),
+            sale.status === "listed" && daysSince(sale.listed_at) >= 30 ? "はい" : "いいえ",
             purchase.name || "",
             purchase.date || "",
             sale.listed_at || "",
@@ -5460,7 +5470,7 @@
 
     function googleSheetSalesRows(sales) {
       return [
-        ["アプリ販売ID", "アプリ仕入ID", "商品名", "メーカー名", "販売先", "状態", "仕入日", "出品日", "販売日", "仕入原価", "販売価格", "費用合計", "粗利", "利益率", "担当", "管理番号", "SKU", "メモ"],
+        ["アプリ販売ID", "アプリ仕入ID", "商品名", "メーカー名", "販売先", "在庫状態", "販売状況", "長期出品", "仕入日", "出品日", "販売日", "仕入原価", "販売価格", "費用合計", "粗利", "利益率", "担当", "管理番号", "SKU", "メモ"],
         ...sales.map((sale) => {
           const purchase = findPurchase(sale.purchase_id) || {};
           const revenue = saleRevenueJpy(sale);
@@ -5471,7 +5481,9 @@
             purchase.name || "",
             purchase.manufacturer || "",
             saleDestinationLabel(sale.destination),
+            saleInventoryLabel(sale.status),
             saleStatusLabel(sale.status),
+            sale.status === "listed" && daysSince(sale.listed_at) >= 30 ? "はい" : "いいえ",
             purchase.date || "",
             sale.listed_at || "",
             sale.sold_at || "",
