@@ -1712,6 +1712,7 @@
                 </label>
               </div>
               <div class="sales-tools">
+                <button id="createMissingSalesBtn" type="button">未登録在庫を販売管理へ作成</button>
                 <button id="selectVisibleSalesBtn" type="button">表示中を全選択</button>
                 <button id="clearSelectedSalesBtn" type="button">選択解除</button>
                 <label>選択した販売の在庫状態
@@ -3124,6 +3125,53 @@
       return true;
     }
 
+    function saleDestinationFromPurchase(record) {
+      const selectedDestination = state.salesFilters.destination;
+      if (["ebay", "catawiki", "overseas", "yahoo", "market", "other"].includes(selectedDestination)) {
+        return selectedDestination;
+      }
+      if (["ebay", "catawiki", "overseas", "yahoo", "market", "other"].includes(record.destination)) {
+        return record.destination;
+      }
+      if (record.destination === "both") return "ebay";
+      return "other";
+    }
+
+    function missingSalesPurchaseRecords() {
+      return state.records.filter((record) => {
+        if (state.activeMonth !== "all" && monthKey(record) !== state.activeMonth) return false;
+        if (recordSales(record).length) return false;
+        return recordInventoryInfo(record).value === "stock";
+      });
+    }
+
+    async function createMissingSalesFromPurchases() {
+      if (!canWritePurchases()) {
+        $("salesStatus").textContent = "販売管理への一括作成にはログイン権限が必要です";
+        return false;
+      }
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.saveSale) return false;
+      const records = missingSalesPurchaseRecords();
+      if (!records.length) {
+        $("salesStatus").textContent = "販売管理へ追加できる未登録在庫はありません";
+        return false;
+      }
+      if (!confirm(`${records.length}件の未登録在庫を販売管理へ作成しますか？`)) return false;
+      for (const record of records) {
+        await service.saveSale({
+          purchaseId: record.id,
+          destination: saleDestinationFromPurchase(record),
+          status: "not_listed",
+          memo: "仕入一覧から一括作成"
+        });
+      }
+      $("salesStatus").textContent = `${records.length}件を販売管理へ作成しました`;
+      state.salesFilters.view = "pending";
+      await loadSales();
+      return true;
+    }
+
     function selectedSaleIds() {
       return [...document.querySelectorAll("[data-sale-select]:checked")].map((element) => element.dataset.saleSelect);
     }
@@ -3207,7 +3255,7 @@
       form.querySelectorAll("input, select, textarea, button").forEach((element) => {
         element.disabled = !canWrite;
       });
-      ["selectVisibleSalesBtn", "clearSelectedSalesBtn", "salesBulkStatus", "applySalesBulkStatusBtn"].forEach((id) => {
+      ["createMissingSalesBtn", "selectVisibleSalesBtn", "clearSelectedSalesBtn", "salesBulkStatus", "applySalesBulkStatusBtn"].forEach((id) => {
         if ($(id)) $(id).disabled = !canWrite;
       });
       if (!canWrite) {
@@ -6195,6 +6243,14 @@
       $("salesFilterText").addEventListener("input", () => {
         state.salesFilters.text = $("salesFilterText").value;
         renderSalesManagement();
+      });
+      $("createMissingSalesBtn").addEventListener("click", async () => {
+        try {
+          await createMissingSalesFromPurchases();
+        } catch (error) {
+          console.error("[Sales] Bulk create failed", error);
+          $("salesStatus").textContent = `販売管理を一括作成できませんでした: ${formatErrorDetails(error)}`;
+        }
       });
       $("selectVisibleSalesBtn").addEventListener("click", () => setVisibleSalesSelected(true));
       $("clearSelectedSalesBtn").addEventListener("click", () => setVisibleSalesSelected(false));
