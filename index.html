@@ -2670,6 +2670,7 @@
       if (!sale.destination) return true;
       if (["not_listed", "preparing", "on_hold"].includes(sale.status)) return true;
       if (sale.status === "listed" && !sale.listing_id) return true;
+      if (sale.status === "listed" && daysSince(sale.listed_at) >= 30) return true;
       if (sale.status === "sold" && (!sale.sold_at || !saleRevenueJpy(sale))) return true;
       if (sale.status === "sold" && saleProfit(sale) < 0) return true;
       return false;
@@ -2830,6 +2831,7 @@
         { label: "在庫あり", count: state.sales.filter((sale) => ["not_listed", "preparing", "on_hold", "cancelled", "returned"].includes(sale.status)).length },
         { label: "出品中在庫", count: state.sales.filter((sale) => sale.status === "listed").length },
         { label: "在庫なし", count: state.sales.filter((sale) => sale.status === "sold").length },
+        { label: "出品30日超", count: state.sales.filter((sale) => sale.status === "listed" && daysSince(sale.listed_at) >= 30).length },
         { label: "管理番号なし", count: state.sales.filter((sale) => !managementNumberFor(findPurchase(sale.purchase_id))).length },
         { label: "利益マイナス", count: state.sales.filter((sale) => sale.status === "sold" && saleProfit(sale) < 0).length }
       ];
@@ -3692,6 +3694,14 @@
       return new Date().toISOString().slice(0, 10);
     }
 
+    function daysSince(date) {
+      if (!date) return 0;
+      const start = new Date(`${date}T00:00:00`);
+      const end = new Date(`${today()}T00:00:00`);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+      return Math.max(0, Math.floor((end - start) / 86400000));
+    }
+
     function defaultRecord() {
       return {
         id: "",
@@ -4017,6 +4027,14 @@
       return { value: "stock", label: "在庫あり", className: "green" };
     }
 
+    function isStaleStockRecord(record) {
+      return recordInventoryInfo(record).value === "stock" && daysSince(record.date) >= 30;
+    }
+
+    function isStaleListedRecord(record) {
+      return recordSales(record).some((sale) => sale.status === "listed" && daysSince(sale.listed_at) >= 30);
+    }
+
     function matchesQuickFilter(record) {
       const quick = state.filters.quick;
       if (!quick) return true;
@@ -4036,6 +4054,8 @@
       if (quick === "inventory_stock") return recordInventoryInfo(record).value === "stock";
       if (quick === "inventory_listed") return recordInventoryInfo(record).value === "listed";
       if (quick === "inventory_sold") return recordInventoryInfo(record).value === "sold";
+      if (quick === "stale_stock") return isStaleStockRecord(record);
+      if (quick === "stale_listed") return isStaleListedRecord(record);
       if (quick === "sold") return recordHasSale(record, "sold");
       if (quick === "noEvidence") return !hasRecordImages(record.id);
       return true;
@@ -4141,6 +4161,8 @@
         { value: "inventory_stock", label: "在庫あり" },
         { value: "inventory_listed", label: "出品中在庫" },
         { value: "inventory_sold", label: "在庫なし" },
+        { value: "stale_stock", label: "仕入30日超" },
+        { value: "stale_listed", label: "出品30日超" },
         { value: "noEvidence", label: "証憑なし" }
       ];
     }
@@ -4367,12 +4389,16 @@
         const imageCount = getRecordImages(record.id).length;
         const managementNumber = managementNumberFor(record);
         const inventory = recordInventoryInfo(record);
+        const inventoryAge = inventory.value === "listed"
+          ? (recordSales(record).find((sale) => sale.status === "listed")?.listed_at || record.date)
+          : record.date;
+        const inventoryAgeLabel = inventoryAge ? `${daysSince(inventoryAge)}日経過` : "";
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td>${image ? `${evidenceThumbHtml(image, `data-evidence="${record.id}"`)}<span class="muted small">${imageCount}枚</span>` : `<span class="empty-thumb">なし</span>`}</td>
           <td><strong>${escapeHtml(record.date || "")}</strong><br><span class="muted small">${escapeHtml(record.branch || "")}</span></td>
           <td><strong>${escapeHtml(managementNumber || "未設定")}</strong></td>
-          <td>${saleBadge(inventory.label, inventory.className)}</td>
+          <td>${saleBadge(inventory.label, inventory.className)}<br><span class="muted small">${escapeHtml(inventoryAgeLabel)}</span></td>
           <td>${escapeHtml(record.channel || "")}</td>
           <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.manufacturer || record.category || "")} / ${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
           <td>${escapeHtml(record.seller || "")}<br><span class="muted small">${escapeHtml(flagText(c))}</span></td>
