@@ -549,6 +549,46 @@
       font-size: 17px;
     }
 
+    .sales-view-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .sales-insights {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .sales-insight-panel {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px;
+      background: #fbfcf9;
+    }
+
+    .sales-insight-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .sales-insight-grid .metric {
+      min-height: 64px;
+      padding: 9px;
+      background: #fff;
+    }
+
+    .sales-task-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
     .cost-detail {
       display: block;
       color: var(--muted);
@@ -1088,6 +1128,10 @@
       .dashboard-split {
         grid-template-columns: 1fr;
       }
+
+      .sales-insights {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 720px) {
@@ -1107,6 +1151,7 @@
       .io-grid,
       .dashboard-grid,
       .summary-grid,
+      .sales-insights,
       .review-supplier-tools {
         grid-template-columns: 1fr;
       }
@@ -1597,6 +1642,36 @@
                   <strong id="salesSummarySold">0件</strong>
                 </div>
               </div>
+              <div id="salesViewTabs" class="sales-view-tabs" aria-label="販売管理ビュー"></div>
+              <div class="sales-insights">
+                <div class="sales-insight-panel">
+                  <strong class="small">販売サマリー</strong>
+                  <div class="sales-insight-grid">
+                    <div class="metric">
+                      <span class="muted small">今年売上</span>
+                      <strong id="salesYearRevenue">0円</strong>
+                    </div>
+                    <div class="metric">
+                      <span class="muted small">今年粗利</span>
+                      <strong id="salesYearProfit">0円</strong>
+                    </div>
+                    <div class="metric">
+                      <span class="muted small">今月売上</span>
+                      <strong id="salesMonthRevenue">0円</strong>
+                    </div>
+                    <div class="metric">
+                      <span class="muted small">今月粗利</span>
+                      <strong id="salesMonthProfit">0円</strong>
+                    </div>
+                  </div>
+                </div>
+                <div class="sales-insight-panel">
+                  <strong class="small">未処理タスク</strong>
+                  <div id="salesTaskList" class="sales-task-list"></div>
+                  <strong class="small" style="display:block;margin-top:10px;">販売先別 粗利</strong>
+                  <div id="salesDestinationProfitList" class="sales-task-list"></div>
+                </div>
+              </div>
               <div id="salesQuickFilters" class="quick-filters" aria-label="販売先クイックフィルタ"></div>
               <div class="sales-tools">
                 <label>販売先で絞り込み
@@ -1941,7 +2016,7 @@
       reviewSelectedIds: new Set(),
       appliedAiId: "",
       sales: [],
-      salesFilters: { destination: "", status: "", staff: "", text: "" },
+      salesFilters: { view: "all", destination: "", status: "", staff: "", text: "" },
       taxPackages: [],
       currentEvidenceId: "",
       currentEvidenceIndex: 0,
@@ -2527,13 +2602,47 @@
       return state.sales.some((sale) => sale.purchase_id === record.id && !["cancelled", "returned"].includes(sale.status));
     }
 
-    function filteredSales() {
-      const text = String(state.salesFilters.text || "").trim().toLowerCase();
+    function salesViewDefinitions() {
+      return [
+        { value: "all", label: "すべて" },
+        { value: "pending", label: "販売待ち" },
+        { value: "listed", label: "出品中" },
+        { value: "sold", label: "販売済み" },
+        { value: "attention", label: "未処理" },
+        { value: "report", label: "レポート" }
+      ];
+    }
+
+    function saleNeedsAttention(sale) {
+      const purchase = findPurchase(sale.purchase_id);
+      if (!purchase) return true;
+      if (!managementNumberFor(purchase)) return true;
+      if (!sale.destination) return true;
+      if (["not_listed", "preparing", "on_hold"].includes(sale.status)) return true;
+      if (sale.status === "listed" && !sale.listing_id) return true;
+      if (sale.status === "sold" && (!sale.sold_at || !saleRevenueJpy(sale))) return true;
+      if (sale.status === "sold" && saleProfit(sale) < 0) return true;
+      return false;
+    }
+
+    function saleMatchesView(sale, view) {
+      if (!view || view === "all" || view === "report") return true;
+      if (view === "pending") return ["not_listed", "preparing", "on_hold"].includes(sale.status);
+      if (view === "listed") return sale.status === "listed";
+      if (view === "sold") return sale.status === "sold";
+      if (view === "attention") return saleNeedsAttention(sale);
+      return true;
+    }
+
+    function filteredSales(options = {}) {
+      const filters = { ...state.salesFilters, ...options };
+      const text = String(filters.text || "").trim().toLowerCase();
       return state.sales.filter((sale) => {
         const purchase = findPurchase(sale.purchase_id);
-        if (state.salesFilters.destination && sale.destination !== state.salesFilters.destination) return false;
-        if (state.salesFilters.status && sale.status !== state.salesFilters.status) return false;
-        if (state.salesFilters.staff && salePurchaseStaff(sale) !== state.salesFilters.staff) return false;
+        if (!saleMatchesView(sale, filters.view)) return false;
+        if (filters.destination && sale.destination !== filters.destination) return false;
+        if (filters.status && sale.status !== filters.status) return false;
+        if (filters.staff && salePurchaseStaff(sale) !== filters.staff) return false;
         if (text) {
           const haystack = [
             purchase?.name,
@@ -2550,6 +2659,30 @@
           if (!haystack.includes(text)) return false;
         }
         return true;
+      });
+    }
+
+    function salesViewCount(value) {
+      return filteredSales({ view: value }).length;
+    }
+
+    function renderSalesViewTabs() {
+      const box = $("salesViewTabs");
+      if (!box) return;
+      box.innerHTML = "";
+      salesViewDefinitions().forEach(({ value, label }) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "quick-filter" + (state.salesFilters.view === value ? " active" : "");
+        button.textContent = `${label} ${salesViewCount(value)}`;
+        button.addEventListener("click", () => {
+          state.salesFilters.view = value;
+          if (value === "pending") state.salesFilters.status = "";
+          if (value === "listed") state.salesFilters.status = "";
+          if (value === "sold") state.salesFilters.status = "";
+          renderSalesManagement();
+        });
+        box.append(button);
       });
     }
 
@@ -2629,6 +2762,46 @@
       $("salesSummaryProfit").className = summary.profit >= 0 ? "profit-plus" : "profit-minus";
       $("salesSummaryMargin").textContent = `${saleMargin(summary.revenue, summary.profit)}%`;
       $("salesSummarySold").textContent = `${summary.sold}件`;
+    }
+
+    function renderSalesInsights() {
+      const year = String(new Date().getFullYear());
+      const month = today().slice(0, 7);
+      const yearSummary = saleSummary(soldSalesForYear(year));
+      const monthSummary = saleSummary(soldSalesForMonth(month));
+      $("salesYearRevenue").textContent = yen(yearSummary.revenue);
+      $("salesYearProfit").textContent = yen(yearSummary.profit);
+      $("salesYearProfit").className = yearSummary.profit >= 0 ? "profit-plus" : "profit-minus";
+      $("salesMonthRevenue").textContent = yen(monthSummary.revenue);
+      $("salesMonthProfit").textContent = yen(monthSummary.profit);
+      $("salesMonthProfit").className = monthSummary.profit >= 0 ? "profit-plus" : "profit-minus";
+
+      const tasks = [
+        { label: "販売待ち", count: state.sales.filter((sale) => ["not_listed", "preparing", "on_hold"].includes(sale.status)).length },
+        { label: "出品中", count: state.sales.filter((sale) => sale.status === "listed").length },
+        { label: "管理番号なし", count: state.sales.filter((sale) => !managementNumberFor(findPurchase(sale.purchase_id))).length },
+        { label: "利益マイナス", count: state.sales.filter((sale) => sale.status === "sold" && saleProfit(sale) < 0).length }
+      ];
+      $("salesTaskList").innerHTML = tasks.map((task) => `
+        <div class="task-item">
+          <span>${escapeHtml(task.label)}</span>
+          <strong>${task.count}件</strong>
+        </div>
+      `).join("");
+
+      const destinationProfit = salesDestinationFilterDefinitions().map(({ value, label }) => {
+        const sales = state.sales.filter((sale) => sale.destination === value && sale.status === "sold");
+        const profit = sales.reduce((sum, sale) => sum + saleProfit(sale), 0);
+        return { label, profit, count: sales.length };
+      }).filter((item) => item.count || item.profit);
+      $("salesDestinationProfitList").innerHTML = destinationProfit.length
+        ? destinationProfit.map((item) => `
+          <div class="task-item">
+            <span>${escapeHtml(item.label)} <span class="muted small">${item.count}件</span></span>
+            <strong class="${item.profit >= 0 ? "profit-plus" : "profit-minus"}">${yen(item.profit)}</strong>
+          </div>
+        `).join("")
+        : `<div class="muted small">売却済みデータがありません</div>`;
     }
 
     function salePurchaseLabel(record) {
@@ -2917,6 +3090,7 @@
       $("salesFilterDestination").value = state.salesFilters.destination;
       $("salesFilterStatus").value = state.salesFilters.status;
       $("salesFilterText").value = state.salesFilters.text;
+      renderSalesViewTabs();
       renderSalesQuickFilters();
       const canWrite = canWritePurchases();
       form.querySelectorAll("input, select, textarea, button").forEach((element) => {
@@ -2929,6 +3103,7 @@
       }
       const sales = filteredSales();
       renderSalesSummary(sales);
+      renderSalesInsights();
       if (!sales.length) {
         rows.innerHTML = `<tr><td colspan="9" class="muted">販売情報はまだありません</td></tr>`;
         return;
