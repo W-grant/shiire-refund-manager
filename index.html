@@ -1711,10 +1711,26 @@
                   <input id="salesFilterText" type="search" placeholder="商品名・管理番号・SKU">
                 </label>
               </div>
+              <div class="sales-tools">
+                <button id="selectVisibleSalesBtn" type="button">表示中を全選択</button>
+                <button id="clearSelectedSalesBtn" type="button">選択解除</button>
+                <label>選択した販売の在庫状態
+                  <select id="salesBulkStatus">
+                    <option value="preparing">在庫あり（出品準備中）</option>
+                    <option value="listed">出品中在庫</option>
+                    <option value="not_listed">在庫あり（未出品）</option>
+                    <option value="on_hold">保留在庫</option>
+                    <option value="cancelled">在庫あり（キャンセル）</option>
+                    <option value="returned">在庫あり（返品）</option>
+                  </select>
+                </label>
+                <button id="applySalesBulkStatusBtn" class="primary" type="button">一括変更</button>
+              </div>
               <div class="sales-table">
                 <table>
                   <thead>
                     <tr>
+                      <th>選択</th>
                       <th>商品</th>
                       <th>販売先</th>
                       <th>在庫状態</th>
@@ -3108,6 +3124,61 @@
       return true;
     }
 
+    function selectedSaleIds() {
+      return [...document.querySelectorAll("[data-sale-select]:checked")].map((element) => element.dataset.saleSelect);
+    }
+
+    function setVisibleSalesSelected(checked) {
+      document.querySelectorAll("[data-sale-select]").forEach((element) => {
+        element.checked = checked;
+      });
+    }
+
+    function saleToSaveInput(sale, overrides = {}) {
+      const nextStatus = overrides.status || sale.status || "not_listed";
+      return {
+        id: sale.id || "",
+        purchaseId: sale.purchase_id || "",
+        destination: sale.destination || "ebay",
+        status: nextStatus,
+        listingId: sale.listing_id || "",
+        sku: sale.sku || "",
+        listedAt: overrides.listedAt ?? sale.listed_at ?? "",
+        soldAt: overrides.soldAt ?? sale.sold_at ?? "",
+        salePrice: Number(sale.sale_price || sale.sale_price_jpy || 0),
+        currency: sale.currency || "JPY",
+        platformFee: Number(sale.platform_fee || 0),
+        paymentFee: Number(sale.payment_fee || 0),
+        domesticShippingFee: Number(sale.domestic_shipping_fee || 0),
+        internationalShippingFee: Number(sale.international_shipping_fee || 0),
+        otherFee: Number(sale.other_fee || 0),
+        memo: sale.memo || ""
+      };
+    }
+
+    async function applySalesBulkStatus() {
+      if (!canWritePurchases()) {
+        $("salesStatus").textContent = "販売情報の一括変更にはログイン権限が必要です";
+        return false;
+      }
+      const ids = selectedSaleIds();
+      if (!ids.length) {
+        $("salesStatus").textContent = "一括変更する販売情報を選択してください";
+        return false;
+      }
+      const status = $("salesBulkStatus").value;
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.saveSale) return false;
+      const targets = state.sales.filter((sale) => ids.includes(sale.id));
+      for (const sale of targets) {
+        const listedAt = status === "listed" && !sale.listed_at ? today() : sale.listed_at || "";
+        await service.saveSale(saleToSaveInput(sale, { status, listedAt }));
+      }
+      $("salesStatus").textContent = `${targets.length}件の在庫状態を変更しました`;
+      await loadSales();
+      return true;
+    }
+
     async function deleteSaleFromList(id) {
       if (!isAdmin()) {
         $("salesStatus").textContent = "販売情報の削除には管理者権限が必要です";
@@ -3136,6 +3207,9 @@
       form.querySelectorAll("input, select, textarea, button").forEach((element) => {
         element.disabled = !canWrite;
       });
+      ["selectVisibleSalesBtn", "clearSelectedSalesBtn", "salesBulkStatus", "applySalesBulkStatusBtn"].forEach((id) => {
+        if ($(id)) $(id).disabled = !canWrite;
+      });
       if (!canWrite) {
         $("salesStatus").textContent = state.profile ? "閲覧専用です" : "ログインしてください";
       } else if (!$("salesStatus").textContent) {
@@ -3145,7 +3219,7 @@
       renderSalesSummary(sales);
       renderSalesInsights();
       if (!sales.length) {
-        rows.innerHTML = `<tr><td colspan="10" class="muted">販売情報はまだありません</td></tr>`;
+        rows.innerHTML = `<tr><td colspan="11" class="muted">販売情報はまだありません</td></tr>`;
         return;
       }
       rows.innerHTML = sales.map((sale) => {
@@ -3157,6 +3231,7 @@
         const itemMeta = [purchase?.date, purchase?.staff || "未設定"].filter(Boolean).join(" / ");
         return `
           <tr>
+            <td><input type="checkbox" data-sale-select="${escapeHtml(sale.id)}" aria-label="販売情報を選択"></td>
             <td>
               <strong>${escapeHtml(purchase ? `${purchase.name || "無題"}` : "仕入不明")}</strong>
               <br><span class="small muted">${escapeHtml(itemMeta)}</span>
@@ -6120,6 +6195,16 @@
       $("salesFilterText").addEventListener("input", () => {
         state.salesFilters.text = $("salesFilterText").value;
         renderSalesManagement();
+      });
+      $("selectVisibleSalesBtn").addEventListener("click", () => setVisibleSalesSelected(true));
+      $("clearSelectedSalesBtn").addEventListener("click", () => setVisibleSalesSelected(false));
+      $("applySalesBulkStatusBtn").addEventListener("click", async () => {
+        try {
+          await applySalesBulkStatus();
+        } catch (error) {
+          console.error("[Sales] Bulk status update failed", error);
+          $("salesStatus").textContent = `販売情報を一括変更できませんでした: ${formatErrorDetails(error)}`;
+        }
       });
       $("salePurchaseSearch").addEventListener("input", renderSalePurchaseOptions);
       $("salePurchaseInventoryFilter").addEventListener("change", renderSalePurchaseOptions);
