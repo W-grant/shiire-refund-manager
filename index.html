@@ -2498,21 +2498,26 @@
             <label for="proxyUrl">中継URL</label>
             <input id="proxyUrl" name="proxyUrl" type="url" placeholder="/extract">
           </div>
-          <div class="field">
-            <label for="syncMode">同期</label>
-            <select id="syncMode" name="syncMode">
-              <option value="none">使わない</option>
-              <option value="cloud">クラウド</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="syncSecret">合言葉</label>
-            <input id="syncSecret" name="syncSecret" type="password" autocomplete="off">
-          </div>
-          <div class="field wide">
-            <label for="syncUrl">同期URL</label>
-            <input id="syncUrl" name="syncUrl" type="url" placeholder="/.netlify/functions/sync">
-          </div>
+          <details class="drop field wide">
+            <summary>旧クラウド同期（通常不要）</summary>
+            <div class="form-grid">
+              <div class="field">
+                <label for="syncMode">同期</label>
+                <select id="syncMode" name="syncMode">
+                  <option value="none">使わない</option>
+                  <option value="cloud">クラウド</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="syncSecret">合言葉</label>
+                <input id="syncSecret" name="syncSecret" type="password" autocomplete="off">
+              </div>
+              <div class="field wide">
+                <label for="syncUrl">同期URL</label>
+                <input id="syncUrl" name="syncUrl" type="url" placeholder="旧同期を使う場合のみ入力">
+              </div>
+            </div>
+          </details>
           <div class="field wide">
             <label for="sheetSyncUrl">スプシ送信URL</label>
             <input id="sheetSyncUrl" name="sheetSyncUrl" type="text" placeholder="/sheets-sync">

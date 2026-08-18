@@ -228,7 +228,9 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "明細",
     "商品ページ",
     "請求書PDF",
-    "現物写真"
+    "現物写真",
+    "旧クラウド同期（通常不要）",
+    "旧同期を使う場合のみ入力"
   ];
 
   for (const marker of requiredControls) {
