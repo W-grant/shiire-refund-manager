@@ -220,7 +220,15 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "restoreSupabaseRecord",
     "restorePurchase",
     "screenDefinitions",
-    "証憑なし"
+    "証憑なし",
+    "EVIDENCE_LABEL_OPTIONS",
+    "data-proof-label",
+    "evidenceLabelOptions",
+    "updateFormProofLabel",
+    "明細",
+    "商品ページ",
+    "請求書PDF",
+    "現物写真"
   ];
 
   for (const marker of requiredControls) {

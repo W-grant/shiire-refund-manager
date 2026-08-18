@@ -1384,6 +1384,21 @@
       border-radius: 6px;
     }
 
+    .evidence-label-select {
+      min-width: 120px;
+      height: 34px;
+      font-size: 12px;
+    }
+
+    .evidence-preview-row {
+      align-items: end;
+      gap: 8px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
     .data-file-list {
       display: flex;
       flex-wrap: wrap;
@@ -2616,6 +2631,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
     const AUTH_CHECKS_KEY = "shiire-auth-checks";
     const INVOICE_REGISTRATION_MEMO_MARKER = "shiire_invoice_registration:";
     const MANAGEMENT_NUMBER_MEMO_MARKER = "shiire_management_number:";
+    const EVIDENCE_LABEL_OPTIONS = ["明細", "商品ページ", "請求書PDF", "現物写真", "その他"];
 
     const BUILTIN = { proxyUrl: "/extract", syncUrl: "", secret: "", model: "claude-haiku-4-5-20251001" };
 
@@ -2772,6 +2788,23 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
     function isPdfEvidence(file) {
       return String(file?.mimeType || file?.mediaType || file?.type || "").includes("pdf")
         || String(file?.fileName || "").toLowerCase().endsWith(".pdf");
+    }
+
+    function defaultEvidenceLabel(file) {
+      return isPdfEvidence(file) ? "請求書PDF" : "明細";
+    }
+
+    function normalizedEvidenceLabel(file) {
+      const label = String(file?.label || "").trim();
+      return label || defaultEvidenceLabel(file);
+    }
+
+    function evidenceLabelOptions(selected, file) {
+      const current = selected || normalizedEvidenceLabel(file);
+      const labels = EVIDENCE_LABEL_OPTIONS.includes(current)
+        ? EVIDENCE_LABEL_OPTIONS
+        : [current, ...EVIDENCE_LABEL_OPTIONS];
+      return labels.map((label) => `<option value="${escapeHtml(label)}" ${label === current ? "selected" : ""}>${escapeHtml(label)}</option>`).join("");
     }
 
     function evidenceThumbHtml(file, attrs = "") {
@@ -5790,7 +5823,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       });
       const full = await resizeImage(dataUrl, 1600, 0.72);
       const thumb = await resizeImage(dataUrl, 160, 0.72);
-      return { full, thumb, fileName: file.name, mimeType: "image/jpeg" };
+      return { full, thumb, fileName: file.name, mimeType: "image/jpeg", label: "明細" };
     }
 
     async function fileToEvidenceData(file) {
@@ -5802,7 +5835,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
           reader.onerror = () => reject(reader.error);
           reader.readAsDataURL(file);
         });
-        return { full, thumb: "", fileName: file.name, mimeType: "application/pdf", label: "PDF" };
+        return { full, thumb: "", fileName: file.name, mimeType: "application/pdf", label: "請求書PDF" };
       }
       return fileToImageData(file);
     }
@@ -5824,7 +5857,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         thumb: "",
         fileName: file.fileName,
         mimeType: file.mediaType,
-        label: "PDF"
+        label: "請求書PDF"
       };
     }
 
@@ -5874,12 +5907,34 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       }
       box.classList.remove("hidden");
       box.innerHTML = current.map(({ image, index, source }) => `
-        <div class="inline">
+        <div class="inline evidence-preview-row">
           ${evidenceThumbHtml(image)}
           <span class="muted small">${escapeHtml(image.fileName || "証憑画像")}</span>
+          <label class="small muted">種類
+            <select class="evidence-label-select" data-proof-label="${source}:${index}">
+              ${evidenceLabelOptions(image.label, image)}
+            </select>
+          </label>
           ${source === "draft" || isAdmin() ? `<button class="danger" type="button" data-proof-remove="${source}:${index}">削除</button>` : ""}
         </div>
       `).join("");
+    }
+
+    function updateFormProofLabel(target, label) {
+      const [source, rawIndex] = String(target || "").split(":");
+      const index = Number(rawIndex);
+      const id = $("recordId").value;
+      if (source === "draft" && state.proofDraft[index]) {
+        state.proofDraft[index].label = label;
+      } else if (source === "saved" && id) {
+        const currentImages = getRecordImages(id);
+        if (currentImages[index]) {
+          currentImages[index].label = label;
+          state.images.set(id, imageBundleFor(id, currentImages));
+        }
+      }
+      renderProofPreview(id ? getRecordImages(id) : []);
+      updateLiveClassify();
     }
 
     async function removeFormProof(target) {
@@ -7003,11 +7058,19 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
 
     function evidenceName(record, image, index = 0) {
       if (!record.hasImage && !image) return "";
-      if (image?.fileName) return image.fileName;
+      const label = normalizedEvidenceLabel(image).replace(/[\\/:*?"<>|]/g, "");
+      if (image?.fileName) {
+        const fileName = String(image.fileName);
+        const dotIndex = fileName.lastIndexOf(".");
+        const baseName = dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
+        const extName = dotIndex > 0 ? fileName.slice(dotIndex) : (isPdfEvidence(image) ? ".pdf" : ".jpg");
+        return label && !baseName.includes(label) ? `${baseName}_${label}${extName}` : `${baseName}${extName}`;
+      }
       const seller = (record.seller || "取引先").replace(/[\\/:*?"<>|]/g, "");
       const suffix = index > 0 ? `_${index + 1}` : "";
+      const labelPart = label ? `_${label}` : "";
       const ext = isPdfEvidence(image) ? ".pdf" : ".jpg";
-      return `証憑_${record.date || "未日付"}_${seller}_${record.amount || 0}${suffix}${ext}`;
+      return `証憑_${record.date || "未日付"}_${seller}_${record.amount || 0}${suffix}${labelPart}${ext}`;
     }
 
     function evidenceNames(record) {
@@ -7875,9 +7938,14 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         if (!button) return;
         await removeFormProof(button.dataset.proofRemove);
       });
+      $("proofPreview").addEventListener("change", (event) => {
+        const select = event.target.closest("[data-proof-label]");
+        if (!select) return;
+        updateFormProofLabel(select.dataset.proofLabel, select.value);
+      });
       $("proof").addEventListener("change", async (event) => {
         const images = [];
-        for (const file of Array.from(event.target.files || []).filter((item) => item.type.startsWith("image/"))) {
+        for (const file of Array.from(event.target.files || []).filter((item) => item.type.startsWith("image/") || item.type === "application/pdf" || String(item.name || "").toLowerCase().endsWith(".pdf"))) {
           images.push(await fileToEvidenceData(file));
         }
         state.proofDraft.push(...images);
