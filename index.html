@@ -5867,14 +5867,18 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       };
     }
 
-    function getReviewEvidenceFiles(imageIndex) {
+    function getReviewEvidenceFiles(imageIndex, label = "") {
+      const applyLabel = (file) => {
+        if (!label) return file;
+        return { ...file, label };
+      };
       const files = [
         ...state.aiImages,
         ...state.aiDocuments.map(aiDocumentToEvidenceData)
       ];
-      if (imageIndex === "all") return files;
+      if (imageIndex === "all") return files.map(applyLabel);
       const index = Number(imageIndex);
-      return Number.isInteger(index) ? [files[index]].filter(Boolean) : [];
+      return Number.isInteger(index) ? [files[index]].filter(Boolean).map(applyLabel) : [];
     }
 
     function formatFileSize(bytes) {
@@ -6376,7 +6380,8 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         address: item["相手方住所"] || "",
         memo: "AI抽出",
         hasImage: Boolean(state.aiImages.length || state.aiDocuments.length),
-        imageIndex: (state.aiImages.length || state.aiDocuments.length) ? "all" : -1
+        imageIndex: (state.aiImages.length || state.aiDocuments.length) ? "all" : -1,
+        evidenceLabel: ""
       };
     }
 
@@ -6658,6 +6663,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       const stockOptions = [["yes", "はい"], ["no", "いいえ"]];
       const qualifiedOptions = [["no", "登録なし"], ["yes", "登録あり"], ["unknown", "不明"]];
       const anonOptions = [["anon", "匿名"], ["named", "本名判明"]];
+      const evidenceLabelOptionsForReview = [["", "自動"], ...EVIDENCE_LABEL_OPTIONS.map((item) => [item, item])];
       $("reviewRows").innerHTML = state.aiItems.map((record, index) => {
         const result = reviewValidation(record);
         const rowClass = result.errors.length ? "review-row-error" : result.warnings.length ? "review-row-warning" : "";
@@ -6692,6 +6698,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
                 <label>証憑ファイル</label>
                 <select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select>
               </div>
+              ${reviewSelectHtml(index, "evidenceLabel", "証憑種類", evidenceLabelOptionsForReview, record.evidenceLabel || "")}
             </div>
           </section>
           <section class="review-section" aria-label="金額・税金">
@@ -6804,7 +6811,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       for (let targetIndex = 0; targetIndex < targets.length; targetIndex += 1) {
         const { record: sourceRecord } = targets[targetIndex];
         const { imageIndex, ...record } = sourceRecord;
-        const selectedImages = getReviewEvidenceFiles(imageIndex);
+        const selectedImages = getReviewEvidenceFiles(imageIndex, record.evidenceLabel);
         const bundle = selectedImages.length ? imageBundleFor(record.id, selectedImages) : null;
         record.hasImage = Boolean(bundle && bundle.images.length);
         const saved = await saveRecord(record, bundle);
@@ -6830,7 +6837,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       const sourceRecord = state.aiItems[index];
       if (!sourceRecord) return;
       const { imageIndex, ...record } = sourceRecord;
-      const selectedImages = getReviewEvidenceFiles(imageIndex);
+      const selectedImages = getReviewEvidenceFiles(imageIndex, record.evidenceLabel);
       setForm({ ...record, id: "", hasImage: selectedImages.length > 0 });
       openManualEntryForm();
       state.appliedAiId = sourceRecord.id;
