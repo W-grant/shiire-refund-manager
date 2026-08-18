@@ -209,6 +209,11 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "要確認も含めて選択",
     "reviewPreflightSummary",
     "setReviewSelectionByValidation",
+    'id="recordCardList"',
+    "record-card-list",
+    "詳細表を表示",
+    "renderRecordCards",
+    "真贋未確認",
     "screenDefinitions",
     "証憑なし"
   ];

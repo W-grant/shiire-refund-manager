@@ -968,6 +968,85 @@
       border-bottom: 0;
     }
 
+    .record-card-list {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .record-card {
+      display: grid;
+      gap: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px;
+    }
+
+    .record-card-head {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .record-card-title {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+
+    .record-card-title strong {
+      font-size: 15px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .record-card-amount {
+      text-align: right;
+      display: grid;
+      gap: 4px;
+      justify-items: end;
+    }
+
+    .record-card-meta,
+    .record-card-details {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .record-card-details {
+      padding-top: 2px;
+    }
+
+    .record-card-detail {
+      display: grid;
+      gap: 2px;
+      min-width: min(180px, 100%);
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcf9;
+      font-size: 12px;
+    }
+
+    .record-card-detail span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .record-card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding-top: 4px;
+      border-top: 1px solid var(--line);
+    }
+
     .badge {
       display: inline-flex;
       align-items: center;
@@ -1499,6 +1578,16 @@
 
       .panel-body {
         padding: 12px;
+      }
+
+      .record-card-head {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .record-card-amount {
+        grid-column: 1 / -1;
+        justify-items: start;
+        text-align: left;
       }
     }
   </style>
@@ -2285,6 +2374,10 @@
                 <input id="filterText" type="search" placeholder="管理番号・商品名・相手方・日付・金額" aria-label="検索">
               </div>
 
+              <div id="recordCardList" class="record-card-list"></div>
+
+              <details class="drop">
+                <summary>詳細表を表示</summary>
               <div class="table-wrap">
                 <table>
                   <thead>
@@ -2307,6 +2400,7 @@
                   <tbody id="recordRows"></tbody>
                 </table>
               </div>
+              </details>
               <div id="emptyState" class="status small"></div>
             </div>
           </section>
@@ -5520,6 +5614,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
     }
 
     function renderRows(records) {
+      renderRecordCards(records);
       const tbody = $("recordRows");
       tbody.innerHTML = "";
       $("emptyState").textContent = records.length ? "" : "該当する仕入はありません。";
@@ -5554,6 +5649,53 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
           <td><div class="row-actions"><button type="button" title="編集" data-edit="${record.id}">✎</button><button class="danger" type="button" title="削除" data-delete="${record.id}">×</button></div></td>
         `;
         tbody.append(tr);
+      });
+    }
+
+    function renderRecordCards(records) {
+      const list = $("recordCardList");
+      if (!list) return;
+      list.innerHTML = "";
+      records.forEach((record) => {
+        const c = classified(record);
+        const image = representativeImage(record.id);
+        const imageCount = getRecordImages(record.id).length;
+        const managementNumber = managementNumberFor(record);
+        const inventory = recordInventoryInfo(record);
+        const authCheck = findAuthCheckByPurchase(record.id);
+        const authDecision = authDecisionMeta(authCheck?.decision || "pending");
+        const authStat = authCheck ? authStats(authCheck) : null;
+        const detail = document.createElement("article");
+        detail.className = "record-card";
+        detail.innerHTML = `
+          <div class="record-card-head">
+            <div>${image ? `${evidenceThumbHtml(image, `data-evidence="${record.id}"`)}<div class="muted small">${imageCount}枚</div>` : `<span class="empty-thumb">なし</span>`}</div>
+            <div class="record-card-title">
+              <strong>${escapeHtml(record.name || "商品名未入力")}</strong>
+              <div class="small muted">${escapeHtml([managementNumber || "管理番号未設定", record.date, record.branch].filter(Boolean).join(" / "))}</div>
+              <div class="record-card-meta">
+                ${saleBadge(inventory.label, inventory.className)}
+                ${authCheck ? saleBadge(authDecision.label, authDecision.className) : saleBadge("真贋未確認", "orange")}
+                ${badge(c.kind)}
+              </div>
+            </div>
+            <div class="record-card-amount">
+              <span class="money">${yen(record.amount)}</span>
+              <span class="small muted">控除 ${yen(c.tax)}</span>
+            </div>
+          </div>
+          <div class="record-card-details">
+            <div class="record-card-detail"><span>商品</span>${escapeHtml(record.manufacturer || "未設定")} / ${escapeHtml(record.category || "未設定")} / ${escapeHtml(String(record.qty || 1))}点</div>
+            <div class="record-card-detail"><span>取引</span>${escapeHtml(record.channel || "未設定")} / ${escapeHtml(destinationLabel(record))}</div>
+            <div class="record-card-detail"><span>相手方</span>${escapeHtml(record.seller || "未設定")}</div>
+            <div class="record-card-detail"><span>担当・確認</span>${escapeHtml(record.staff || "未設定")} / ${authStat ? `${authStat.progress}%` : "真贋未確認"}</div>
+          </div>
+          <div class="record-card-actions">
+            <button type="button" title="編集" data-edit="${record.id}">編集</button>
+            <button class="danger" type="button" title="削除" data-delete="${record.id}">削除</button>
+          </div>
+        `;
+        list.append(detail);
       });
     }
 
@@ -7782,7 +7924,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         if (deleted && deleted.id === state.appliedAiId) state.appliedAiId = "";
         renderReview();
       });
-      $("recordRows").addEventListener("click", async (event) => {
+      const handleRecordAction = async (event) => {
         const evidenceId = event.target.closest("[data-evidence]")?.dataset.evidence;
         const editId = event.target.closest("[data-edit]")?.dataset.edit;
         const deleteId = event.target.closest("[data-delete]")?.dataset.delete;
@@ -7798,7 +7940,9 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         if (deleteId && confirm("削除しますか？")) {
           await deleteRecord(deleteId);
         }
-      });
+      };
+      $("recordRows").addEventListener("click", handleRecordAction);
+      $("recordCardList").addEventListener("click", handleRecordAction);
       ["filterStaff", "filterChannel", "filterBranch", "filterKind"].forEach((id) => {
         $(id).addEventListener("change", () => {
           const key = id.replace("filter", "").toLowerCase();
