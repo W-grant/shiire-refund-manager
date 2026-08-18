@@ -527,6 +527,88 @@
       letter-spacing: 0;
     }
 
+    .staff-workflow {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid #cfe1d4;
+      border-radius: 8px;
+      background: #f7faf6;
+      margin-bottom: 14px;
+    }
+
+    .staff-workflow-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .staff-workflow-head h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .staff-action-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .staff-action {
+      display: grid;
+      gap: 5px;
+      min-height: 92px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      text-align: left;
+      align-content: start;
+    }
+
+    .staff-action strong {
+      font-size: 15px;
+    }
+
+    .staff-action span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .staff-action.primary-action {
+      border-color: #1f6a4b;
+      background: #fff;
+    }
+
+    .staff-workflow-status {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .staff-status-chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .staff-status-chip span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .staff-status-chip strong {
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+    }
+
     .dashboard-split {
       display: grid;
       grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
@@ -1349,7 +1431,9 @@
       }
 
       .auth-grid,
-      .auth-check {
+      .auth-check,
+      .staff-action-grid,
+      .staff-workflow-status {
         grid-template-columns: 1fr;
       }
     }
@@ -1724,6 +1808,44 @@
               </div>
             </div>
             <div class="panel-body">
+              <section id="staffWorkflow" class="staff-workflow" aria-labelledby="staffWorkflowTitle">
+                <div class="staff-workflow-head">
+                  <h3 id="staffWorkflowTitle">今日の作業</h3>
+                  <span id="staffWorkflowStatus" class="status small"></span>
+                </div>
+                <div class="staff-action-grid">
+                  <button class="staff-action primary-action" type="button" data-screen-shortcut="purchase">
+                    <strong>仕入を登録</strong>
+                    <span>AI読取、CSV/PDF取込、手入力をここから始めます。</span>
+                  </button>
+                  <button class="staff-action" type="button" data-screen-shortcut="sales">
+                    <strong>販売を登録</strong>
+                    <span>在庫を選んで出品・売却状況を更新します。</span>
+                  </button>
+                  <button class="staff-action" type="button" data-screen-shortcut="list">
+                    <strong>要確認を見る</strong>
+                    <span>証憑なし、未出品、長期在庫を確認します。</span>
+                  </button>
+                </div>
+                <div class="staff-workflow-status">
+                  <div class="staff-status-chip">
+                    <span>未出品</span>
+                    <strong id="staffNotListedCount">0件</strong>
+                  </div>
+                  <div class="staff-status-chip">
+                    <span>証憑なし</span>
+                    <strong id="staffNoEvidenceCount">0件</strong>
+                  </div>
+                  <div class="staff-status-chip">
+                    <span>仕入30日超</span>
+                    <strong id="staffStaleStockCount">0件</strong>
+                  </div>
+                  <div class="staff-status-chip">
+                    <span>出品30日超</span>
+                    <strong id="staffStaleListedCount">0件</strong>
+                  </div>
+                </div>
+              </section>
               <div class="dashboard-grid annual-dashboard">
                 <div class="dashboard-card">
                   <span id="dashYearLabel" class="muted small">年間仕入点数</span>
@@ -4895,28 +5017,28 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
 
     function screenDefinitions() {
       return [
-        { value: "all", label: "全体表示" },
-        { value: "dashboard", label: "ダッシュボード" },
-        { value: "purchase", label: "仕入登録・AI" },
-        { value: "list", label: "一覧・集計" },
-        { value: "sales", label: "販売管理" },
-        { value: "auth", label: "真贋チェック" },
-        { value: "export", label: "出力・設定" }
+        { value: "dashboard", label: "ホーム", roles: ["admin", "staff", "tax_accountant"] },
+        { value: "purchase", label: "仕入登録", roles: ["admin", "staff"] },
+        { value: "sales", label: "販売登録", roles: ["admin", "staff"] },
+        { value: "list", label: "仕入一覧", roles: ["admin", "staff", "tax_accountant"] },
+        { value: "auth", label: "真贋チェック", roles: ["admin", "staff"] },
+        { value: "export", label: "出力・設定", roles: ["admin", "tax_accountant"] }
       ];
     }
 
     const PAGE_LABELS = {
-      dashboard: "ダッシュボード",
+      dashboard: "ホーム",
       purchase: "仕入登録",
       list: "仕入一覧",
-      sales: "販売管理",
+      sales: "販売登録",
       auth: "真贋",
       export: "出力・設定"
     };
 
     function visibleScreenDefinitions() {
+      const role = state.profile?.role || "";
       return screenDefinitions()
-        .filter((item) => item.value !== "all")
+        .filter((item) => !item.roles || item.roles.includes(role))
         .map((item) => ({ ...item, label: PAGE_LABELS[item.value] || item.label }));
     }
 
@@ -4937,7 +5059,12 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       const nav = $("screenNav");
       if (!nav) return;
       nav.innerHTML = "";
-      visibleScreenDefinitions().forEach(({ value, label }) => {
+      const screens = visibleScreenDefinitions();
+      if (!screens.some((item) => item.value === state.activeScreen)) {
+        state.activeScreen = screens[0]?.value || "dashboard";
+        localStorage.setItem("shiire-refund-active-screen", state.activeScreen);
+      }
+      screens.forEach(({ value, label }) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "screen-tab" + (state.activeScreen === value ? " active" : "");
@@ -5201,6 +5328,13 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       const staleStockCount = records.filter(isStaleStockRecord).length;
       const staleListedCount = records.filter(isStaleListedRecord).length;
       const openTaskCount = noEvidenceCount + missingDestinationCount + notListedCount + preparingCount + staleStockCount + staleListedCount;
+      renderStaffWorkflow({
+        notListedCount,
+        noEvidenceCount,
+        staleStockCount,
+        staleListedCount,
+        openTaskCount
+      });
 
       $("dashYearLabel").textContent = `${targetYear}年 仕入点数`;
       $("dashYearPurchaseQty").textContent = `${yearPurchaseQty}点`;
@@ -5232,6 +5366,20 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         "出品30日超": staleListedCount,
         "未売却": unsoldCount
       });
+    }
+
+    function renderStaffWorkflow(summary) {
+      const box = $("staffWorkflow");
+      if (!box) return;
+      box.classList.toggle("hidden", state.profile?.role === "tax_accountant");
+      $("staffWorkflowTitle").textContent = state.profile?.role === "staff" ? "今日の作業" : "日常業務ショートカット";
+      $("staffWorkflowStatus").textContent = summary.openTaskCount
+        ? `確認が必要な項目 ${summary.openTaskCount}件`
+        : "現在の大きな未処理はありません";
+      $("staffNotListedCount").textContent = `${summary.notListedCount}件`;
+      $("staffNoEvidenceCount").textContent = `${summary.noEvidenceCount}件`;
+      $("staffStaleStockCount").textContent = `${summary.staleStockCount}件`;
+      $("staffStaleListedCount").textContent = `${summary.staleListedCount}件`;
     }
 
     function sumBy(records, keyFn, valueFn) {
@@ -7245,6 +7393,13 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       $("dashboardMonth").addEventListener("change", () => {
         state.dashboardMonth = $("dashboardMonth").value;
         render();
+      });
+      document.querySelectorAll("[data-screen-shortcut]").forEach((button) => {
+        button.addEventListener("click", () => {
+          setActiveScreen(button.dataset.screenShortcut);
+          if (button.dataset.screenShortcut === "purchase") openManualEntryForm();
+          render();
+        });
       });
       form.addEventListener("submit", async (event) => {
         event.preventDefault();

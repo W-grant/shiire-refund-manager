@@ -196,6 +196,13 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "3. 取引先情報",
     "review-delete-actions",
     "送料・手数料・税率だけ全行へ反映",
+    'id="staffWorkflow"',
+    "今日の作業",
+    "仕入を登録",
+    "販売を登録",
+    "要確認を見る",
+    "data-screen-shortcut",
+    "日常業務ショートカット",
     "screenDefinitions",
     "証憑なし"
   ];
