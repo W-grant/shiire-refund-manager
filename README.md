@@ -197,7 +197,7 @@ pnpm run smoke:production
 - `src/lib/repositories/`: Supabase Database / Storage access
 - `src/lib/services/`: Auth、仕入保存、月次ZIP保存
 - `functions/extract.js`: Cloudflare Pages Function Claude API中継
-- `netlify/functions/`: 旧Netlify用Function。移管前互換として残置
+- `netlify/functions/`: 旧Netlify用Function。通常運用では使わず、移管前互換として残置
 - `supabase/schema.sql`: Supabase初期SQL
 - `docs/`: 設計書、検証手順、権限チェックリスト
 
@@ -206,4 +206,5 @@ pnpm run smoke:production
 - admin実務データでの最終通し確認
 - CSV / Excel / PDF / 税理士提出ZIPの実ファイル確認
 - staff / tax_accountant は必要になった時点で実アカウントを追加して権限別テスト
+- スタッフ運用ではCloudflare Pages公開URLと `/extract` を使い、旧Netlify同期は使わない
 - ブラウザE2Eテストの追加

@@ -3323,7 +3323,8 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       $("passwordResetView").classList.toggle("hidden", !passwordRecovery);
       $("loginView").classList.toggle("hidden", passwordRecovery || authenticated);
       $("appMain").classList.toggle("hidden", passwordRecovery || !authenticated);
-      ["refreshBtn", "sampleBtn", "clearBtn"].forEach((id) => $(id).classList.toggle("hidden", passwordRecovery || !authenticated));
+      ["refreshBtn", "sampleBtn"].forEach((id) => $(id).classList.toggle("hidden", passwordRecovery || !authenticated));
+      $("clearBtn").classList.toggle("hidden", passwordRecovery || !authenticated || !isAdmin());
       $("settingsBtn").classList.toggle("hidden", passwordRecovery || !authenticated || !isAdmin());
       $("logoutBtn").classList.toggle("hidden", passwordRecovery || !authenticated);
       $("userBadge").classList.toggle("hidden", passwordRecovery || !authenticated);
@@ -7089,12 +7090,14 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       $("evidenceViewer").innerHTML = isPdfEvidence(image)
         ? `<iframe class="evidence-pdf" src="${image.full}" title="${escapeHtml(image.fileName || "PDF証憑")}"></iframe>`
         : `<img class="evidence-full" src="${image.full}" alt="証憑画像">`;
-      $("evidenceCounter").textContent = `${state.currentEvidenceIndex + 1} / ${images.length}枚 ${image.fileName || ""}`;
+      const label = normalizedEvidenceLabel(image);
+      $("evidenceCounter").textContent = `${state.currentEvidenceIndex + 1} / ${images.length}枚 ${label} ${image.fileName || ""}`;
       $("prevEvidenceBtn").disabled = images.length <= 1;
       $("nextEvidenceBtn").disabled = images.length <= 1;
       $("evidenceThumbs").innerHTML = images.map((item, index) => `
         <button type="button" class="${index === state.currentEvidenceIndex ? "primary" : ""}" data-evidence-index="${index}">
           ${evidenceThumbHtml(item)}
+          <span class="small muted">${escapeHtml(normalizedEvidenceLabel(item))}</span>
         </button>
       `).join("");
     }
@@ -8192,6 +8195,10 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         await addSampleRecords();
       });
       $("clearBtn").addEventListener("click", async () => {
+        if (!isAdmin()) {
+          $("ioStatus").textContent = "全削除には管理者権限が必要です";
+          return;
+        }
         if (!confirm("すべて削除しますか？")) return;
         for (const record of [...state.records]) await deleteRecord(record.id);
         setForm(defaultRecord());
