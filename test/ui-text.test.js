@@ -213,7 +213,6 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "record-card-list",
     "詳細表を表示",
     "renderRecordCards",
-    "真贋未確認",
     'id="recordActionStatus"',
     "元に戻す",
     "restoreLastDeletedRecord",

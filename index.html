@@ -2419,7 +2419,6 @@
                       <th>在庫状態</th>
                       <th>チャネル</th>
                       <th>商品</th>
-                      <th>真贋</th>
                       <th>相手方</th>
                       <th>金額</th>
                       <th>控除区分</th>
@@ -5283,7 +5282,6 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         { value: "purchase", label: "仕入登録", roles: ["admin", "staff"] },
         { value: "sales", label: "販売登録", roles: ["admin", "staff"] },
         { value: "list", label: "仕入一覧", roles: ["admin", "staff", "tax_accountant"] },
-        { value: "auth", label: "真贋チェック", roles: ["admin", "staff"] },
         { value: "export", label: "出力・設定", roles: ["admin", "tax_accountant"] }
       ];
     }
@@ -5293,7 +5291,6 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       purchase: "仕入登録",
       list: "仕入一覧",
       sales: "販売登録",
-      auth: "真贋",
       export: "出力・設定"
     };
 
@@ -5767,9 +5764,6 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         const imageCount = getRecordImages(record.id).length;
         const managementNumber = managementNumberFor(record);
         const inventory = recordInventoryInfo(record);
-        const authCheck = findAuthCheckByPurchase(record.id);
-        const authDecision = authDecisionMeta(authCheck?.decision || "pending");
-        const authStat = authCheck ? authStats(authCheck) : null;
         const inventoryAge = inventory.value === "listed"
           ? (recordSales(record).find((sale) => sale.status === "listed")?.listed_at || record.date)
           : record.date;
@@ -5782,7 +5776,6 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
           <td>${saleBadge(inventory.label, inventory.className)}<br><span class="muted small">${escapeHtml(inventoryAgeLabel)}</span></td>
           <td>${escapeHtml(record.channel || "")}</td>
           <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.manufacturer || record.category || "")} / ${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
-          <td>${authCheck ? saleBadge(authDecision.label, authDecision.className) : saleBadge("未確認", "orange")}<br><span class="muted small">${authStat ? `${authStat.progress}%` : "要チェック"}</span></td>
           <td>${escapeHtml(record.seller || "")}<br><span class="muted small">${escapeHtml(flagText(c))}</span></td>
           <td><span class="money">${yen(record.amount)}</span><br><span class="muted small">${record.rate || 10}% / ${escapeHtml(destinationLabel(record))}</span></td>
           <td>${badge(c.kind)}<br><span class="muted small">${Math.round(c.ratio * 100)}%</span></td>
@@ -5804,9 +5797,6 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         const imageCount = getRecordImages(record.id).length;
         const managementNumber = managementNumberFor(record);
         const inventory = recordInventoryInfo(record);
-        const authCheck = findAuthCheckByPurchase(record.id);
-        const authDecision = authDecisionMeta(authCheck?.decision || "pending");
-        const authStat = authCheck ? authStats(authCheck) : null;
         const detail = document.createElement("article");
         detail.className = "record-card";
         detail.innerHTML = `
@@ -5817,7 +5807,6 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
               <div class="small muted">${escapeHtml([managementNumber || "管理番号未設定", record.date, record.branch].filter(Boolean).join(" / "))}</div>
               <div class="record-card-meta">
                 ${saleBadge(inventory.label, inventory.className)}
-                ${authCheck ? saleBadge(authDecision.label, authDecision.className) : saleBadge("真贋未確認", "orange")}
                 ${badge(c.kind)}
               </div>
             </div>
@@ -5830,7 +5819,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
             <div class="record-card-detail"><span>商品</span>${escapeHtml(record.manufacturer || "未設定")} / ${escapeHtml(record.category || "未設定")} / ${escapeHtml(String(record.qty || 1))}点</div>
             <div class="record-card-detail"><span>取引</span>${escapeHtml(record.channel || "未設定")} / ${escapeHtml(destinationLabel(record))}</div>
             <div class="record-card-detail"><span>相手方</span>${escapeHtml(record.seller || "未設定")}</div>
-            <div class="record-card-detail"><span>担当・確認</span>${escapeHtml(record.staff || "未設定")} / ${authStat ? `${authStat.progress}%` : "真贋未確認"}</div>
+            <div class="record-card-detail"><span>担当</span>${escapeHtml(record.staff || "未設定")}</div>
           </div>
           <div class="record-card-actions">
             <button type="button" title="編集" data-edit="${record.id}">編集</button>
