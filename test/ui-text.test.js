@@ -191,6 +191,11 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "applyPurchaseSuggestion",
     "similarityScore",
     "normalizePredictText",
+    "1. 商品情報",
+    "2. 金額・税金",
+    "3. 取引先情報",
+    "review-delete-actions",
+    "送料・手数料・税率だけ全行へ反映",
     "screenDefinitions",
     "証憑なし"
   ];

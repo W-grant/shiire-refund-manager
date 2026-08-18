@@ -261,6 +261,32 @@
       gap: 12px;
     }
 
+    .form-sections {
+      display: grid;
+      gap: 18px;
+    }
+
+    .form-section {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcf9;
+    }
+
+    .form-section h3 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .form-section-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 12px;
+      align-items: start;
+    }
+
     .field {
       display: grid;
       gap: 6px;
@@ -643,6 +669,120 @@
       margin-top: 8px;
     }
 
+    .auth-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .auth-workbench,
+    .auth-knowledge,
+    .auth-table {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 12px;
+      min-width: 0;
+    }
+
+    .auth-workbench {
+      display: grid;
+      gap: 12px;
+    }
+
+    .auth-score {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .auth-score .metric {
+      min-height: 70px;
+      padding: 10px;
+    }
+
+    .auth-checklist {
+      display: grid;
+      gap: 8px;
+    }
+
+    .auth-check {
+      display: grid;
+      grid-template-columns: minmax(150px, 0.8fr) minmax(160px, 0.7fr) minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcf9;
+    }
+
+    .auth-check label {
+      display: grid;
+      gap: 4px;
+    }
+
+    .auth-photo-tools,
+    .auth-ai-result {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fbfcf9;
+      padding: 10px;
+    }
+
+    .auth-ai-result {
+      border-left: 3px solid var(--blue);
+    }
+
+    .auth-ai-result.hidden {
+      display: none;
+    }
+
+    .auth-ai-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .auth-ai-list {
+      display: grid;
+      gap: 4px;
+      margin: 0;
+      padding-left: 18px;
+      font-size: 12px;
+    }
+
+    .auth-knowledge {
+      display: grid;
+      gap: 10px;
+    }
+
+    .auth-knowledge-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .auth-knowledge-item {
+      border-left: 3px solid var(--green);
+      background: #f7faf6;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .auth-table {
+      margin-top: 12px;
+      overflow-x: auto;
+    }
+
+    .auth-table table {
+      min-width: 980px;
+    }
+
     .cost-detail {
       display: block;
       color: var(--muted);
@@ -915,7 +1055,7 @@
       background: #fff;
       padding: 14px;
       display: grid;
-      gap: 12px;
+      gap: 16px;
     }
 
     .review-card.review-row-error {
@@ -980,6 +1120,27 @@
       gap: 8px;
       flex-wrap: wrap;
       justify-content: flex-end;
+    }
+
+    .review-delete-actions {
+      display: flex;
+      justify-content: flex-end;
+      padding-top: 4px;
+      border-top: 1px solid var(--line);
+    }
+
+    .review-section {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fffdfa;
+    }
+
+    .review-section h3 {
+      margin: 0;
+      font-size: 14px;
     }
 
     .review-flags {
@@ -1186,6 +1347,11 @@
       .sales-insights {
         grid-template-columns: 1fr;
       }
+
+      .auth-grid,
+      .auth-check {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (max-width: 720px) {
@@ -1201,11 +1367,15 @@
       }
 
       .form-grid,
+      .form-section-grid,
       .filters,
       .io-grid,
       .dashboard-grid,
       .summary-grid,
       .sales-insights,
+      .auth-grid,
+      .auth-check,
+      .auth-score,
       .review-supplier-tools,
       .purchase-suggestion-grid {
         grid-template-columns: 1fr;
@@ -1308,141 +1478,152 @@
           <div class="panel-body">
             <form id="recordForm">
               <input id="recordId" type="hidden">
-              <div class="form-grid">
-                <div class="field">
-                  <label for="managementNumber">管理番号</label>
-                  <div class="field-inline">
-                    <input id="managementNumber" name="managementNumber" type="text" placeholder="例: 001DCgZ06 / 0016ER" autocomplete="off">
-                    <button id="generateManagementNumberBtn" type="button">自動生成</button>
+              <div class="form-sections">
+                <section class="form-section" aria-labelledby="productSectionTitle">
+                  <h3 id="productSectionTitle">1. 商品情報</h3>
+                  <div class="form-section-grid">
+                    <div class="field wide">
+                      <label for="name">商品名</label>
+                      <input id="name" name="name" type="text" required autocomplete="off">
+                    </div>
+                    <div id="purchaseSuggestion" class="field wide purchase-suggestion hidden"></div>
+                    <div class="field">
+                      <label for="manufacturer">メーカー名</label>
+                      <input id="manufacturer" name="manufacturer" type="text" autocomplete="off">
+                    </div>
+                    <div class="field">
+                      <label for="category">品目</label>
+                      <select id="category" name="category"></select>
+                    </div>
+                    <div class="field">
+                      <label for="qty">数量</label>
+                      <input id="qty" name="qty" type="number" min="1" step="1" value="1" required>
+                    </div>
+                    <div class="field">
+                      <label for="date">仕入日</label>
+                      <input id="date" name="date" type="date" required>
+                    </div>
+                    <div class="field">
+                      <label for="channel">チャネル</label>
+                      <select id="channel" name="channel"></select>
+                    </div>
+                    <div class="field">
+                      <label for="branch">支店</label>
+                      <select id="branch" name="branch"></select>
+                    </div>
+                    <div class="field">
+                      <label for="staff">担当</label>
+                      <select id="staff" name="staff"></select>
+                    </div>
+                    <div class="field wide">
+                      <label for="proof">証憑ファイル</label>
+                      <input id="proof" name="proof" type="file" accept="image/*,application/pdf,.pdf" multiple>
+                    </div>
+                    <div id="proofPreview" class="field wide hidden"></div>
                   </div>
-                </div>
-                <div class="field">
-                  <label for="date">仕入日</label>
-                  <input id="date" name="date" type="date" required>
-                </div>
-                <div class="field">
-                  <label for="branch">支店</label>
-                  <select id="branch" name="branch"></select>
-                </div>
-                <div class="field">
-                  <label for="channel">チャネル</label>
-                  <select id="channel" name="channel"></select>
-                </div>
-                <div class="field">
-                  <label for="staff">担当</label>
-                  <select id="staff" name="staff"></select>
-                </div>
-                <div class="field wide">
-                  <label for="name">商品名</label>
-                  <input id="name" name="name" type="text" required autocomplete="off">
-                </div>
-                <div id="purchaseSuggestion" class="field wide purchase-suggestion hidden"></div>
-                <div class="field">
-                  <label for="manufacturer">メーカー名</label>
-                  <input id="manufacturer" name="manufacturer" type="text" autocomplete="off">
-                </div>
-                <div class="field">
-                  <label for="destination">利用先</label>
-                  <select id="destination" name="destination">
-                    <option value="ebay">EBAY</option>
-                    <option value="catawiki">CATAWIKI</option>
-                    <option value="overseas">その他海外サイト</option>
-                    <option value="yahoo">ヤフオク</option>
-                    <option value="market">市場</option>
-                    <option value="other">その他</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="category">品目</label>
-                  <select id="category" name="category"></select>
-                </div>
-                <div class="field">
-                  <label for="qty">数量</label>
-                  <input id="qty" name="qty" type="number" min="1" step="1" value="1" required>
-                </div>
-                <div class="field">
-                  <label for="itemPrice">商品本体価格</label>
-                  <input id="itemPrice" name="itemPrice" type="number" min="0" step="1">
-                </div>
-                                <div class="field">
-                  <label for="shippingFee">&#36865;&#26009;</label>
-                  <input id="shippingFee" name="shippingFee" type="number" min="0" step="1" value="0">
-                </div>
-                <div class="field">
-                  <label for="purchaseFee">&#25163;&#25968;&#26009;</label>
-                  <input id="purchaseFee" name="purchaseFee" type="number" min="0" step="1" value="0">
-                </div>
-                <div class="field">
-                  <label for="purchaseFeeTax">&#25163;&#25968;&#26009;&#28040;&#36027;&#31246;</label>
-                  <input id="purchaseFeeTax" name="purchaseFeeTax" type="number" min="0" step="1" value="0">
-                </div>
-<div class="field">
-                  <label for="shippingFeeTotal">送料・手数料合計</label>
-                  <input id="shippingFeeTotal" name="shippingFeeTotal" type="number" min="0" step="1" value="0" readonly>
-                </div>
-                <div class="field">
-                  <label for="amount">仕入総額（税込）</label>
-                  <input id="amount" name="amount" type="number" min="0" step="1" required>
-                </div>
-                <div class="field">
-                  <label for="rate">税率</label>
-                  <select id="rate" name="rate">
-                    <option value="10">10%</option>
-                    <option value="8">8%</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="kind">古物区分</label>
-                  <select id="kind" name="kind">
-                    <option value="kobutsu">古物</option>
-                    <option value="jun">準古物</option>
-                    <option value="other">古物以外</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="stock">棚卸資産</label>
-                  <select id="stock" name="stock">
-                    <option value="yes">はい</option>
-                    <option value="no">いいえ</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="qualified">適格事業者</label>
-                  <select id="qualified" name="qualified">
-                    <option value="no">登録なし</option>
-                    <option value="yes">登録あり</option>
-                    <option value="unknown">不明</option>
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="invoiceRegistrationNumber">適格事業者番号</label>
-                  <input id="invoiceRegistrationNumber" name="invoiceRegistrationNumber" type="text" placeholder="T1234567890123" autocomplete="off">
-                </div>
-                <div class="field">
-                  <label for="anon">取引形態</label>
-                  <select id="anon" name="anon">
-                    <option value="anon">匿名</option>
-                    <option value="named">本名判明</option>
-                  </select>
-                </div>
-                <div class="field wide">
-                  <label for="seller">相手方氏名</label>
-                  <input id="seller" name="seller" type="text" autocomplete="off">
-                </div>
-                <div class="field wide">
-                  <label for="address">相手方住所</label>
-                  <input id="address" name="address" type="text" autocomplete="off">
-                </div>
-                <div class="field wide">
-                  <label for="proof">証憑ファイル</label>
-                  <input id="proof" name="proof" type="file" accept="image/*,application/pdf,.pdf" multiple>
-                </div>
-                <div id="proofPreview" class="field wide hidden"></div>
-                <div class="field wide">
-                  <label for="memo">メモ</label>
-                  <textarea id="memo" name="memo"></textarea>
-                </div>
+                </section>
+
+                <section class="form-section" aria-labelledby="amountSectionTitle">
+                  <h3 id="amountSectionTitle">2. 金額・税金</h3>
+                  <div class="form-section-grid">
+                    <div class="field">
+                      <label for="itemPrice">商品本体価格</label>
+                      <input id="itemPrice" name="itemPrice" type="number" min="0" step="1">
+                    </div>
+                    <div class="field">
+                      <label for="purchaseFee">手数料</label>
+                      <input id="purchaseFee" name="purchaseFee" type="number" min="0" step="1" value="0">
+                    </div>
+                    <div class="field">
+                      <label for="shippingFee">送料</label>
+                      <input id="shippingFee" name="shippingFee" type="number" min="0" step="1" value="0">
+                    </div>
+                    <div class="field">
+                      <label for="rate">税率</label>
+                      <select id="rate" name="rate">
+                        <option value="10">10%</option>
+                        <option value="8">8%</option>
+                      </select>
+                    </div>
+                    <div class="field wide">
+                      <label for="amount">仕入総額（税込）</label>
+                      <input id="amount" name="amount" type="number" min="0" step="1" required>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="form-section" aria-labelledby="partnerSectionTitle">
+                  <h3 id="partnerSectionTitle">3. 取引先情報</h3>
+                  <div class="form-section-grid">
+                    <div class="field">
+                      <label for="managementNumber">管理番号</label>
+                      <div class="field-inline">
+                        <input id="managementNumber" name="managementNumber" type="text" placeholder="例: 001DCgZ06 / 0016ER" autocomplete="off">
+                        <button id="generateManagementNumberBtn" type="button">自動生成</button>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="destination">利用先</label>
+                      <select id="destination" name="destination">
+                        <option value="ebay">EBAY</option>
+                        <option value="catawiki">CATAWIKI</option>
+                        <option value="overseas">その他海外サイト</option>
+                        <option value="yahoo">ヤフオク</option>
+                        <option value="market">市場</option>
+                        <option value="other">その他</option>
+                      </select>
+                    </div>
+                    <div class="field wide">
+                      <label for="seller">相手方氏名</label>
+                      <input id="seller" name="seller" type="text" autocomplete="off">
+                    </div>
+                    <div class="field wide">
+                      <label for="address">相手方住所</label>
+                      <input id="address" name="address" type="text" autocomplete="off">
+                    </div>
+                    <div class="field">
+                      <label for="kind">古物区分</label>
+                      <select id="kind" name="kind">
+                        <option value="kobutsu">古物</option>
+                        <option value="jun">準古物</option>
+                        <option value="other">古物以外</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="stock">棚卸資産</label>
+                      <select id="stock" name="stock">
+                        <option value="yes">はい</option>
+                        <option value="no">いいえ</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="anon">取引形態</label>
+                      <select id="anon" name="anon">
+                        <option value="anon">匿名</option>
+                        <option value="named">本名判明</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="qualified">適格事業者</label>
+                      <select id="qualified" name="qualified">
+                        <option value="no">登録なし</option>
+                        <option value="yes">登録あり</option>
+                        <option value="unknown">不明</option>
+                      </select>
+                    </div>
+                    <div class="field wide">
+                      <label for="invoiceRegistrationNumber">適格事業者番号</label>
+                      <input id="invoiceRegistrationNumber" name="invoiceRegistrationNumber" type="text" placeholder="T1234567890123" autocomplete="off">
+                    </div>
+                    <div class="field wide">
+                      <label for="memo">メモ</label>
+                      <textarea id="memo" name="memo"></textarea>
+                    </div>
+                  </div>
+                </section>
               </div>
+              <input id="purchaseFeeTax" name="purchaseFeeTax" type="hidden" value="0">
+              <input id="shippingFeeTotal" name="shippingFeeTotal" type="hidden" value="0">
 
               <div class="prediction" aria-live="polite">
                 <div class="prediction-main">
@@ -1519,7 +1700,7 @@
                 </div>
                 <button type="button" data-review-copy-first="channel,destination,seller,address,qualified,invoiceRegistrationNumber,anon,kind,stock,rate,imageIndex">先頭行の取引情報を全行へ反映</button>
                 <button type="button" data-review-copy-first="seller,address,qualified,invoiceRegistrationNumber,anon">相手方・適格事業者だけ全行へ反映</button>
-                <button type="button" data-review-copy-first="shippingFee,purchaseFee,purchaseFeeTax,rate">手数料・税率だけ全行へ反映</button>
+                <button type="button" data-review-copy-first="shippingFee,purchaseFee,rate">送料・手数料・税率だけ全行へ反映</button>
                 <button id="assignReviewManagementNumbers" type="button">選択行へ管理番号を自動採番</button>
               </div>
               <div id="reviewRows"></div>
@@ -1806,6 +1987,103 @@
             </div>
           </section>
 
+          <section class="panel" aria-labelledby="authTitle" data-screen-panel="auth">
+            <div class="panel-head">
+              <h2 id="authTitle">真贋チェック</h2>
+              <span id="authStatus" class="status small"></span>
+            </div>
+            <div class="panel-body">
+              <div class="auth-grid">
+                <form id="authForm" class="auth-workbench">
+                  <input id="authId" name="id" type="hidden">
+                  <label>仕入商品
+                    <input id="authPurchaseSearch" type="search" placeholder="管理番号・商品名・ブランドで検索">
+                    <select id="authPurchaseId" name="purchaseId"></select>
+                  </label>
+                  <div class="form-grid">
+                    <label>ブランド
+                      <select id="authBrand" name="brand"></select>
+                    </label>
+                    <label>判定
+                      <select id="authDecision" name="decision">
+                        <option value="pending">要確認</option>
+                        <option value="authentic">真贋OK</option>
+                        <option value="hold">保留</option>
+                        <option value="fake">偽物疑い</option>
+                      </select>
+                    </label>
+                    <label>確認日
+                      <input id="authCheckedAt" name="checkedAt" type="date">
+                    </label>
+                    <label>担当
+                      <input id="authChecker" name="checker" type="text" placeholder="担当者名">
+                    </label>
+                    <label class="wide">外部参照・根拠メモ
+                      <textarea id="authSources" name="sources" rows="2" placeholder="参照したサイト、過去販売、正規情報、比較対象など"></textarea>
+                    </label>
+                    <label class="wide">未確認点・次回確認
+                      <textarea id="authOpenIssues" name="openIssues" rows="2" placeholder="写真追加、刻印拡大、シリアル照合、外部鑑定に回す条件など"></textarea>
+                    </label>
+                  </div>
+                  <div class="auth-photo-tools">
+                    <label>真贋確認写真
+                      <input id="authImages" type="file" accept="image/*" multiple>
+                    </label>
+                    <div id="authImageThumbs" class="thumb-list"></div>
+                    <div class="actions">
+                      <button id="runAuthAiBtn" type="button">写真をAI一次判定</button>
+                      <button id="clearAuthImagesBtn" type="button">写真をクリア</button>
+                    </div>
+                    <div id="authAiResult" class="auth-ai-result hidden"></div>
+                  </div>
+                  <div class="auth-score">
+                    <div class="metric">
+                      <span class="muted small">確認済み</span>
+                      <strong id="authPassCount">0</strong>
+                    </div>
+                    <div class="metric">
+                      <span class="muted small">リスク</span>
+                      <strong id="authRiskCount">0</strong>
+                    </div>
+                    <div class="metric">
+                      <span class="muted small">進捗</span>
+                      <strong id="authProgress">0%</strong>
+                    </div>
+                  </div>
+                  <div id="authChecklist" class="auth-checklist"></div>
+                  <div class="actions">
+                    <button id="saveAuthBtn" class="primary" type="submit">真贋チェックを保存</button>
+                    <button id="resetAuthBtn" type="button">新規</button>
+                  </div>
+                </form>
+                <div class="auth-knowledge">
+                  <div>
+                    <strong id="authKnowledgeTitle">ブランド別の確認観点</strong>
+                    <p id="authKnowledgeLead" class="muted small"></p>
+                  </div>
+                  <div id="authKnowledgeList" class="auth-knowledge-list"></div>
+                </div>
+              </div>
+              <div class="auth-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>商品</th>
+                      <th>ブランド</th>
+                      <th>判定</th>
+                      <th>進捗</th>
+                      <th>リスク</th>
+                      <th>確認日</th>
+                      <th>未確認点</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="authRows"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
           <section class="panel" aria-labelledby="summaryTitle" data-screen-panel="list">
             <div class="panel-head">
               <h2 id="summaryTitle">一覧・集計</h2>
@@ -1860,6 +2138,7 @@
                       <th>在庫状態</th>
                       <th>チャネル</th>
                       <th>商品</th>
+                      <th>真贋</th>
                       <th>相手方</th>
                       <th>金額</th>
                       <th>控除区分</th>
@@ -2064,12 +2343,25 @@
 
     const EXTRACT_COST_PROMPT = "明細に内訳がある場合は、送料、手数料、手数料消費税をそれぞれJSONキー「送料」「手数料」「手数料消費税」で返してください。内訳が不明で合計だけ分かる場合は従来通り「送料手数料合計」に入れてください。";
     const EXTRACT_PARTNER_PROMPT = "業者オークション、市場、請求書、仕入明細書、PDFでは、明細行だけでなく書類のヘッダー、発行元、販売者、会社名、登録番号、住所、所在地、請求元住所、販売者住所欄も確認してください。顧客情報・宛先・買手情報は自社情報なので、相手方に入れないでください。発行元・販売者・請求元・市場運営会社を相手方として優先してください。複数商品が同じ業者からの一括仕入れの場合は、各itemsの「相手方氏名」に同じ業者名を入れてください。住所または所在地が書類内に見える場合は各itemsの「相手方住所」に同じ住所を入れてください。適格請求書発行事業者番号（Tから始まる番号）や登録番号が確認できる場合は各itemsの「適格事業者番号」に入れ、「適格請求書発行事業者」をtrueにしてください。相手方氏名が空欄になりそうな場合でも、業者名・市場名・請求元名・発行元名の候補があれば最も確からしい名称を入れてください。住所が書類内に見当たらない場合だけ「相手方住所」はnullにしてください。";
+    const AUTH_AI_PROMPT = `あなたは中古ブランド品の真贋一次チェック補助です。写真だけで断定せず、販売前に人が確認すべき点を絞り込んでください。
+返答はJSONだけにしてください。
+{
+  "decision":"pending|authentic|hold|fake",
+  "confidence":0-100,
+  "summary":"短い総評",
+  "positives":["真贋OK寄りの根拠"],
+  "risks":["違和感・偽物疑い・写真不足"],
+  "openIssues":["追加撮影や外部確認が必要な点"],
+  "checks":[{"name":"確認項目名","status":"unknown|pass|risk|na","note":"写真上の根拠"}]
+}
+decisionは写真だけで本物断定できる場合でも原則pendingまたはholdを優先し、強い不一致があればfakeにしてください。confidenceは「一次絞り込みとしての確度」です。`;
     const DB_NAME = "shiire-refund-db";
     const STORE_RECORDS = "records";
     const STORE_IMAGES = "images";
     const STORE_SETTINGS = "settings";
     const STORE_META = "meta";
     const LOCAL_DELETED_IDS_KEY = "shiire-refund-deleted-ids";
+    const AUTH_CHECKS_KEY = "shiire-auth-checks";
     const INVOICE_REGISTRATION_MEMO_MARKER = "shiire_invoice_registration:";
     const MANAGEMENT_NUMBER_MEMO_MARKER = "shiire_management_number:";
 
@@ -2099,6 +2391,9 @@
       appliedAiId: "",
       sales: [],
       salesFilters: { view: "all", destination: "", status: "", staff: "", text: "" },
+      authChecks: [],
+      authImages: [],
+      authAiResult: null,
       taxPackages: [],
       currentEvidenceId: "",
       currentEvidenceIndex: 0,
@@ -2231,6 +2526,431 @@
       return `<img class="thumb" src="${file.thumb || file.full}" alt="" ${attrs}>`;
     }
 
+    const AUTH_BRAND_TEMPLATES = {
+      louis_vuitton: {
+        label: "Louis Vuitton",
+        lead: "刻印、製造番号・RFID、金具、縫製、素材感をセットで確認します。",
+        checks: ["ロゴ刻印の深さ・文字間隔", "製造番号またはRFIDの整合", "金具の色味・重さ・刻印", "縫製ピッチと糸処理", "モノグラムや革の質感", "付属品と年代の整合"],
+        knowledge: ["年代により製造番号とRFIDの扱いが変わるため、番号だけで断定しない。", "金具、刻印、縫製、素材の複数点が同時に合うかを見る。", "型番・年代・ライン名が販売説明と矛盾していないか残す。"]
+      },
+      chanel: {
+        label: "CHANEL",
+        lead: "シリアル、ギャランティ、金具、チェーン、縫製、革質を重点確認します。",
+        checks: ["シリアルシール・カードの整合", "ロゴ金具とネジ形状", "チェーン重量と革の通し方", "キルティングのズレ", "内側刻印の書体", "付属品と年代の整合"],
+        knowledge: ["シリアルの桁数やシール仕様は年代で異なる。", "金具の質感とロゴの位置は写真で拡大保存する。", "カード単体ではなく本体仕様との整合で判断する。"]
+      },
+      hermes: {
+        label: "HERMES",
+        lead: "刻印、ステッチ、金具、革質、付属品の整合を確認します。",
+        checks: ["刻印位置・書体", "職人刻印・年式刻印", "ステッチの角度と間隔", "金具刻印とメッキ質感", "革の質感・コバ処理", "箱・保存袋など付属品"],
+        knowledge: ["刻印位置はモデルや年代で変わるため、モデル特定を先に行う。", "ステッチとコバ処理は写真で差が残りやすい。", "付属品は真贋の補助であり、本体確認を優先する。"]
+      },
+      rolex: {
+        label: "ROLEX",
+        lead: "文字盤、針、ブレス、リファレンス、シリアル、ムーブメント確認の記録を重視します。",
+        checks: ["リファレンス・シリアル", "文字盤印字と夜光", "針・ベゼル・風防", "ブレス・バックル刻印", "重量と仕上げ", "ムーブメント確認"],
+        knowledge: ["外装パーツ交換の可能性も記録し、真贋とコンディションを分ける。", "文字盤印字のズレや夜光の色味は拡大写真を残す。", "ムーブメント未確認の場合は未確認点へ明記する。"]
+      },
+      jewelry: {
+        label: "貴金属・宝飾",
+        lead: "刻印、比重、磁性、石、鑑別書、買取経路を分けて確認します。",
+        checks: ["素材刻印", "重量・比重・磁性", "石の留め方・傷", "鑑別書・保証書", "ブランド刻印", "買取経路の妥当性"],
+        knowledge: ["素材真贋とブランド真贋を分けて記録する。", "石付きは鑑別書の有無と現物一致を確認する。", "刻印だけでなく重量・比重など複数条件で見る。"]
+      },
+      general: {
+        label: "その他ブランド",
+        lead: "商品カテゴリごとに、刻印、素材、縫製、付属品、出品履歴との整合を確認します。",
+        checks: ["ブランドロゴ・刻印", "シリアル・型番", "素材・重量・質感", "縫製・接着・仕上げ", "付属品・購入経路", "相場とかけ離れていないか"],
+        knowledge: ["単一情報で断定せず、複数の根拠を残す。", "不一致は販売前に保留または外部確認へ回す。", "確認した外部情報はURLや検索語をメモに残す。"]
+      }
+    };
+
+    const AUTH_DECISIONS = {
+      authentic: { label: "真贋OK", className: "green" },
+      pending: { label: "要確認", className: "orange" },
+      hold: { label: "保留", className: "blue" },
+      fake: { label: "偽物疑い", className: "red" }
+    };
+
+    function loadAuthChecks() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(AUTH_CHECKS_KEY) || "[]");
+        state.authChecks = Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        state.authChecks = [];
+      }
+    }
+
+    function saveAuthChecks() {
+      localStorage.setItem(AUTH_CHECKS_KEY, JSON.stringify(state.authChecks));
+    }
+
+    function authTemplate(brand) {
+      return AUTH_BRAND_TEMPLATES[brand] || AUTH_BRAND_TEMPLATES.general;
+    }
+
+    function authDecisionMeta(value) {
+      return AUTH_DECISIONS[value] || AUTH_DECISIONS.pending;
+    }
+
+    function authDefaultCheck(name) {
+      return { name, status: "unknown", note: "" };
+    }
+
+    function defaultAuthCheck(purchaseId = "") {
+      const purchase = findPurchase(purchaseId);
+      const brand = authBrandFromPurchase(purchase);
+      return {
+        id: crypto.randomUUID(),
+        purchaseId,
+        brand,
+        decision: "pending",
+        checkedAt: today(),
+        checker: state.profile?.display_name || "",
+        sources: "",
+        openIssues: "",
+        checks: authTemplate(brand).checks.map(authDefaultCheck),
+        createdAt: nowIso(),
+        updatedAt: nowIso()
+      };
+    }
+
+    function authBrandFromPurchase(purchase) {
+      const text = `${purchase?.manufacturer || ""} ${purchase?.name || ""} ${purchase?.category || ""}`.toLowerCase();
+      if (text.includes("louis") || text.includes("vuitton") || text.includes("ルイ") || text.includes("ヴィトン")) return "louis_vuitton";
+      if (text.includes("chanel") || text.includes("シャネル")) return "chanel";
+      if (text.includes("hermes") || text.includes("エルメス")) return "hermes";
+      if (text.includes("rolex") || text.includes("ロレックス")) return "rolex";
+      if (text.includes("宝飾") || text.includes("貴金属") || text.includes("jewelry")) return "jewelry";
+      return "general";
+    }
+
+    function authStats(check) {
+      const checks = check?.checks || [];
+      const total = checks.length || 1;
+      const pass = checks.filter((item) => item.status === "pass").length;
+      const risk = checks.filter((item) => item.status === "risk").length;
+      const progress = Math.round((checks.filter((item) => item.status !== "unknown").length / total) * 100);
+      return { pass, risk, progress };
+    }
+
+    function authConfidenceLabel(value) {
+      const score = Math.max(0, Math.min(100, Number(value || 0)));
+      if (score >= 80) return `${score}% 高`;
+      if (score >= 55) return `${score}% 中`;
+      if (score > 0) return `${score}% 低`;
+      return "未算出";
+    }
+
+    function findAuthCheck(id) {
+      return state.authChecks.find((item) => item.id === id);
+    }
+
+    function findAuthCheckByPurchase(purchaseId) {
+      return state.authChecks.find((item) => item.purchaseId === purchaseId);
+    }
+
+    function renderAuthBrandOptions() {
+      const select = $("authBrand");
+      if (!select) return;
+      const current = select.value || "general";
+      select.innerHTML = Object.entries(AUTH_BRAND_TEMPLATES)
+        .map(([value, template]) => `<option value="${value}">${escapeHtml(template.label)}</option>`)
+        .join("");
+      if (AUTH_BRAND_TEMPLATES[current]) select.value = current;
+    }
+
+    function renderAuthPurchaseOptions() {
+      const select = $("authPurchaseId");
+      if (!select) return;
+      const current = select.value;
+      const text = ($("authPurchaseSearch")?.value || "").trim().toLowerCase();
+      const records = state.records.filter((record) => {
+        if (!text) return true;
+        return [managementNumberFor(record), record.name, record.manufacturer, record.category].join(" ").toLowerCase().includes(text);
+      });
+      select.innerHTML = "";
+      select.append(new Option(records.length ? "商品を選択" : "該当する仕入商品がありません", ""));
+      records.forEach((record) => {
+        const label = [managementNumberFor(record) || "未設定", record.manufacturer || "", record.name || ""].filter(Boolean).join(" / ");
+        select.append(new Option(label, record.id));
+      });
+      if (records.some((record) => record.id === current)) select.value = current;
+    }
+
+    function setAuthForm(check) {
+      renderAuthBrandOptions();
+      renderAuthPurchaseOptions();
+      const next = check || defaultAuthCheck();
+      $("authId").value = next.id || "";
+      if (next.purchaseId && !Array.from($("authPurchaseId").options).some((option) => option.value === next.purchaseId)) {
+        const purchase = findPurchase(next.purchaseId);
+        const label = purchase
+          ? [managementNumberFor(purchase) || "未設定", purchase.manufacturer || "", purchase.name || ""].filter(Boolean).join(" / ")
+          : "仕入不明";
+        $("authPurchaseId").append(new Option(label, next.purchaseId));
+      }
+      $("authPurchaseId").value = next.purchaseId || "";
+      $("authBrand").value = next.brand || "general";
+      $("authDecision").value = next.decision || "pending";
+      $("authCheckedAt").value = next.checkedAt || today();
+      $("authChecker").value = next.checker || "";
+      $("authSources").value = next.sources || "";
+      $("authOpenIssues").value = next.openIssues || "";
+      state.authAiResult = next.aiResult || null;
+      renderAuthChecklist(next);
+      renderAuthKnowledge(next.brand || "general");
+      renderAuthImages();
+      renderAuthAiResult();
+      updateAuthScoreFromForm();
+    }
+
+    function readAuthForm() {
+      const existing = findAuthCheck($("authId").value);
+      const checks = Array.from(document.querySelectorAll("[data-auth-check-row]")).map((row) => ({
+        name: row.querySelector("[data-auth-check-name]").value.trim(),
+        status: row.querySelector("[data-auth-check-status]").value,
+        note: row.querySelector("[data-auth-check-note]").value.trim()
+      })).filter((item) => item.name);
+      return {
+        id: $("authId").value || crypto.randomUUID(),
+        purchaseId: $("authPurchaseId").value,
+        brand: $("authBrand").value || "general",
+        decision: $("authDecision").value || "pending",
+        checkedAt: $("authCheckedAt").value || today(),
+        checker: $("authChecker").value.trim(),
+        sources: $("authSources").value.trim(),
+        openIssues: $("authOpenIssues").value.trim(),
+        checks,
+        aiResult: state.authAiResult,
+        createdAt: existing?.createdAt || nowIso(),
+        updatedAt: nowIso()
+      };
+    }
+
+    function renderAuthChecklist(check) {
+      const box = $("authChecklist");
+      if (!box) return;
+      const checks = check.checks && check.checks.length ? check.checks : authTemplate(check.brand).checks.map(authDefaultCheck);
+      box.innerHTML = checks.map((item, index) => `
+        <div class="auth-check" data-auth-check-row="${index}">
+          <label>確認項目
+            <input data-auth-check-name type="text" value="${escapeHtml(item.name || "")}">
+          </label>
+          <label>状態
+            <select data-auth-check-status>
+              <option value="unknown" ${item.status === "unknown" ? "selected" : ""}>未確認</option>
+              <option value="pass" ${item.status === "pass" ? "selected" : ""}>確認済み</option>
+              <option value="risk" ${item.status === "risk" ? "selected" : ""}>リスクあり</option>
+              <option value="na" ${item.status === "na" ? "selected" : ""}>対象外</option>
+            </select>
+          </label>
+          <label>メモ
+            <input data-auth-check-note type="text" value="${escapeHtml(item.note || "")}" placeholder="違和感・根拠・写真位置">
+          </label>
+        </div>
+      `).join("");
+    }
+
+    function renderAuthKnowledge(brand) {
+      const template = authTemplate(brand);
+      $("authKnowledgeTitle").textContent = `${template.label} の確認観点`;
+      $("authKnowledgeLead").textContent = template.lead;
+      $("authKnowledgeList").innerHTML = template.knowledge.map((item) => `
+        <div class="auth-knowledge-item">${escapeHtml(item)}</div>
+      `).join("");
+    }
+
+    async function prepareAuthImages(files) {
+      state.authImages = [];
+      for (const file of Array.from(files || []).filter((item) => item.type.startsWith("image/"))) {
+        const image = await fileToImageData(file);
+        const source = await fileToAnthropicSource(file);
+        state.authImages.push({ ...image, source });
+      }
+      renderAuthImages();
+    }
+
+    function renderAuthImages() {
+      const box = $("authImageThumbs");
+      if (!box) return;
+      box.innerHTML = state.authImages.map((image, index) => `
+        <span class="thumb-tile">
+          <img src="${image.thumb}" alt="">
+          <span>${index + 1}枚目</span>
+          <button class="danger" type="button" data-auth-image-delete="${index}">削除</button>
+        </span>
+      `).join("");
+    }
+
+    function normalizeAuthAiResult(payload) {
+      const allowedDecisions = new Set(["pending", "authentic", "hold", "fake"]);
+      const allowedStatuses = new Set(["unknown", "pass", "risk", "na"]);
+      const checks = Array.isArray(payload?.checks) ? payload.checks : [];
+      return {
+        decision: allowedDecisions.has(payload?.decision) ? payload.decision : "pending",
+        confidence: Math.max(0, Math.min(100, Number(payload?.confidence || 0))),
+        summary: String(payload?.summary || "").trim(),
+        positives: Array.isArray(payload?.positives) ? payload.positives.map(String).filter(Boolean).slice(0, 5) : [],
+        risks: Array.isArray(payload?.risks) ? payload.risks.map(String).filter(Boolean).slice(0, 5) : [],
+        openIssues: Array.isArray(payload?.openIssues) ? payload.openIssues.map(String).filter(Boolean).slice(0, 6) : [],
+        checks: checks.map((item) => ({
+          name: String(item?.name || "").trim(),
+          status: allowedStatuses.has(item?.status) ? item.status : "unknown",
+          note: String(item?.note || "").trim()
+        })).filter((item) => item.name)
+      };
+    }
+
+    function buildAuthAiMessages() {
+      const purchase = findPurchase($("authPurchaseId").value) || {};
+      const brand = authTemplate($("authBrand").value || "general");
+      const checks = Array.from(document.querySelectorAll("[data-auth-check-name]"))
+        .map((input) => input.value.trim())
+        .filter(Boolean);
+      const productText = [
+        `商品名: ${purchase.name || ""}`,
+        `メーカー/ブランド: ${purchase.manufacturer || brand.label}`,
+        `品目: ${purchase.category || ""}`,
+        `仕入金額: ${purchase.amount ? yen(purchase.amount) : ""}`,
+        `選択ブランド: ${brand.label}`,
+        `確認項目: ${checks.join(" / ")}`
+      ].join("\n");
+      const content = state.authImages.map((image) => ({ type: "image", source: image.source }));
+      content.push({ type: "text", text: `${AUTH_AI_PROMPT}\n\n対象商品:\n${productText}` });
+      return [{ role: "user", content }];
+    }
+
+    function applyAuthAiResult(result) {
+      const current = readAuthForm();
+      const mergedChecks = current.checks.map((check) => {
+        const suggested = result.checks.find((item) => item.name === check.name);
+        if (!suggested) return check;
+        return {
+          ...check,
+          status: suggested.status || check.status,
+          note: suggested.note || check.note
+        };
+      });
+      result.checks.forEach((suggested) => {
+        if (!mergedChecks.some((check) => check.name === suggested.name)) mergedChecks.push(suggested);
+      });
+      current.checks = mergedChecks;
+      $("authDecision").value = result.decision;
+      if (result.openIssues.length) {
+        $("authOpenIssues").value = result.openIssues.join("\n");
+      }
+      const sourceNote = [
+        `AI一次判定: ${authDecisionMeta(result.decision).label} / 確度 ${authConfidenceLabel(result.confidence)}`,
+        result.summary
+      ].filter(Boolean).join("\n");
+      $("authSources").value = [$("authSources").value.trim(), sourceNote].filter(Boolean).join("\n\n");
+      state.authAiResult = result;
+      renderAuthChecklist(current);
+      renderAuthAiResult();
+      updateAuthScoreFromForm();
+    }
+
+    function renderAuthAiResult() {
+      const box = $("authAiResult");
+      if (!box) return;
+      const result = state.authAiResult;
+      box.classList.toggle("hidden", !result);
+      if (!result) {
+        box.innerHTML = "";
+        return;
+      }
+      const decision = authDecisionMeta(result.decision);
+      const risks = result.risks.length
+        ? `<ul class="auth-ai-list">${result.risks.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+        : `<div class="muted small">大きなリスク指摘はありません</div>`;
+      const positives = result.positives.length
+        ? `<ul class="auth-ai-list">${result.positives.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+        : "";
+      box.innerHTML = `
+        <div class="auth-ai-head">
+          ${saleBadge(decision.label, decision.className)}
+          <span class="small muted">AI確度 ${escapeHtml(authConfidenceLabel(result.confidence))}</span>
+        </div>
+        <div class="small">${escapeHtml(result.summary || "写真から一次判定しました")}</div>
+        ${positives}
+        ${risks}
+      `;
+    }
+
+    async function runAuthAiAnalysis() {
+      if (!state.authImages.length) {
+        $("authStatus").textContent = "真贋確認写真を選択してください";
+        return;
+      }
+      $("authStatus").textContent = "写真をAIで確認しています...";
+      const result = normalizeAuthAiResult(await callAiJson(buildAuthAiMessages(), 2048));
+      applyAuthAiResult(result);
+      $("authStatus").textContent = "AI一次判定を反映しました。最終判断は人が確認してください";
+    }
+
+    function updateAuthScoreFromForm() {
+      const check = readAuthForm();
+      const stats = authStats(check);
+      $("authPassCount").textContent = String(stats.pass);
+      $("authRiskCount").textContent = String(stats.risk);
+      $("authProgress").textContent = `${stats.progress}%`;
+    }
+
+    function renderAuthentication() {
+      if (!$("authRows")) return;
+      renderAuthBrandOptions();
+      renderAuthPurchaseOptions();
+      if (!$("authChecklist").children.length) setAuthForm(defaultAuthCheck());
+      const rows = $("authRows");
+      if (!state.authChecks.length) {
+        rows.innerHTML = `<tr><td colspan="8" class="muted">真贋チェックはまだありません</td></tr>`;
+        $("authStatus").textContent = "仕入商品を選んでチェックを開始できます";
+        return;
+      }
+      rows.innerHTML = state.authChecks.map((check) => {
+        const purchase = findPurchase(check.purchaseId) || {};
+        const stats = authStats(check);
+        const decision = authDecisionMeta(check.decision);
+        return `
+          <tr>
+            <td><strong>${escapeHtml(purchase.name || "仕入不明")}</strong><br><span class="muted small">${escapeHtml(managementNumberFor(purchase) || "")}</span></td>
+            <td>${escapeHtml(authTemplate(check.brand).label)}</td>
+            <td>${saleBadge(decision.label, decision.className)}</td>
+            <td>${stats.progress}%<br><span class="muted small">確認済み ${stats.pass}${check.aiResult ? ` / AI ${authConfidenceLabel(check.aiResult.confidence)}` : ""}</span></td>
+            <td>${stats.risk ? saleBadge(`${stats.risk}件`, "red") : saleBadge("なし", "green")}</td>
+            <td>${escapeHtml(check.checkedAt || "")}<br><span class="muted small">${escapeHtml(check.checker || "")}</span></td>
+            <td>${escapeHtml(check.openIssues || "")}</td>
+            <td><div class="row-actions"><button type="button" title="編集" data-auth-edit="${check.id}">✎</button><button class="danger" type="button" title="削除" data-auth-delete="${check.id}">×</button></div></td>
+          </tr>
+        `;
+      }).join("");
+      const pending = state.authChecks.filter((check) => check.decision !== "authentic").length;
+      $("authStatus").textContent = pending ? `要確認 ${pending}件` : "真贋チェックは完了しています";
+    }
+
+    function saveAuthFromForm() {
+      const check = readAuthForm();
+      if (!check.purchaseId) {
+        $("authStatus").textContent = "仕入商品を選択してください";
+        return false;
+      }
+      const index = state.authChecks.findIndex((item) => item.id === check.id);
+      if (index >= 0) {
+        state.authChecks.splice(index, 1, check);
+      } else {
+        const samePurchaseIndex = state.authChecks.findIndex((item) => item.purchaseId === check.purchaseId);
+        if (samePurchaseIndex >= 0 && !confirm("この仕入商品には既に真贋チェックがあります。上書きしますか？")) return false;
+        if (samePurchaseIndex >= 0) state.authChecks.splice(samePurchaseIndex, 1, check);
+        else state.authChecks.unshift(check);
+      }
+      saveAuthChecks();
+      $("authStatus").textContent = "真贋チェックを保存しました";
+      renderAuthentication();
+      renderRows(filteredRecords());
+      return true;
+    }
+
     function localDeletedIds() {
       try {
         return new Set(JSON.parse(localStorage.getItem(LOCAL_DELETED_IDS_KEY) || "[]"));
@@ -2321,7 +3041,7 @@
       Array.from(form.elements).forEach((element) => {
         if (element.id !== "recordId") element.disabled = !canWrite;
       });
-      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractDataFiles", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn", "taxPackageBtn"], !canWrite);
+      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractDataFiles", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn", "taxPackageBtn", "authPurchaseId", "authBrand", "authDecision", "authCheckedAt", "authChecker", "authSources", "authOpenIssues", "authImages", "runAuthAiBtn", "clearAuthImagesBtn", "saveAuthBtn", "resetAuthBtn"], !canWrite);
       $("sampleBtn").disabled = !canWrite;
       $("clearBtn").disabled = !isAdmin();
       render();
@@ -4180,6 +4900,7 @@
         { value: "purchase", label: "仕入登録・AI" },
         { value: "list", label: "一覧・集計" },
         { value: "sales", label: "販売管理" },
+        { value: "auth", label: "真贋チェック" },
         { value: "export", label: "出力・設定" }
       ];
     }
@@ -4189,6 +4910,7 @@
       purchase: "仕入登録",
       list: "仕入一覧",
       sales: "販売管理",
+      auth: "真贋",
       export: "出力・設定"
     };
 
@@ -4330,6 +5052,7 @@
       const records = filteredRecords();
       renderDashboard(records);
       renderSalesManagement();
+      renderAuthentication();
       renderSummary(records);
       renderRows(records);
       applyRenderedRoleControls();
@@ -4337,11 +5060,14 @@
 
     function applyRenderedRoleControls() {
       if (!canWritePurchases()) {
-        document.querySelectorAll("[data-edit], [data-delete]").forEach((element) => element.remove());
+        document.querySelectorAll("[data-edit], [data-delete], [data-auth-edit], [data-auth-delete]").forEach((element) => element.remove());
+        document.querySelectorAll("[data-auth-check-name], [data-auth-check-status], [data-auth-check-note]").forEach((element) => {
+          element.disabled = true;
+        });
         return;
       }
       if (!isAdmin()) {
-        document.querySelectorAll("[data-delete]").forEach((element) => element.remove());
+        document.querySelectorAll("[data-delete], [data-auth-delete]").forEach((element) => element.remove());
       }
     }
 
@@ -4621,6 +5347,9 @@
         const imageCount = getRecordImages(record.id).length;
         const managementNumber = managementNumberFor(record);
         const inventory = recordInventoryInfo(record);
+        const authCheck = findAuthCheckByPurchase(record.id);
+        const authDecision = authDecisionMeta(authCheck?.decision || "pending");
+        const authStat = authCheck ? authStats(authCheck) : null;
         const inventoryAge = inventory.value === "listed"
           ? (recordSales(record).find((sale) => sale.status === "listed")?.listed_at || record.date)
           : record.date;
@@ -4633,6 +5362,7 @@
           <td>${saleBadge(inventory.label, inventory.className)}<br><span class="muted small">${escapeHtml(inventoryAgeLabel)}</span></td>
           <td>${escapeHtml(record.channel || "")}</td>
           <td><strong>${escapeHtml(record.name || "")}</strong><br><span class="muted small">${escapeHtml(record.manufacturer || record.category || "")} / ${escapeHtml(record.category || "")} / ${escapeHtml(String(record.qty || 1))}点</span></td>
+          <td>${authCheck ? saleBadge(authDecision.label, authDecision.className) : saleBadge("未確認", "orange")}<br><span class="muted small">${authStat ? `${authStat.progress}%` : "要チェック"}</span></td>
           <td>${escapeHtml(record.seller || "")}<br><span class="muted small">${escapeHtml(flagText(c))}</span></td>
           <td><span class="money">${yen(record.amount)}</span><br><span class="muted small">${record.rate || 10}% / ${escapeHtml(destinationLabel(record))}</span></td>
           <td>${badge(c.kind)}<br><span class="muted small">${Math.round(c.ratio * 100)}%</span></td>
@@ -4967,6 +5697,30 @@
       return parseExtractResponse(payload);
     }
 
+    async function callAiJson(messages, maxTokens = 2048) {
+      const settings = state.settings || defaultSettings();
+      if (settings.aiMode !== "proxy") {
+        throw new Error("AI機能は中継設定を有効にしてください。");
+      }
+      if (!settings.proxyUrl) throw new Error("中継URLが未設定です。");
+
+      const response = await fetch(settings.proxyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Secret": settings.syncSecret || ""
+        },
+        body: JSON.stringify({
+          model: settings.model || "claude-haiku-4-5-20251001",
+          max_tokens: maxTokens,
+          messages
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(extractErrorMessage(payload));
+      return parseAiJsonResponse(payload);
+    }
+
     function parseExtractResponse(payload) {
       const text = (payload.content || [])
         .filter((part) => part.type === "text")
@@ -4977,6 +5731,17 @@
       if (!jsonText) throw new Error("AI応答からJSONを取得できませんでした。");
       const parsed = JSON.parse(jsonText);
       return Array.isArray(parsed.items) ? parsed.items : [];
+    }
+
+    function parseAiJsonResponse(payload) {
+      const text = (payload.content || [])
+        .filter((part) => part.type === "text")
+        .map((part) => part.text)
+        .join("\n")
+        .replace(/```json|```/g, "");
+      const jsonText = extractJsonObjectText(text);
+      if (!jsonText) throw new Error("AI応答からJSONを取得できませんでした。");
+      return JSON.parse(jsonText);
     }
 
     function extractJsonObjectText(text) {
@@ -5406,37 +6171,50 @@
             </div>
             <div class="review-actions">
               <button type="button" data-review-apply="${index}">フォームへ反映</button>
-              <button class="danger" type="button" data-review-delete="${index}">削除</button>
             </div>
           </div>
           ${reviewFlagsHtml(result)}
-          <div class="review-fields">
-            ${reviewInputHtml(index, "managementNumber", "管理番号", "text", managementNumberFor(record))}
-            ${reviewInputHtml(index, "date", "仕入日", "date", record.date)}
-            ${reviewSelectHtml(index, "channel", "チャネル", channelOptions, record.channel)}
-            ${reviewInputHtml(index, "name", "商品名", "text", record.name, "", true)}
-            ${reviewInputHtml(index, "manufacturer", "メーカー", "text", record.manufacturer || "")}
-            ${reviewSelectHtml(index, "category", "品目", categoryOptions, record.category)}
-            ${reviewInputHtml(index, "qty", "数量", "number", record.qty, 'min="1" step="1"')}
-            ${reviewInputHtml(index, "itemPrice", "本体価格", "number", record.itemPrice ?? record.amount ?? 0, 'min="0" step="1" inputmode="numeric"')}
-            ${reviewInputHtml(index, "shippingFee", "\u9001\u6599", "number", record.shippingFee ?? 0, 'min="0" step="1" inputmode="numeric"')}
-            ${reviewInputHtml(index, "purchaseFee", "\u624b\u6570\u6599", "number", record.purchaseFee ?? 0, 'min="0" step="1" inputmode="numeric"')}
-            ${reviewInputHtml(index, "purchaseFeeTax", "\u624b\u6570\u6599\u6d88\u8cbb\u7a0e", "number", record.purchaseFeeTax ?? 0, 'min="0" step="1" inputmode="numeric"')}
-            ${reviewInputHtml(index, "shippingFeeTotal", "送料・手数料", "number", record.shippingFeeTotal ?? 0, 'min="0" step="1" inputmode="numeric"')}
-            ${reviewInputHtml(index, "amount", "仕入総額", "number", record.amount, 'min="0" step="1" inputmode="numeric"')}
-            ${reviewSelectHtml(index, "rate", "税率", [["10", "10%"], ["8", "8%"]], record.rate)}
-            ${reviewSelectHtml(index, "destination", "利用先", destinationOptions, record.destination || "ebay")}
-            ${reviewInputHtml(index, "seller", "相手方", "text", record.seller, "", true)}
-            ${reviewInputHtml(index, "address", "\u76f8\u624b\u65b9\u4f4f\u6240", "text", record.address || "", "", true)}
-            ${reviewSelectHtml(index, "kind", "古物区分", kindOptions, record.kind)}
-            ${reviewSelectHtml(index, "stock", "棚卸資産", stockOptions, record.stock)}
-            ${reviewSelectHtml(index, "qualified", "適格事業者", qualifiedOptions, record.qualified)}
-            ${reviewInputHtml(index, "invoiceRegistrationNumber", "\u9069\u683c\u4e8b\u696d\u8005\u756a\u53f7", "text", record.invoiceRegistrationNumber || "")}
-            ${reviewSelectHtml(index, "anon", "取引形態", anonOptions, record.anon)}
-            <div class="review-field">
-              <label>証憑画像</label>
-              <select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select>
+          <section class="review-section" aria-label="商品情報">
+            <h3>1. 商品情報</h3>
+            <div class="review-fields">
+              ${reviewInputHtml(index, "managementNumber", "管理番号", "text", managementNumberFor(record))}
+              ${reviewInputHtml(index, "name", "商品名", "text", record.name, "", true)}
+              ${reviewInputHtml(index, "manufacturer", "メーカー", "text", record.manufacturer || "")}
+              ${reviewSelectHtml(index, "category", "品目", categoryOptions, record.category)}
+              ${reviewInputHtml(index, "qty", "数量", "number", record.qty, 'min="1" step="1"')}
+              ${reviewInputHtml(index, "date", "仕入日", "date", record.date)}
+              ${reviewSelectHtml(index, "channel", "チャネル", channelOptions, record.channel)}
+              <div class="review-field">
+                <label>証憑ファイル</label>
+                <select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select>
+              </div>
             </div>
+          </section>
+          <section class="review-section" aria-label="金額・税金">
+            <h3>2. 金額・税金</h3>
+            <div class="review-fields">
+              ${reviewInputHtml(index, "itemPrice", "本体価格", "number", record.itemPrice ?? record.amount ?? 0, 'min="0" step="1" inputmode="numeric"')}
+              ${reviewInputHtml(index, "purchaseFee", "手数料", "number", record.purchaseFee ?? 0, 'min="0" step="1" inputmode="numeric"')}
+              ${reviewInputHtml(index, "shippingFee", "送料", "number", record.shippingFee ?? 0, 'min="0" step="1" inputmode="numeric"')}
+              ${reviewInputHtml(index, "amount", "仕入総額", "number", record.amount, 'min="0" step="1" inputmode="numeric"')}
+              ${reviewSelectHtml(index, "rate", "税率", [["10", "10%"], ["8", "8%"]], record.rate)}
+            </div>
+          </section>
+          <section class="review-section" aria-label="取引先情報">
+            <h3>3. 取引先情報</h3>
+            <div class="review-fields">
+              ${reviewSelectHtml(index, "destination", "利用先", destinationOptions, record.destination || "ebay")}
+              ${reviewInputHtml(index, "seller", "相手方", "text", record.seller, "", true)}
+              ${reviewInputHtml(index, "address", "\u76f8\u624b\u65b9\u4f4f\u6240", "text", record.address || "", "", true)}
+              ${reviewSelectHtml(index, "kind", "古物区分", kindOptions, record.kind)}
+              ${reviewSelectHtml(index, "stock", "棚卸資産", stockOptions, record.stock)}
+              ${reviewSelectHtml(index, "qualified", "適格事業者", qualifiedOptions, record.qualified)}
+              ${reviewInputHtml(index, "invoiceRegistrationNumber", "\u9069\u683c\u4e8b\u696d\u8005\u756a\u53f7", "text", record.invoiceRegistrationNumber || "")}
+              ${reviewSelectHtml(index, "anon", "取引形態", anonOptions, record.anon)}
+            </div>
+          </section>
+          <div class="review-delete-actions">
+            <button class="danger" type="button" data-review-delete="${index}">削除</button>
           </div>
         </article>
       `;
@@ -6554,6 +7332,84 @@
           }
         }
       });
+      $("authForm").addEventListener("submit", (event) => {
+        event.preventDefault();
+        saveAuthFromForm();
+      });
+      $("resetAuthBtn").addEventListener("click", () => {
+        $("authStatus").textContent = "";
+        state.authImages = [];
+        state.authAiResult = null;
+        $("authImages").value = "";
+        setAuthForm(defaultAuthCheck());
+      });
+      $("authPurchaseSearch").addEventListener("input", renderAuthPurchaseOptions);
+      $("authPurchaseId").addEventListener("change", () => {
+        const purchaseId = $("authPurchaseId").value;
+        const existing = findAuthCheckByPurchase(purchaseId);
+        state.authImages = [];
+        $("authImages").value = "";
+        setAuthForm(existing || defaultAuthCheck(purchaseId));
+      });
+      $("authBrand").addEventListener("change", () => {
+        const check = readAuthForm();
+        const template = authTemplate(check.brand);
+        check.checks = template.checks.map(authDefaultCheck);
+        renderAuthChecklist(check);
+        renderAuthKnowledge(check.brand);
+        updateAuthScoreFromForm();
+      });
+      $("authChecklist").addEventListener("input", updateAuthScoreFromForm);
+      $("authChecklist").addEventListener("change", updateAuthScoreFromForm);
+      $("authImages").addEventListener("change", async (event) => {
+        try {
+          await prepareAuthImages(event.target.files);
+          $("authStatus").textContent = `${state.authImages.length}枚の真贋確認写真を読み込みました`;
+        } catch (error) {
+          $("authStatus").textContent = `写真を読み込めませんでした: ${formatErrorDetails(error)}`;
+        }
+      });
+      $("runAuthAiBtn").addEventListener("click", async () => {
+        try {
+          await runAuthAiAnalysis();
+        } catch (error) {
+          console.error("[AuthAI] Analysis failed", error);
+          $("authStatus").textContent = `AI一次判定に失敗しました: ${formatErrorDetails(error)}`;
+        }
+      });
+      $("clearAuthImagesBtn").addEventListener("click", () => {
+        state.authImages = [];
+        $("authImages").value = "";
+        renderAuthImages();
+        $("authStatus").textContent = "真贋確認写真をクリアしました";
+      });
+      $("authImageThumbs").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-auth-image-delete]");
+        if (!button) return;
+        state.authImages.splice(Number(button.dataset.authImageDelete), 1);
+        $("authImages").value = "";
+        renderAuthImages();
+      });
+      $("authRows").addEventListener("click", (event) => {
+        const editId = event.target.closest("[data-auth-edit]")?.dataset.authEdit;
+        const deleteId = event.target.closest("[data-auth-delete]")?.dataset.authDelete;
+        if (editId) {
+          const check = findAuthCheck(editId);
+          if (check) {
+            state.authImages = [];
+            $("authImages").value = "";
+            setAuthForm(check);
+          }
+          return;
+        }
+        if (deleteId && confirm("真贋チェックを削除しますか？")) {
+          state.authChecks = state.authChecks.filter((item) => item.id !== deleteId);
+          saveAuthChecks();
+          $("authStatus").textContent = "真贋チェックを削除しました";
+          renderAuthentication();
+          renderRows(filteredRecords());
+        }
+      });
       $("resetBtn").addEventListener("click", () => {
         setForm(defaultRecord());
         openManualEntryForm();
@@ -6808,6 +7664,7 @@
     async function initApp() {
       await loadSettings();
       await loadMeta();
+      loadAuthChecks();
       initMeta();
       restoreActiveScreen();
       bindEvents();
