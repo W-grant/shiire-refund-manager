@@ -1,7 +1,7 @@
 import { completePasswordRecovery, getCurrentAuth, signInWithPassword, signOut, updatePassword } from "./lib/services/authService";
 import { deleteMonthlyPackage, getMonthlyPackageDownloadUrl, listMonthlyPackages, saveMonthlyPackage } from "./lib/services/monthlyPackageService";
 import { loadSupabasePurchaseState } from "./lib/services/purchaseReadService";
-import { deletePurchase, getPurchaseSaveStatus, migratePurchases, savePurchase, updatePurchase } from "./lib/services/purchaseWriteService";
+import { deletePurchase, getPurchaseSaveStatus, migratePurchases, restorePurchase, savePurchase, updatePurchase } from "./lib/services/purchaseWriteService";
 import { deleteSale, listSales, saveSale } from "./lib/services/salesService";
 
 declare global {
@@ -20,6 +20,7 @@ declare global {
       getSaveStatus: typeof getPurchaseSaveStatus;
       savePurchase: typeof savePurchase;
       updatePurchase: typeof updatePurchase;
+      restorePurchase: typeof restorePurchase;
       deletePurchase: typeof deletePurchase;
       migratePurchases: typeof migratePurchases;
       saveMonthlyPackage: typeof saveMonthlyPackage;
@@ -47,6 +48,7 @@ window.ShiireSupabaseWrite = {
   getSaveStatus: getPurchaseSaveStatus,
   savePurchase,
   updatePurchase,
+  restorePurchase,
   deletePurchase,
   migratePurchases,
   saveMonthlyPackage,

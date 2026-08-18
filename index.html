@@ -2373,6 +2373,7 @@
                 </select>
                 <input id="filterText" type="search" placeholder="管理番号・商品名・相手方・日付・金額" aria-label="検索">
               </div>
+              <div id="recordActionStatus" class="status small"></div>
 
               <div id="recordCardList" class="record-card-list"></div>
 
@@ -2650,7 +2651,8 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       currentEvidenceIndex: 0,
       profile: null,
       passwordRecovery: false,
-      currentPurchaseSuggestion: null
+      currentPurchaseSuggestion: null,
+      lastDeletedPurchase: null
     };
 
     const $ = (id) => document.getElementById(id);
@@ -3412,6 +3414,20 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       const result = await service.deletePurchase(id);
       $("ioStatus").textContent = "仕入を削除しました";
       return Boolean(result && result.id);
+    }
+
+    async function restoreSupabaseRecord(record, imageBundle) {
+      const service = await waitForSupabaseWriteService();
+      if (!service || !service.restorePurchase) return false;
+      const bundle = normalizeImageBundle(imageBundle);
+      const result = await service.restorePurchase(record, classified(record), bundle ? bundle.images : []);
+      if (result.evidence && result.evidence.failures.length) {
+        console.warn("[Restore] Evidence failures", result.evidence.failures);
+        $("ioStatus").textContent = `仕入は復元しましたが、一部の証憑を復元できませんでした: ${formatEvidenceFailures(result.evidence.failures)}`;
+      } else {
+        $("ioStatus").textContent = "仕入を復元しました";
+      }
+      return Boolean(result && result.purchase && result.purchase.id);
     }
 
     async function readIndexedDbSnapshot() {
@@ -4626,6 +4642,12 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         $("ioStatus").textContent = "仕入の削除には管理者権限が必要です";
         return false;
       }
+      const deletedRecord = state.records.find((record) => record.id === id);
+      const deletedImages = normalizeImageBundle(state.images.get(id));
+      state.lastDeletedPurchase = deletedRecord ? {
+        record: { ...deletedRecord, updatedAt: nowIso() },
+        imageBundle: deletedImages ? { id, images: deletedImages.images.map((image) => ({ ...image })) } : null
+      } : null;
       rememberLocalDeletedId(id);
       state.records = state.records.filter((record) => record.id !== id);
       state.images.delete(id);
@@ -4654,8 +4676,49 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       await loadAll();
       if (deleteWarning) {
         $("ioStatus").textContent = deleteWarning;
+      } else if (state.lastDeletedPurchase) {
+        showDeleteUndo(id);
       }
       return true;
+    }
+
+    function showDeleteUndo(id) {
+      const target = $("recordActionStatus");
+      const deleted = state.lastDeletedPurchase;
+      if (!target || !deleted || deleted.record.id !== id) return;
+      const name = escapeHtml(deleted.record.name || "仕入");
+      target.innerHTML = `${name} を削除しました <button id="undoDeleteRecordBtn" type="button">元に戻す</button>`;
+    }
+
+    async function restoreLastDeletedRecord() {
+      const deleted = state.lastDeletedPurchase;
+      if (!deleted) {
+        $("recordActionStatus").textContent = "復元できる直前削除はありません";
+        return false;
+      }
+      const record = { ...deleted.record, updatedAt: nowIso() };
+      const bundle = deleted.imageBundle ? normalizeImageBundle(deleted.imageBundle) : null;
+      try {
+        forgetLocalDeletedId(record.id);
+        const restoredToSupabase = await restoreSupabaseRecord(record, bundle);
+        if (!restoredToSupabase && state.profile) {
+          $("recordActionStatus").textContent = "仕入を復元できませんでした";
+          await loadAll();
+          return false;
+        }
+        await tx(STORE_RECORDS, "readwrite", (store) => store.put(record));
+        if (bundle && bundle.images.length) {
+          await tx(STORE_IMAGES, "readwrite", (store) => store.put(bundle));
+        }
+        state.lastDeletedPurchase = null;
+        await loadAll();
+        $("recordActionStatus").textContent = "仕入を復元しました";
+        return true;
+      } catch (error) {
+        console.error("[Restore] purchase restore failed", error);
+        $("recordActionStatus").textContent = `仕入を復元できませんでした: ${formatErrorDetails(error)}`;
+        return false;
+      }
     }
 
     function populateSelect(select, items, allLabel) {
@@ -7943,6 +8006,10 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       };
       $("recordRows").addEventListener("click", handleRecordAction);
       $("recordCardList").addEventListener("click", handleRecordAction);
+      $("recordActionStatus").addEventListener("click", async (event) => {
+        if (!event.target.closest("#undoDeleteRecordBtn")) return;
+        await restoreLastDeletedRecord();
+      });
       ["filterStaff", "filterChannel", "filterBranch", "filterKind"].forEach((id) => {
         $(id).addEventListener("change", () => {
           const key = id.replace("filter", "").toLowerCase();

@@ -1,7 +1,7 @@
 import { legacyRecordToPurchaseInsert, legacyRecordToPurchaseUpdate, type LegacyClassification, type LegacyImage, type LegacyRecord } from "../mappers/purchaseMapper";
 import { deletePurchaseEvidenceByIds, fetchPurchaseEvidenceByPurchaseId } from "../repositories/evidenceRepository";
 import { fetchBranches, fetchCategories, fetchChannels } from "../repositories/masterRepository";
-import { hardDeletePurchase, insertPurchase, markPurchaseDeleted, updatePurchase as updatePurchaseRow } from "../repositories/purchaseRepository";
+import { hardDeletePurchase, insertPurchase, markPurchaseDeleted, restoreDeletedPurchase, updatePurchase as updatePurchaseRow } from "../repositories/purchaseRepository";
 import { uploadEvidenceImages, type EvidenceUploadResult } from "../repositories/storageRepository";
 import { supabase } from "../supabase";
 
@@ -27,6 +27,12 @@ export type PurchaseUpdateResult = {
   purchase: { id: string };
   evidence: EvidenceUploadResult;
   removedEvidenceCount: number;
+};
+
+export type PurchaseRestoreResult = {
+  purchase: { id: string };
+  evidence: EvidenceUploadResult;
+  restoredBy: "update" | "insert";
 };
 
 export type LegacyImageBundle = {
@@ -238,6 +244,58 @@ export async function updatePurchase(
     return { purchase, evidence, removedEvidenceCount };
   } catch (error) {
     console.error("[Save] Update failed", {
+      message: (error as SupabaseWriteError).message,
+      code: (error as SupabaseWriteError).code,
+      details: (error as SupabaseWriteError).details,
+      hint: (error as SupabaseWriteError).hint
+    });
+    throw error;
+  }
+}
+
+export async function restorePurchase(
+  record: LegacyRecord,
+  classification: LegacyClassification,
+  images: LegacyImage[] = []
+): Promise<PurchaseRestoreResult> {
+  console.log("[Restore] Start", { id: record.id });
+  try {
+    const [branches, channels, categories, sessionResult] = await Promise.all([
+      fetchBranches(),
+      fetchChannels(),
+      fetchCategories(),
+      supabase.auth.getSession()
+    ]);
+    if (sessionResult.error) throw sessionResult.error;
+    const userId = sessionResult.data.session?.user.id || null;
+    if (!userId) throw new Error("Supabase login is required to restore purchases");
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .single();
+    if (profileError) throw profileError;
+    if (profile?.role !== "admin") throw new Error("Admin role is required to restore purchases");
+
+    const row = legacyRecordToPurchaseUpdate(record, classification, { branches, channels, categories }, userId);
+    let purchase: { id: string };
+    let restoredBy: "update" | "insert" = "update";
+    try {
+      purchase = await restoreDeletedPurchase(record.id, { ...row, deleted_at: null });
+      console.log("[Restore] Soft delete undo success", purchase);
+    } catch (restoreError) {
+      const code = (restoreError as SupabaseWriteError).code || "";
+      const message = (restoreError as SupabaseWriteError).message || "";
+      if (!/PGRST116|0 rows|not found|No rows/i.test(`${code} ${message}`)) throw restoreError;
+      purchase = await insertPurchase(legacyRecordToPurchaseInsert(record, classification, { branches, channels, categories }, userId));
+      restoredBy = "insert";
+      console.log("[Restore] Reinsert success", purchase);
+    }
+    const evidence = images.length ? await uploadEvidenceImages(record, images, userId) : { successes: [], failures: [] };
+    return { purchase, evidence, restoredBy };
+  } catch (error) {
+    console.error("[Restore] Failed", {
       message: (error as SupabaseWriteError).message,
       code: (error as SupabaseWriteError).code,
       details: (error as SupabaseWriteError).details,

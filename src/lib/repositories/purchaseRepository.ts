@@ -66,6 +66,9 @@ export type PurchaseInsert = {
 };
 
 export type PurchaseUpdate = Omit<PurchaseInsert, "id" | "created_by">;
+export type PurchaseRestoreUpdate = PurchaseUpdate & {
+  deleted_at: null;
+};
 
 export async function fetchPurchases() {
   const { data, error } = await supabase
@@ -121,6 +124,17 @@ export async function insertPurchase(row: PurchaseInsert) {
 }
 
 export async function updatePurchase(id: string, row: PurchaseUpdate) {
+  const { data, error } = await supabase
+    .from("purchases")
+    .update(row)
+    .eq("id", id)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function restoreDeletedPurchase(id: string, row: PurchaseRestoreUpdate) {
   const { data, error } = await supabase
     .from("purchases")
     .update(row)
