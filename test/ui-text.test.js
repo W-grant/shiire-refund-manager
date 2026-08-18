@@ -237,7 +237,10 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "全削除には管理者権限が必要です",
     "data-task-screen",
     "data-task-filter",
-    "dashTaskBreakdown"
+    "dashTaskBreakdown",
+    "data-sales-issue",
+    "saleMatchesIssue",
+    "利益マイナス"
   ];
 
   for (const marker of requiredControls) {
