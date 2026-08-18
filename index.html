@@ -1119,6 +1119,37 @@
       border-top: 1px solid var(--line);
     }
 
+    .review-preflight {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #cfe1d4;
+      border-radius: 8px;
+      background: #f7faf6;
+    }
+
+    .review-preflight-item {
+      display: grid;
+      gap: 3px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .review-preflight-item span {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .review-preflight-item strong {
+      font-size: 17px;
+      font-variant-numeric: tabular-nums;
+    }
+
     .review-check {
       display: inline-flex;
       gap: 8px;
@@ -1433,7 +1464,8 @@
       .auth-grid,
       .auth-check,
       .staff-action-grid,
-      .staff-workflow-status {
+      .staff-workflow-status,
+      .review-preflight {
         grid-template-columns: 1fr;
       }
     }
@@ -1755,6 +1787,7 @@
             </div>
             <div id="reviewWrap" class="review-table hidden">
               <div id="reviewBulkTools" class="review-bulk-tools">
+                <div id="reviewPreflight" class="review-preflight" aria-live="polite"></div>
                 <span>一括変更</span>
                 <div class="review-supplier-tools" aria-label="仕入先一括反映">
                   <label>仕入先
@@ -1781,6 +1814,8 @@
                     全選択
                   </label>
                   <span id="reviewSelectionCount">0件選択中</span>
+                  <button id="selectReadyReviewBtn" type="button">登録可能だけ選択</button>
+                  <button id="selectWarningReviewBtn" type="button">要確認も含めて選択</button>
                 </div>
                 <button type="button" data-review-copy-first="channel,destination,seller,address,qualified,invoiceRegistrationNumber,anon,kind,stock,rate,imageIndex">先頭行の取引情報を全行へ反映</button>
                 <button type="button" data-review-copy-first="seller,address,qualified,invoiceRegistrationNumber,anon">相手方・適格事業者だけ全行へ反映</button>
@@ -6272,6 +6307,60 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         .filter((item) => state.reviewSelectedIds.has(item.record.id));
     }
 
+    function reviewPreflightSummary() {
+      return state.aiItems.reduce((summary, record) => {
+        const result = reviewValidation(record);
+        summary.total += 1;
+        if (result.errors.length) summary.blocked += 1;
+        else if (result.warnings.length) summary.warning += 1;
+        else summary.ready += 1;
+        if (!getReviewEvidenceFiles(record.imageIndex).length) summary.noEvidence += 1;
+        return summary;
+      }, { total: 0, ready: 0, warning: 0, blocked: 0, noEvidence: 0 });
+    }
+
+    function renderReviewPreflight() {
+      const target = $("reviewPreflight");
+      if (!target) return;
+      const summary = reviewPreflightSummary();
+      if (!summary.total) {
+        target.innerHTML = "";
+        return;
+      }
+      target.innerHTML = `
+        <div class="review-preflight-item">
+          <span>抽出件数</span>
+          <strong>${summary.total}件</strong>
+        </div>
+        <div class="review-preflight-item">
+          <span>登録可能</span>
+          <strong>${summary.ready}件</strong>
+        </div>
+        <div class="review-preflight-item">
+          <span>要確認</span>
+          <strong>${summary.warning}件</strong>
+        </div>
+        <div class="review-preflight-item">
+          <span>登録不可</span>
+          <strong>${summary.blocked}件</strong>
+        </div>
+      `;
+    }
+
+    function setReviewSelectionByValidation(mode) {
+      const selected = new Set();
+      state.aiItems.forEach((record) => {
+        const result = reviewValidation(record);
+        const canSave = !result.errors.length;
+        const shouldInclude = mode === "ready" ? canSave && !result.warnings.length : canSave;
+        if (shouldInclude) selected.add(record.id);
+      });
+      state.reviewSelectedIds = selected;
+      renderReview();
+      const label = mode === "ready" ? "登録可能な行" : "要確認を含む登録可能な行";
+      $("extractStatus").textContent = `${label}を${selected.size}件選択しました`;
+    }
+
     function updateReviewSelectionControls() {
       const count = selectedReviewItems().length;
       const total = state.aiItems.length;
@@ -6281,6 +6370,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         $("reviewSelectAll").checked = total > 0 && count === total;
         $("reviewSelectAll").indeterminate = count > 0 && count < total;
       }
+      renderReviewPreflight();
     }
 
     function renderReview() {
@@ -6437,6 +6527,12 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         renderReview();
         $("extractStatus").textContent = `要修正の選択行があります: ${invalidRows.map((item) => item.index + 1).join(", ")}件目`;
         return;
+      }
+      const warningRows = targets
+        .map((item) => ({ index: item.index, result: reviewValidation(item.record) }))
+        .filter((item) => item.result.warnings.length);
+      if (warningRows.length) {
+        console.info("[Review] Saving rows with warnings", warningRows.map((item) => item.index + 1));
       }
       const savedIds = [];
       for (let targetIndex = 0; targetIndex < targets.length; targetIndex += 1) {
@@ -7649,6 +7745,8 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         copyFirstReviewFieldsToAll(fields);
       });
       $("reviewSelectAll").addEventListener("change", (event) => setAllReviewSelection(event.target.checked));
+      $("selectReadyReviewBtn").addEventListener("click", () => setReviewSelectionByValidation("ready"));
+      $("selectWarningReviewBtn").addEventListener("click", () => setReviewSelectionByValidation("warning"));
       $("reviewSupplierPreset").addEventListener("change", updateSupplierPresetInputs);
       $("applyReviewSupplierPreset").addEventListener("click", applySupplierToAllReviewItems);
       $("assignReviewManagementNumbers").addEventListener("click", assignManagementNumbersToSelectedReviewItems);

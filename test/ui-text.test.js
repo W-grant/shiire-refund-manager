@@ -203,6 +203,12 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "要確認を見る",
     "data-screen-shortcut",
     "日常業務ショートカット",
+    'id="reviewPreflight"',
+    "review-preflight",
+    "登録可能だけ選択",
+    "要確認も含めて選択",
+    "reviewPreflightSummary",
+    "setReviewSelectionByValidation",
     "screenDefinitions",
     "証憑なし"
   ];
