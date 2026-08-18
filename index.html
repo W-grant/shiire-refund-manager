@@ -662,11 +662,20 @@
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       gap: 10px;
+      width: 100%;
       border: 1px solid var(--line);
       border-radius: 6px;
       padding: 8px;
       background: #fbfcf9;
+      color: inherit;
+      cursor: pointer;
       font-size: 12px;
+      text-align: left;
+    }
+
+    .task-item:hover {
+      border-color: var(--green);
+      background: #f4faf5;
     }
 
     .task-item strong {
@@ -5664,11 +5673,20 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         target.innerHTML = `<span class="muted small">現在の未処理タスクはありません</span>`;
         return;
       }
+      const routes = {
+        "証憑なし": ["list", "noEvidence"],
+        "利用先未定": ["list", "all"],
+        "未出品": ["sales", "not_listed"],
+        "準備中・保留": ["sales", "preparing"],
+        "仕入30日超": ["list", "staleStock"],
+        "出品30日超": ["sales", "stale"],
+        "未売却": ["sales", "unsold"]
+      };
       target.innerHTML = entries.map(([label, count]) => `
-        <div class="task-item">
+        <button class="task-item" type="button" data-task-screen="${routes[label]?.[0] || "list"}" data-task-filter="${routes[label]?.[1] || "all"}">
           <span>${escapeHtml(label)}</span>
           <strong>${count}件</strong>
-        </div>
+        </button>
       `).join("");
     }
 
@@ -7771,6 +7789,19 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       });
       $("dashboardMonth").addEventListener("change", () => {
         state.dashboardMonth = $("dashboardMonth").value;
+        render();
+      });
+      $("dashTaskBreakdown").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-task-screen]");
+        if (!button) return;
+        const screen = button.dataset.taskScreen || "list";
+        const filter = button.dataset.taskFilter || "all";
+        if (screen === "sales") {
+          state.salesFilters.view = filter;
+        } else {
+          state.filters.quick = filter;
+        }
+        setActiveScreen(screen);
         render();
       });
       document.querySelectorAll("[data-screen-shortcut]").forEach((button) => {

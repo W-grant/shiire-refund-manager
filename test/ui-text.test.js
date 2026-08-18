@@ -234,7 +234,10 @@ test("Sales dashboard and Google Sheets controls stay visible", () => {
     "現物写真",
     "旧クラウド同期（通常不要）",
     "旧同期を使う場合のみ入力",
-    "全削除には管理者権限が必要です"
+    "全削除には管理者権限が必要です",
+    "data-task-screen",
+    "data-task-filter",
+    "dashTaskBreakdown"
   ];
 
   for (const marker of requiredControls) {
