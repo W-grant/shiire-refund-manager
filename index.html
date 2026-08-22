@@ -4179,6 +4179,20 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       if (records.some((record) => record.id === current)) select.value = current;
     }
 
+    function openSaleFormForPurchase(record, status = "sold") {
+      setActiveScreen("sales");
+      resetSaleForm();
+      $("salePurchaseInventoryFilter").value = "";
+      $("salePurchaseSearch").value = managementNumberFor(record) || record.name || "";
+      renderSalePurchaseOptions();
+      $("salePurchaseId").value = record.id;
+      $("saleDestination").value = saleDestinationFromPurchase(record);
+      $("saleStatusField").value = status;
+      if (status === "sold") $("saleSoldAt").value = today();
+      suggestSaleListingIdIfEmpty();
+      $("salesStatus").textContent = "販売価格を入力して保存すると、在庫なしになります";
+      $("salesForm").scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     function resetSaleForm() {
       const form = $("salesForm");
       if (!form) return;
@@ -5821,7 +5835,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
           <td>${badge(c.kind)}<br><span class="muted small">${Math.round(c.ratio * 100)}%</span></td>
           <td><span class="money">${yen(c.tax)}</span></td>
           <td>${escapeHtml(record.staff || "")}</td>
-          <td><div class="row-actions"><button type="button" title="編集" data-edit="${record.id}">✎</button><button class="danger" type="button" title="削除" data-delete="${record.id}">×</button></div></td>
+          <td><div class="row-actions"><button type="button" title="販売登録" data-sale-create="${record.id}">販売</button><button type="button" title="編集" data-edit="${record.id}">✎</button><button class="danger" type="button" title="削除" data-delete="${record.id}">×</button></div></td>
         `;
         tbody.append(tr);
       });
@@ -8208,8 +8222,12 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       const handleRecordAction = async (event) => {
         const evidenceId = event.target.closest("[data-evidence]")?.dataset.evidence;
         const editId = event.target.closest("[data-edit]")?.dataset.edit;
+        const saleCreateId = event.target.closest("[data-sale-create]")?.dataset.saleCreate;
         const deleteId = event.target.closest("[data-delete]")?.dataset.delete;
-        if (evidenceId) openEvidence(evidenceId);
+        if (evidenceId) {
+          openEvidence(evidenceId);
+          return;
+        }
         if (editId) {
           const record = state.records.find((item) => item.id === editId);
           if (record) {
@@ -8217,6 +8235,12 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
             openManualEntryForm();
             setActiveScreen("purchase");
           }
+          return;
+        }
+        if (saleCreateId) {
+          const record = state.records.find((item) => item.id === saleCreateId);
+          if (record) openSaleFormForPurchase(record, "sold");
+          return;
         }
         if (deleteId && confirm("削除しますか？")) {
           await deleteRecord(deleteId);

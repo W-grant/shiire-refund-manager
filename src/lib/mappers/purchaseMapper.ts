@@ -81,6 +81,7 @@ function optionalText(value: string | null | undefined) {
 const COST_MEMO_MARKER = "shiire_cost_breakdown:";
 const INVOICE_REGISTRATION_MEMO_MARKER = "shiire_invoice_registration:";
 const STAFF_MEMO_MARKER = "shiire_staff:";
+const MANAGEMENT_NUMBER_MEMO_MARKER = "shiire_management_number:";
 
 function numberValue(value: unknown) {
   const number = Number(value || 0);
@@ -111,6 +112,9 @@ function normalizeStaffName(value: unknown) {
   if (staff === "阿部さん") return "阿部";
   if (staff === "大石さん") return "大石";
   return staff;
+}
+function normalizeManagementNumber(value: unknown) {
+  return String(value || "").trim().replace(/\s+/g, "");
 }
 
 function splitMemoAndInvoiceRegistration(memo: string | null | undefined) {
@@ -144,6 +148,21 @@ function memoWithStaff(memo: string | null | undefined, staff: string | null | u
   if (!normalized || normalized === "未設定") return cleanMemo;
   return `${cleanMemo}${cleanMemo ? "\n" : ""}${STAFF_MEMO_MARKER}${normalized}`;
 }
+function splitMemoAndManagementNumber(memo: string | null | undefined) {
+  const text = String(memo || "");
+  const markerIndex = text.indexOf(MANAGEMENT_NUMBER_MEMO_MARKER);
+  if (markerIndex < 0) return { memo: text, managementNumber: "" };
+  const cleanMemo = text.slice(0, markerIndex).trim();
+  const managementNumber = normalizeManagementNumber(text.slice(markerIndex + MANAGEMENT_NUMBER_MEMO_MARKER.length).trim().split(/\s+/)[0] || "");
+  return { memo: cleanMemo, managementNumber };
+}
+
+function memoWithManagementNumber(memo: string | null | undefined, managementNumber: string | null | undefined) {
+  const cleanMemo = splitMemoAndManagementNumber(memo).memo.trim();
+  const normalized = normalizeManagementNumber(managementNumber);
+  if (!normalized) return cleanMemo;
+  return `${cleanMemo}${cleanMemo ? "\n" : ""}${MANAGEMENT_NUMBER_MEMO_MARKER}${normalized}`;
+}
 
 function memoWithCostBreakdown(memo: string | null | undefined, record: LegacyRecord) {
   const cleanMemo = String(memo || "").replace(new RegExp(`\\n?${COST_MEMO_MARKER}.*$`, "s"), "").trim();
@@ -153,7 +172,7 @@ function memoWithCostBreakdown(memo: string | null | undefined, record: LegacyRe
 }
 
 function memoWithInternalMarkers(memo: string | null | undefined, record: LegacyRecord) {
-  return memoWithCostBreakdown(memoWithStaff(memoWithInvoiceRegistration(memo, record.invoiceRegistrationNumber), record.staff), record);
+  return memoWithCostBreakdown(memoWithStaff(memoWithManagementNumber(memoWithInvoiceRegistration(memo, record.invoiceRegistrationNumber), record.managementNumber), record.staff), record);
 }
 
 function splitMemoAndCosts(memo: string | null | undefined) {
@@ -232,13 +251,15 @@ export function purchasesToLegacyRecords(rows: PurchaseRow[], evidenceRows: Evid
 export function purchaseToLegacyRecord(row: PurchaseRow, evidenceRows: EvidenceWithUrl[]): LegacyRecord {
   const memoParts = splitMemoAndCosts(row.memo);
   const staffParts = splitMemoAndStaff(memoParts.memo);
-  const invoiceParts = splitMemoAndInvoiceRegistration(staffParts.memo);
+  const managementParts = splitMemoAndManagementNumber(staffParts.memo);
+  const invoiceParts = splitMemoAndInvoiceRegistration(managementParts.memo);
   const costs = costBreakdown({ shippingFeeTotal: Number(row.shipping_fee_total || 0), ...(memoParts.costs || {}) });
   return {
     id: row.id,
     date: row.purchase_date,
     channel: row.channel?.name || "",
     staff: normalizeStaffName(row.staff?.display_name || staffParts.staff || "未設定"),
+    managementNumber: managementParts.managementNumber,
     name: row.name,
     manufacturer: row.manufacturer || "",
     category: row.category?.name || "",
