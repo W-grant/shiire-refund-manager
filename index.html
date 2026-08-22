@@ -1942,6 +1942,12 @@
                   </label>
                   <button id="applyReviewSupplierPreset" type="button">全行へ適用</button>
                 </div>
+                <div class="review-supplier-tools" aria-label="担当一括反映">
+                  <label>担当
+                    <select id="reviewStaffBulk"></select>
+                  </label>
+                  <button id="applyReviewStaffBulk" type="button">担当を全行へ適用</button>
+                </div>
                 <div class="review-selection-tools">
                   <label class="review-check">
                     <input id="reviewSelectAll" type="checkbox" checked>
@@ -2677,7 +2683,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
     const META = {
       branches: ["札幌", "千葉", "東京", "福岡"],
       channels: ["ヤフオク", "メルカリ", "ラクマ", "市場（古物市場）", "業者オークション", "店頭買取", "その他"],
-      staff: ["未設定"],
+      staff: ["未設定", "阿部さん", "大石さん", "朝田"],
       categories: ["時計", "バッグ", "貴金属・宝飾", "カメラ", "コイン・切手", "美術品・骨董", "道具類", "衣類", "その他"]
     };
 
@@ -4541,12 +4547,18 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       await tx(STORE_SETTINGS, "readwrite", (store) => store.put(state.settings));
     }
 
+    function mergeMetaList(savedItems, defaultItems) {
+      const merged = [...(Array.isArray(savedItems) ? savedItems : []), ...defaultItems]
+        .map((item) => String(item || "").trim())
+        .filter(Boolean);
+      return [...new Set(merged)].length ? [...new Set(merged)] : defaultItems;
+    }
     async function loadMeta() {
       const saved = await tx(STORE_META, "readonly", (store) => requestToPromise(store.get("meta")));
       if (saved) {
         META.branches = saved.branches || META.branches;
         META.channels = saved.channels || META.channels;
-        META.staff = saved.staff || META.staff;
+        META.staff = mergeMetaList(saved.staff, META.staff);
         META.categories = saved.categories || META.categories;
       }
     }
@@ -4822,6 +4834,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       populateSelect($("branch"), META.branches);
       populateSelect($("channel"), META.channels);
       populateSelect($("staff"), META.staff);
+      if ($("reviewStaffBulk")) populateSelect($("reviewStaffBulk"), META.staff);
       populateSelect($("category"), META.categories);
       populateSelect($("filterStaff"), META.staff, "担当すべて");
       populateSelect($("filterChannel"), META.channels, "チャネルすべて");
@@ -6567,6 +6580,16 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       }
     }
 
+    function applyStaffToAllReviewItems() {
+      const staff = $("reviewStaffBulk").value || META.staff[0] || "未設定";
+      if (!state.aiItems.length) {
+        $("extractStatus").textContent = "一括変更できる抽出行がありません";
+        return;
+      }
+      state.aiItems.forEach((_, index) => updateReviewItem(index, "staff", staff));
+      renderReview();
+      $("extractStatus").textContent = `担当を${staff}に全行へ反映しました`;
+    }
     function applySupplierToAllReviewItems() {
       if (!state.aiItems.length) {
         $("extractStatus").textContent = "一括変更できる抽出行がありません";
@@ -6725,6 +6748,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         })
       ].join("");
       const channelOptions = META.channels.map((item) => [item, item]);
+      const staffOptions = META.staff.map((item) => [item, item]);
       const categoryOptions = META.categories.map((item) => [item, item]);
       const destinationOptions = [["ebay", "EBAY"], ["catawiki", "CATAWIKI"], ["overseas", "その他海外サイト"], ["yahoo", "ヤフオク"], ["market", "市場"], ["other", "その他"]];
       const kindOptions = [["kobutsu", "古物"], ["jun", "準古物"], ["other", "古物以外"]];
@@ -6762,6 +6786,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
               ${reviewInputHtml(index, "qty", "数量", "number", record.qty, 'min="1" step="1"')}
               ${reviewInputHtml(index, "date", "仕入日", "date", record.date)}
               ${reviewSelectHtml(index, "channel", "チャネル", channelOptions, record.channel)}
+              ${reviewSelectHtml(index, "staff", "担当", staffOptions, record.staff || META.staff[0] || "未設定")}
               <div class="review-field">
                 <label>証憑ファイル</label>
                 <select data-review="${index}" data-field="imageIndex">${imageOptions(record.imageIndex)}</select>
@@ -8139,6 +8164,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       $("selectWarningReviewBtn").addEventListener("click", () => setReviewSelectionByValidation("warning"));
       $("reviewSupplierPreset").addEventListener("change", updateSupplierPresetInputs);
       $("applyReviewSupplierPreset").addEventListener("click", applySupplierToAllReviewItems);
+      $("applyReviewStaffBulk").addEventListener("click", applyStaffToAllReviewItems);
       $("assignReviewManagementNumbers").addEventListener("click", assignManagementNumbersToSelectedReviewItems);
       $("reviewRows").addEventListener("input", (event) => {
         const target = event.target.closest("[data-review]");
