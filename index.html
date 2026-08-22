@@ -1213,6 +1213,21 @@
       border-top: 1px solid var(--line);
     }
 
+    .review-save-tools {
+      width: 100%;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      padding: 10px;
+      border: 1px solid #cfe1d4;
+      border-radius: 8px;
+      background: #f7faf6;
+    }
+
+    .review-save-tools .small {
+      flex: 1 1 240px;
+    }
     .review-preflight {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1940,11 +1955,15 @@
                 <button type="button" data-review-copy-first="seller,address,qualified,invoiceRegistrationNumber,anon">相手方・適格事業者だけ全行へ反映</button>
                 <button type="button" data-review-copy-first="shippingFee,purchaseFee,rate">送料・手数料・税率だけ全行へ反映</button>
                 <button id="assignReviewManagementNumbers" type="button">選択行へ管理番号を自動採番</button>
+                <div class="review-save-tools">
+                  <button id="addExtractedTopBtn" class="primary" type="button">選択した行を一括登録</button>
+                  <span class="small muted">修正が終わった行にチェックを入れて、このボタンで仕入一覧へまとめて登録できます。個別確認したい時だけ各行の「1件だけフォームで確認」を使います。</span>
+                </div>
               </div>
               <div id="reviewRows"></div>
             </div>
             <div class="actions">
-              <button id="addExtractedBtn" type="button">まとめて追加</button>
+              <button id="addExtractedBtn" class="primary" type="button">選択した行を一括登録</button>
             </div>
           </div>
         </section>
@@ -3347,7 +3366,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       Array.from(form.elements).forEach((element) => {
         if (element.id !== "recordId") element.disabled = !canWrite;
       });
-      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractDataFiles", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn", "taxPackageBtn", "authPurchaseId", "authBrand", "authDecision", "authCheckedAt", "authChecker", "authSources", "authOpenIssues", "authImages", "runAuthAiBtn", "clearAuthImagesBtn", "saveAuthBtn", "resetAuthBtn"], !canWrite);
+      setControlsDisabled(["proof", "resetBtn", "extractImages", "extractDataFiles", "extractText", "runExtractBtn", "clearExtractBtn", "addExtractedBtn", "addExtractedTopBtn", "importFile", "importEvidenceFiles", "restoreFile", "migrateLocalBtn", "taxPackageBtn", "authPurchaseId", "authBrand", "authDecision", "authCheckedAt", "authChecker", "authSources", "authOpenIssues", "authImages", "runAuthAiBtn", "clearAuthImagesBtn", "saveAuthBtn", "resetAuthBtn"], !canWrite);
       $("sampleBtn").disabled = !canWrite;
       $("clearBtn").disabled = !isAdmin();
       render();
@@ -6661,11 +6680,18 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       $("extractStatus").textContent = `${label}を${selected.size}件選択しました`;
     }
 
+    function setAddExtractedButtonText(count) {
+      const label = count ? `選択した${count}件を一括登録` : "選択した行を一括登録";
+      ["addExtractedBtn", "addExtractedTopBtn"].forEach((id) => {
+        const button = $(id);
+        if (button) button.textContent = label;
+      });
+    }
     function updateReviewSelectionControls() {
       const count = selectedReviewItems().length;
       const total = state.aiItems.length;
       if ($("reviewSelectionCount")) $("reviewSelectionCount").textContent = `${count} / ${total}件選択中`;
-      if ($("addExtractedBtn")) $("addExtractedBtn").textContent = count ? `選択した${count}件を仕入れ一覧へ追加` : "選択した行を仕入れ一覧へ追加";
+      setAddExtractedButtonText(count);
       if ($("reviewSelectAll")) {
         $("reviewSelectAll").checked = total > 0 && count === total;
         $("reviewSelectAll").indeterminate = count > 0 && count < total;
@@ -6709,7 +6735,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
               <span class="small muted">${escapeHtml([record.date, record.channel, record.category].filter(Boolean).join(" / "))}</span>
             </div>
             <div class="review-actions">
-              <button type="button" data-review-apply="${index}">フォームへ反映</button>
+              <button type="button" data-review-apply="${index}">1件だけフォームで確認</button>
             </div>
           </div>
           ${reviewFlagsHtml(result)}
@@ -6873,7 +6899,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       state.proofDraft = selectedImages.map((image) => ({ ...image }));
       renderProofPreview([]);
       updateLiveClassify();
-      $("extractStatus").textContent = "フォームへ反映しました。内容を確認して保存してください";
+      $("extractStatus").textContent = "1件だけフォームに反映しました。まとめて登録する場合は抽出結果の一括登録ボタンを使ってください";
       $("formTitle").scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
@@ -8073,12 +8099,14 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         }
       });
       $("clearExtractBtn").addEventListener("click", clearExtract);
-      $("addExtractedBtn").addEventListener("click", async () => {
-        try {
-          await addExtracted();
-        } catch (error) {
-          $("extractStatus").textContent = error.message;
-        }
+      ["addExtractedBtn", "addExtractedTopBtn"].forEach((id) => {
+        $(id).addEventListener("click", async () => {
+          try {
+            await addExtracted();
+          } catch (error) {
+            $("extractStatus").textContent = error.message;
+          }
+        });
       });
       $("reviewBulkTools").addEventListener("click", (event) => {
         const button = event.target.closest("[data-review-copy-first]");
