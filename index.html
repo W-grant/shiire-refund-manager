@@ -1953,6 +1953,7 @@
                 </div>
                 <button type="button" data-review-copy-first="channel,destination,seller,address,qualified,invoiceRegistrationNumber,anon,kind,stock,rate,imageIndex">先頭行の取引情報を全行へ反映</button>
                 <button type="button" data-review-copy-first="seller,address,qualified,invoiceRegistrationNumber,anon">相手方・適格事業者だけ全行へ反映</button>
+                <button type="button" data-review-set-all="destination:ebay">利用先をEBAYに全行へ反映</button>
                 <button type="button" data-review-copy-first="shippingFee,purchaseFee,rate">送料・手数料・税率だけ全行へ反映</button>
                 <button id="assignReviewManagementNumbers" type="button">選択行へ管理番号を自動採番</button>
                 <div class="review-save-tools">
@@ -6539,6 +6540,18 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       $("extractStatus").textContent = "\u5148\u982d\u884c\u306e\u5185\u5bb9\u3092\u5168\u884c\u3078\u53cd\u6620\u3057\u307e\u3057\u305f";
     }
 
+
+    function setReviewFieldForAll(field, value) {
+      if (!state.aiItems.length) {
+        $("extractStatus").textContent = "一括変更できる抽出行がありません";
+        return;
+      }
+      state.aiItems.forEach((_, index) => updateReviewItem(index, field, value));
+      renderReview();
+      const label = field === "destination" && value === "ebay" ? "利用先をEBAY" : `${field}を${value}`;
+      $("extractStatus").textContent = `${label}に全行へ反映しました`;
+    }
+
     const SUPPLIER_PRESETS = {
       ecoring: { seller: "エコリング", address: "" },
       daikichi: { seller: "大吉", address: "" },
@@ -8109,10 +8122,17 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         });
       });
       $("reviewBulkTools").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-review-copy-first]");
-        if (!button) return;
-        const fields = button.dataset.reviewCopyFirst.split(",").map((field) => field.trim()).filter(Boolean);
-        copyFirstReviewFieldsToAll(fields);
+        const copyButton = event.target.closest("[data-review-copy-first]");
+        if (copyButton) {
+          const fields = copyButton.dataset.reviewCopyFirst.split(",").map((field) => field.trim()).filter(Boolean);
+          copyFirstReviewFieldsToAll(fields);
+          return;
+        }
+        const setButton = event.target.closest("[data-review-set-all]");
+        if (setButton) {
+          const [field, value] = setButton.dataset.reviewSetAll.split(":");
+          if (field && value) setReviewFieldForAll(field, value);
+        }
       });
       $("reviewSelectAll").addEventListener("change", (event) => setAllReviewSelection(event.target.checked));
       $("selectReadyReviewBtn").addEventListener("click", () => setReviewSelectionByValidation("ready"));
