@@ -2683,7 +2683,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
     const META = {
       branches: ["札幌", "千葉", "東京", "福岡"],
       channels: ["ヤフオク", "メルカリ", "ラクマ", "市場（古物市場）", "業者オークション", "店頭買取", "その他"],
-      staff: ["未設定", "阿部さん", "大石さん", "朝田"],
+      staff: ["未設定", "阿部", "大石", "朝田"],
       categories: ["時計", "バッグ", "貴金属・宝飾", "カメラ", "コイン・切手", "美術品・骨董", "道具類", "衣類", "その他"]
     };
 
@@ -4547,9 +4547,16 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       await tx(STORE_SETTINGS, "readwrite", (store) => store.put(state.settings));
     }
 
+    function normalizeStaffName(name) {
+      const value = String(name || "").trim();
+      if (value === "阿部さん") return "阿部";
+      if (value === "大石さん") return "大石";
+      return value;
+    }
+
     function mergeMetaList(savedItems, defaultItems) {
       const merged = [...(Array.isArray(savedItems) ? savedItems : []), ...defaultItems]
-        .map((item) => String(item || "").trim())
+        .map((item) => normalizeStaffName(item))
         .filter(Boolean);
       return [...new Set(merged)].length ? [...new Set(merged)] : defaultItems;
     }
