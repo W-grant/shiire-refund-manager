@@ -178,12 +178,20 @@ function numberValue(value: unknown) {
   return Number.isFinite(number) ? Math.round(number) : 0;
 }
 
+function nonNegativeNumber(value: unknown) {
+  return Math.max(0, numberValue(value));
+}
+
+function positiveQuantity(value: unknown) {
+  return Math.max(1, numberValue(value) || 1);
+}
+
 function costBreakdown(record: Partial<LegacyRecord>) {
-  const shippingFee = numberValue(record.shippingFee);
-  const purchaseFeeTax = numberValue(record.purchaseFeeTax);
-  const oldTotal = numberValue(record.shippingFeeTotal);
+  const shippingFee = nonNegativeNumber(record.shippingFee);
+  const purchaseFeeTax = nonNegativeNumber(record.purchaseFeeTax);
+  const oldTotal = nonNegativeNumber(record.shippingFeeTotal);
   const hasBreakdown = Boolean(record.shippingFee || record.purchaseFee || record.purchaseFeeTax);
-  const purchaseFee = numberValue(record.purchaseFee ?? (hasBreakdown ? 0 : oldTotal));
+  const purchaseFee = nonNegativeNumber(record.purchaseFee ?? (hasBreakdown ? 0 : oldTotal));
   const total = shippingFee + purchaseFee + purchaseFeeTax;
   return {
     shippingFee,
@@ -293,10 +301,10 @@ export function legacyRecordToPurchaseInsert(
     staff_id: null,
     name: record.name,
     manufacturer: optionalText(record.manufacturer),
-    quantity: Number(record.qty || 1),
-    item_price: Number(record.itemPrice ?? record.amount ?? 0),
+    quantity: positiveQuantity(record.qty),
+    item_price: nonNegativeNumber(record.itemPrice ?? record.amount ?? 0),
     shipping_fee_total: costBreakdown(record).shippingFeeTotal,
-    amount: Number(record.amount || 0),
+    amount: nonNegativeNumber(record.amount),
     destination: destinationForSave(record.destination),
     tax_rate: taxRateForSave(record.rate),
     kind: kindForSave(record.kind),
@@ -394,3 +402,4 @@ export function evidenceToLegacyImageBundles(rows: EvidenceWithUrl[]) {
   });
   return [...bundles.values()];
 }
+

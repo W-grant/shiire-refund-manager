@@ -288,4 +288,13 @@ test("Evidence upload retries are resilient", () => {
   assert.equal(evidenceRepository.includes('.upsert(rows, { onConflict: "storage_path" })'), true, "Evidence metadata should upsert by storage_path");
   assert.equal(storageRepository.includes('const rawBase = dot > 0 ? raw.slice(0, dot) : raw;'), true, "Storage file names should sanitize the base name before adding MIME extension");
 });
+test("Supabase save values are normalized before constrained inserts", () => {
+  const purchaseMapper = fs.readFileSync(path.join(__dirname, "..", "src", "lib", "mappers", "purchaseMapper.ts"), "utf8");
+  const salesService = fs.readFileSync(path.join(__dirname, "..", "src", "lib", "services", "salesService.ts"), "utf8");
+  assert.equal(purchaseMapper.includes("function nonNegativeNumber"), true, "purchase amounts should be clamped before Supabase insert");
+  assert.equal(purchaseMapper.includes("function positiveQuantity"), true, "purchase quantity should be at least 1 before Supabase insert");
+  assert.equal(salesService.includes("function normalizedDestination"), true, "sales destination should be normalized before Supabase insert");
+  assert.equal(salesService.includes("function normalizedStatus"), true, "sales status should be normalized before Supabase insert");
+  assert.equal(salesService.includes("replace(/[./]/g, \"-\")"), true, "sales dates should be normalized before Supabase insert");
+});
 

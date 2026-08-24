@@ -46,7 +46,28 @@ async function getWriteContext() {
 
 function numberValue(value: number | undefined) {
   const numeric = Number(value || 0);
-  return Number.isFinite(numeric) ? Math.round(numeric) : 0;
+  return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0;
+}
+
+function normalizedDestination(value: unknown): SaleDestination {
+  const text = String(value || "").trim().toLowerCase();
+  if (text.includes("catawiki")) return "catawiki";
+  if (text.includes("ebay") || text.includes("e-bay")) return "ebay";
+  if (text.includes("海外") || text.includes("overseas") || text.includes("oversea")) return "overseas";
+  if (text.includes("ヤフオク") || text.includes("yahoo")) return "yahoo";
+  if (text.includes("市場") || text.includes("market")) return "market";
+  return "other";
+}
+
+function normalizedStatus(value: unknown): SaleStatus {
+  const allowed: SaleStatus[] = ["not_listed", "preparing", "listed", "sold", "cancelled", "returned", "on_hold"];
+  const text = String(value || "").trim().toLowerCase();
+  return allowed.includes(text as SaleStatus) ? text as SaleStatus : "not_listed";
+}
+
+function normalizedCurrency(value: unknown) {
+  const text = String(value || "JPY").trim().toUpperCase().replace(/[^A-Z]/g, "");
+  return text || "JPY";
 }
 
 function optionalText(value: string | undefined) {
@@ -56,12 +77,17 @@ function optionalText(value: string | undefined) {
 
 function optionalDate(value: string | undefined) {
   const text = String(value || "").trim();
-  return text || null;
+  if (!text) return null;
+  const normalized = text.replace(/[./]/g, "-").replace(/年|月/g, "-").replace(/日/g, "");
+  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!match) return null;
+  const [, year, month, day] = match;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
 function salePriceJpy(input: SaleFormInput) {
   const price = numberValue(input.salePrice);
-  const currency = String(input.currency || "JPY").toUpperCase();
+  const currency = normalizedCurrency(input.currency);
   const exchangeRate = Number(input.exchangeRate || 0);
   if (currency === "JPY") return price;
   if (Number.isFinite(exchangeRate) && exchangeRate > 0) {
@@ -73,15 +99,15 @@ function salePriceJpy(input: SaleFormInput) {
 function buildSaleRow(input: SaleFormInput, userId: string) {
   return {
     purchase_id: input.purchaseId,
-    destination: input.destination || "other",
-    status: input.status || "not_listed",
+    destination: normalizedDestination(input.destination),
+    status: normalizedStatus(input.status),
     listing_id: optionalText(input.listingId),
     sku: optionalText(input.sku),
     listed_at: optionalDate(input.listedAt),
     sold_at: optionalDate(input.soldAt),
     sale_price: numberValue(input.salePrice),
-    currency: String(input.currency || "JPY").toUpperCase(),
-    exchange_rate: input.currency && input.currency !== "JPY" ? Number(input.exchangeRate || 0) || null : null,
+    currency: normalizedCurrency(input.currency),
+    exchange_rate: normalizedCurrency(input.currency) !== "JPY" && Number(input.exchangeRate || 0) > 0 ? Number(input.exchangeRate || 0) : null,
     sale_price_jpy: salePriceJpy(input),
     platform_fee: numberValue(input.platformFee),
     payment_fee: numberValue(input.paymentFee),
@@ -111,3 +137,4 @@ export async function deleteSale(id: string) {
   if (role !== "admin") throw new Error("販売情報の削除には管理者権限が必要です");
   return markSaleDeleted(id, userId);
 }
+
