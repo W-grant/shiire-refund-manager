@@ -18,7 +18,7 @@ export type LegacyRecord = {
   purchaseFeeTax?: number;
   shippingFeeTotal?: number;
   amount: number;
-  destination?: "catawiki" | "ebay" | "overseas" | "yahoo" | "market" | "both" | "undecided" | "other";
+  destination?: string;
   kind: "kobutsu" | "jun" | "other";
   stock: "yes" | "no";
   qualified: "yes" | "no" | "unknown";
@@ -126,6 +126,46 @@ export function normalizePurchaseDate(value: string | null | undefined) {
 function purchaseDateForSave(value: string | null | undefined) {
   const normalized = normalizePurchaseDate(value);
   return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : new Date().toISOString().slice(0, 10);
+}
+
+function destinationForSave(value: unknown): PurchaseInsert["destination"] {
+  const text = normalizedText(value);
+  if (!text || text === "未定" || text === "未設定") return "undecided";
+  if (text.includes("catawiki")) return "catawiki";
+  if (text.includes("ebay") || text.includes("e-bay")) return "ebay";
+  if (text.includes("海外") || text.includes("overseas") || text.includes("oversea")) return "overseas";
+  if (text.includes("ヤフオク") || text.includes("yahoo")) return "yahoo";
+  if (text.includes("市場") || text.includes("market")) return "market";
+  if (text.includes("共通") || text.includes("both")) return "both";
+  return "other";
+}
+
+function kindForSave(value: unknown): PurchaseInsert["kind"] {
+  const text = normalizedText(value);
+  if (text === "jun" || text.includes("準")) return "jun";
+  if (text === "other" || text.includes("その他")) return "other";
+  return "kobutsu";
+}
+
+function stockForSave(value: unknown): PurchaseInsert["stock"] {
+  const text = normalizedText(value);
+  return text === "no" || text.includes("いいえ") || text.includes("なし") ? "no" : "yes";
+}
+
+function qualifiedForSave(value: unknown): PurchaseInsert["qualified"] {
+  const text = normalizedText(value);
+  if (text === "yes" || text.includes("あり") || text.includes("登録")) return "yes";
+  if (text === "no" || text.includes("なし")) return "no";
+  return "unknown";
+}
+
+function transactionTypeForSave(value: unknown): PurchaseInsert["transaction_type"] {
+  const text = normalizedText(value);
+  return text === "named" || text.includes("記名") || text.includes("本名") ? "named" : "anon";
+}
+
+function taxRateForSave(value: unknown) {
+  return Number(value) === 8 ? 8 : 10;
 }
 
 const COST_MEMO_MARKER = "shiire_cost_breakdown:";
@@ -257,12 +297,12 @@ export function legacyRecordToPurchaseInsert(
     item_price: Number(record.itemPrice ?? record.amount ?? 0),
     shipping_fee_total: costBreakdown(record).shippingFeeTotal,
     amount: Number(record.amount || 0),
-    destination: record.destination || "undecided",
-    tax_rate: Number(record.rate || 10),
-    kind: record.kind,
-    stock: record.stock,
-    qualified: record.qualified,
-    transaction_type: record.anon,
+    destination: destinationForSave(record.destination),
+    tax_rate: taxRateForSave(record.rate),
+    kind: kindForSave(record.kind),
+    stock: stockForSave(record.stock),
+    qualified: qualifiedForSave(record.qualified),
+    transaction_type: transactionTypeForSave(record.anon),
     seller_name: optionalText(record.seller),
     seller_address: optionalText(record.address),
     memo: optionalText(memoWithInternalMarkers(record.memo, record)),
