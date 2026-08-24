@@ -276,3 +276,16 @@ test("Sales input validation prevents incomplete sold records", () => {
     assert.equal(indexHtml.includes(message), true, `${message} should be present in sales validation`);
   }
 });
+test("AI review save keeps PDFs and defaults missing destination to EBAY", () => {
+  assert.equal(indexHtml.includes('images: item.images.filter((image) => image && image.full)'), true, "PDF evidence without thumbnail should remain saveable");
+  assert.equal(indexHtml.includes('if (!text || text === "未定" || text === "未設定") return "ebay";'), true, "missing AI destination should default to EBAY");
+});
+
+test("Evidence upload retries are resilient", () => {
+  const storageRepository = fs.readFileSync(path.join(__dirname, "..", "src", "lib", "repositories", "storageRepository.ts"), "utf8");
+  const evidenceRepository = fs.readFileSync(path.join(__dirname, "..", "src", "lib", "repositories", "evidenceRepository.ts"), "utf8");
+  assert.equal(storageRepository.includes('upsert: true'), true, "Storage upload should allow retrying the same evidence key");
+  assert.equal(evidenceRepository.includes('.upsert(rows, { onConflict: "storage_path" })'), true, "Evidence metadata should upsert by storage_path");
+  assert.equal(storageRepository.includes('const rawBase = dot > 0 ? raw.slice(0, dot) : raw;'), true, "Storage file names should sanitize the base name before adding MIME extension");
+});
+

@@ -2798,10 +2798,10 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       if (Array.isArray(item.images)) {
         return {
           id: item.id,
-          images: item.images.filter((image) => image && image.full && image.thumb)
+          images: item.images.filter((image) => image && image.full)
         };
       }
-      if (item.full && item.thumb) {
+      if (item.full) {
         const { id, ...image } = item;
         return { id, images: [image] };
       }
@@ -6526,6 +6526,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
 
     function destinationValue(value) {
       const text = String(value || "").trim().toLowerCase();
+      if (!text || text === "未定" || text === "未設定") return "ebay";
       if (text.includes("catawiki")) return "catawiki";
       if (text.includes("ebay") || text.includes("e-bay")) return "ebay";
       if (text.includes("海外") || text.includes("overseas")) return "overseas";
@@ -8434,3 +8435,4 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
   </script>
 </body>
 </html>
+

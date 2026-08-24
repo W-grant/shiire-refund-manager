@@ -52,7 +52,7 @@ export async function insertPurchaseEvidence(rows: PurchaseEvidenceInsert[]) {
   if (!rows.length) return [];
   const { data, error } = await supabase
     .from("purchase_evidence")
-    .insert(rows)
+    .upsert(rows, { onConflict: "storage_path" })
     .select("id,purchase_id,storage_bucket,storage_path,file_name,label,mime_type,file_size,sort_order,created_at");
   if (error) throw error;
   return (data || []) as EvidenceRow[];
@@ -83,3 +83,4 @@ export async function attachEvidenceUrls(rows: EvidenceRow[]) {
   );
   return withUrls.filter((row) => row.url) as EvidenceWithUrl[];
 }
+

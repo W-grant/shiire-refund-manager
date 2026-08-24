@@ -55,9 +55,10 @@ function extensionFromMime(mimeType: string) {
 }
 
 function fileNameForStorage(fileName: string, mimeType: string) {
-  const safe = sanitizePathPart(fileName, "evidence");
-  const dot = safe.lastIndexOf(".");
-  const base = dot > 0 ? safe.slice(0, dot) : safe;
+  const raw = String(fileName || "");
+  const dot = raw.lastIndexOf(".");
+  const rawBase = dot > 0 ? raw.slice(0, dot) : raw;
+  const base = sanitizePathPart(rawBase, "evidence");
   return `${base}${extensionFromMime(mimeType)}`;
 }
 
@@ -107,7 +108,7 @@ export async function uploadEvidenceImages(
       const storagePath = evidenceStoragePath(record, image, sortOrder, mimeType);
       const { error } = await supabase.storage
         .from(EVIDENCE_BUCKET)
-        .upload(storagePath, blob, { contentType: mimeType, upsert: false });
+        .upload(storagePath, blob, { contentType: mimeType, upsert: true });
 
       if (error) throw error;
       console.log("[Storage] Upload success", { id: record.id, storagePath });
@@ -149,3 +150,4 @@ export async function uploadEvidenceImages(
 
   return { successes, failures };
 }
+
