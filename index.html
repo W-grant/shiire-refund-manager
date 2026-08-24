@@ -6930,7 +6930,8 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         record.hasImage = Boolean(bundle && bundle.images.length);
         const saved = await saveRecord(record, bundle);
         if (!saved) {
-          $("extractStatus").textContent = `${targetIndex + 1}件目の保存に失敗しました`;
+          const detail = $("ioStatus").textContent || "原因不明です。画面を更新して再度お試しください";
+          $("extractStatus").textContent = `${targetIndex + 1}件目の保存に失敗しました: ${detail}`;
           return;
         }
         savedIds.push(sourceRecord.id);

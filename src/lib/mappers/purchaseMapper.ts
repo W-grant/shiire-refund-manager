@@ -66,12 +66,47 @@ export function masterNames(rows: MasterRow[]) {
   return rows.map((row) => row.name);
 }
 
+const MASTER_ALIASES: Record<string, Array<[string, string]>> = {
+  channel: [
+    ["市場", "市場（古物市場）"],
+    ["古物市場", "市場（古物市場）"],
+    ["オークション", "業者オークション"]
+  ],
+  category: [
+    ["財布", "バッグ"],
+    ["ジュエリー", "貴金属・宝飾"],
+    ["宝飾", "貴金属・宝飾"],
+    ["アクセサリー", "貴金属・宝飾"],
+    ["レンズ", "カメラ"]
+  ]
+};
+
+function normalizedText(value: unknown) {
+  return String(value || "").normalize("NFKC").trim().toLowerCase();
+}
+
 function byName(rows: MasterRow[], name: string | null | undefined, label: string) {
   const value = String(name || "").trim();
   if (!value) return null;
-  const row = rows.find((item) => item.name === value || item.name.trim() === value);
-  if (!row) throw new Error(`${label} not found: ${value}`);
-  return row.id;
+  const normalizedValue = normalizedText(value);
+  const exact = rows.find((item) => normalizedText(item.name) === normalizedValue);
+  if (exact) return exact.id;
+
+  const alias = (MASTER_ALIASES[label] || []).find(([keyword]) => normalizedValue.includes(normalizedText(keyword)));
+  if (alias) {
+    const aliasRow = rows.find((item) => normalizedText(item.name) === normalizedText(alias[1]));
+    if (aliasRow) return aliasRow.id;
+  }
+
+  const partial = rows.find((item) => {
+    const rowName = normalizedText(item.name);
+    return rowName && (normalizedValue.includes(rowName) || rowName.includes(normalizedValue));
+  });
+  if (partial) return partial.id;
+
+  const fallback = rows.find((item) => item.name === "その他");
+  console.warn("[Save] Master not found; falling back", { label, value, fallback: fallback?.name || null });
+  return fallback?.id || null;
 }
 
 function optionalText(value: string | null | undefined) {
@@ -81,10 +116,16 @@ function optionalText(value: string | null | undefined) {
 
 export function normalizePurchaseDate(value: string | null | undefined) {
   const text = String(value || "").trim();
-  const match = text.replace(/[./]/g, "-").match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const normalized = text.replace(/[./]/g, "-").replace(/年|月/g, "-").replace(/日/g, "");
+  const match = normalized.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (!match) return text;
   const [, year, month, day] = match;
   return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function purchaseDateForSave(value: string | null | undefined) {
+  const normalized = normalizePurchaseDate(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : new Date().toISOString().slice(0, 10);
 }
 
 const COST_MEMO_MARKER = "shiire_cost_breakdown:";
@@ -205,7 +246,7 @@ export function legacyRecordToPurchaseInsert(
 ): PurchaseInsert {
   return {
     id: record.id,
-    purchase_date: normalizePurchaseDate(record.date),
+    purchase_date: purchaseDateForSave(record.date),
     branch_id: byName(masters.branches, record.branch, "branch"),
     channel_id: byName(masters.channels, record.channel, "channel"),
     category_id: byName(masters.categories, record.category, "category"),
