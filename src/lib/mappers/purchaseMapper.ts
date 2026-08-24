@@ -29,6 +29,7 @@ export type LegacyRecord = {
   address: string;
   memo: string;
   hasImage: boolean;
+  managementNumber?: string;
   updatedAt: string;
 };
 
@@ -76,6 +77,14 @@ function byName(rows: MasterRow[], name: string | null | undefined, label: strin
 function optionalText(value: string | null | undefined) {
   const text = String(value || "").trim();
   return text || null;
+}
+
+export function normalizePurchaseDate(value: string | null | undefined) {
+  const text = String(value || "").trim();
+  const match = text.replace(/[./]/g, "-").match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!match) return text;
+  const [, year, month, day] = match;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
 const COST_MEMO_MARKER = "shiire_cost_breakdown:";
@@ -196,7 +205,7 @@ export function legacyRecordToPurchaseInsert(
 ): PurchaseInsert {
   return {
     id: record.id,
-    purchase_date: record.date,
+    purchase_date: normalizePurchaseDate(record.date),
     branch_id: byName(masters.branches, record.branch, "branch"),
     channel_id: byName(masters.channels, record.channel, "channel"),
     category_id: byName(masters.categories, record.category, "category"),

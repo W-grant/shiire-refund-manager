@@ -1,4 +1,4 @@
-import type { LegacyImage, LegacyRecord } from "../mappers/purchaseMapper";
+import { normalizePurchaseDate, type LegacyImage, type LegacyRecord } from "../mappers/purchaseMapper";
 import { insertPurchaseEvidence } from "./evidenceRepository";
 import { supabase } from "../supabase";
 
@@ -58,7 +58,7 @@ async function dataUrlToBlob(dataUrl: string) {
 }
 
 export function evidenceStoragePath(record: LegacyRecord, image: LegacyImage, index: number, mimeType = "image/jpeg") {
-  const [year = "unknown", month = "unknown"] = String(record.date || "").split("-");
+  const [year = "unknown", month = "unknown"] = normalizePurchaseDate(record.date).split("-");
   const order = String(index + 1).padStart(3, "0");
   const label = sanitizePathPart(image.label || (mimeType === "application/pdf" ? "pdf" : "evidence"), "evidence");
   const fileName = fileNameForStorage(image.fileName || `evidence_${order}`, mimeType);
