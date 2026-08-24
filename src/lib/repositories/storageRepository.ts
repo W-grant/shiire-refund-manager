@@ -27,13 +27,22 @@ export type EvidenceUploadResult = {
 };
 
 function sanitizePathPart(value: string, fallback: string) {
-  const safe = String(value || "")
+  const ascii = String(value || "")
     .normalize("NFKC")
-    .replace(/[\\/:*?"<>|#%{}^~[\]`]/g, "_")
-    .replace(/\s+/g, "_")
+    .replace(/[^A-Za-z0-9._-]+/g, "_")
     .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return safe || fallback;
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80);
+  return ascii || fallback;
+}
+
+function storageLabel(value: string | null | undefined, mimeType: string) {
+  const text = String(value || "").trim();
+  if (/pdf|請求|適格|invoice/i.test(text) || mimeType === "application/pdf") return "invoice_pdf";
+  if (/商品|page|ページ/i.test(text)) return "item_page";
+  if (/現物|photo|写真/i.test(text)) return "item_photo";
+  if (/明細|detail|receipt/i.test(text)) return "detail";
+  return "evidence";
 }
 
 function extensionFromMime(mimeType: string) {
@@ -60,7 +69,7 @@ async function dataUrlToBlob(dataUrl: string) {
 export function evidenceStoragePath(record: LegacyRecord, image: LegacyImage, index: number, mimeType = "image/jpeg") {
   const [year = "unknown", month = "unknown"] = normalizePurchaseDate(record.date).split("-");
   const order = String(index + 1).padStart(3, "0");
-  const label = sanitizePathPart(image.label || (mimeType === "application/pdf" ? "pdf" : "evidence"), "evidence");
+  const label = storageLabel(image.label, mimeType);
   const fileName = fileNameForStorage(image.fileName || `evidence_${order}`, mimeType);
   return `purchases/${year}/${month}/${record.id}/${order}_${label}_${fileName}`;
 }

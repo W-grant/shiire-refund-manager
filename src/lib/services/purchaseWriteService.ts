@@ -105,8 +105,22 @@ export async function savePurchase(
       sessionResult.data.session?.user.id || null
     );
     console.log("[Save] Before insert", { id: row.id });
-    const purchase = await insertPurchase(row);
-    console.log("[Save] Insert success", purchase);
+    let purchase: { id: string };
+    try {
+      purchase = await insertPurchase(row);
+      console.log("[Save] Insert success", purchase);
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) throw error;
+      const updateRow = legacyRecordToPurchaseUpdate(
+        record,
+        classification,
+        { branches, channels, categories },
+        sessionResult.data.session?.user.id || null
+      );
+      console.warn("[Save] Insert skipped; existing purchase will be updated", { id: row.id });
+      purchase = await updatePurchaseRow(record.id, updateRow);
+      console.log("[Save] Existing purchase update success", purchase);
+    }
     const evidence = images.length
       ? await uploadEvidenceImages(record, images, sessionResult.data.session?.user.id || null)
       : { successes: [], failures: [] };
