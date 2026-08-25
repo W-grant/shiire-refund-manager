@@ -302,4 +302,11 @@ test("Supabase save values are normalized before constrained inserts", () => {
   assert.equal(salesService.includes("function normalizedStatus"), true, "sales status should be normalized before Supabase insert");
   assert.equal(salesService.includes("replace(/[./]/g, \"-\")"), true, "sales dates should be normalized before Supabase insert");
 });
+test("CSV and AI extraction fold purchase taxes into visible prices", () => {
+  assert.equal(indexHtml.includes('getCell(row, "bid_price_tax")'), true, "CSV bid price tax should be read");
+  assert.equal(indexHtml.includes('const itemPrice = bidPrice + bidPriceTax;'), true, "CSV item price should include bid price tax");
+  assert.equal(indexHtml.includes('const purchaseFee = purchaseCommission + purchaseCommissionTax;'), true, "CSV purchase fee should include commission tax");
+  assert.equal(indexHtml.includes('item["落札額消費税"]'), true, "AI extraction should support bid price tax");
+  assert.equal(indexHtml.includes('const purchaseFee = purchaseFeeBase + purchaseFeeTaxRaw;'), true, "AI extraction should fold fee tax into fee");
+});
 

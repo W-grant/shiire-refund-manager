@@ -2659,7 +2659,7 @@
 
 判定ルール: メルカリ/ヤフオク/ラクマ等のフリマは通常 適格請求書発行事業者=false、匿名取引=true。市場・業者オークション・店頭買取は相手方氏名が分かれば記載し匿名取引=false。金額は必ず数値（カンマや円記号を除く）。読み取れない値はnull。`;
 
-    const EXTRACT_COST_PROMPT = "明細に内訳がある場合は、送料、手数料、手数料消費税をそれぞれJSONキー「送料」「手数料」「手数料消費税」で返してください。内訳が不明で合計だけ分かる場合は従来通り「送料手数料合計」に入れてください。";
+    const EXTRACT_COST_PROMPT = "明細に内訳がある場合は、落札額や商品本体価格の消費税をJSONキー「落札額消費税」または「商品本体消費税」、送料、手数料、手数料消費税をそれぞれJSONキー「送料」「手数料」「手数料消費税」で返してください。税込合計だけ分かる場合は従来通り「金額税込」または「送料手数料合計」に入れてください。";
     const EXTRACT_PARTNER_PROMPT = "業者オークション、市場、請求書、仕入明細書、PDFでは、明細行だけでなく書類のヘッダー、発行元、販売者、会社名、登録番号、住所、所在地、請求元住所、販売者住所欄も確認してください。顧客情報・宛先・買手情報は自社情報なので、相手方に入れないでください。発行元・販売者・請求元・市場運営会社を相手方として優先してください。複数商品が同じ業者からの一括仕入れの場合は、各itemsの「相手方氏名」に同じ業者名を入れてください。住所または所在地が書類内に見える場合は各itemsの「相手方住所」に同じ住所を入れてください。適格請求書発行事業者番号（Tから始まる番号）や登録番号が確認できる場合は各itemsの「適格事業者番号」に入れ、「適格請求書発行事業者」をtrueにしてください。相手方氏名が空欄になりそうな場合でも、業者名・市場名・請求元名・発行元名の候補があれば最も確からしい名称を入れてください。住所が書類内に見当たらない場合だけ「相手方住所」はnullにしてください。";
     const AUTH_AI_PROMPT = `あなたは中古ブランド品の真贋一次チェック補助です。写真だけで断定せず、販売前に人が確認すべき点を絞り込んでください。
 返答はJSONだけにしてください。
@@ -6331,10 +6331,14 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
           const name = getCell(row, "item_name");
           if (!name) return;
           const memo = getCell(row, "memo");
-          const itemPrice = numberFromCsvValue(getCell(row, "bid_price"));
-          const purchaseFee = numberFromCsvValue(getCell(row, "purchase_commission"));
-          const purchaseFeeTax = numberFromCsvValue(getCell(row, "purchase_commission_tax"));
-          const shippingFeeTotal = purchaseFee + purchaseFeeTax;
+          const bidPrice = numberFromCsvValue(getCell(row, "bid_price"));
+          const bidPriceTax = numberFromCsvValue(getCell(row, "bid_price_tax"));
+          const itemPrice = bidPrice + bidPriceTax;
+          const purchaseCommission = numberFromCsvValue(getCell(row, "purchase_commission"));
+          const purchaseCommissionTax = numberFromCsvValue(getCell(row, "purchase_commission_tax"));
+          const purchaseFee = purchaseCommission + purchaseCommissionTax;
+          const purchaseFeeTax = 0;
+          const shippingFeeTotal = purchaseFee;
           const csvTotal = numberFromCsvValue(getCell(row, "buy_total"));
           const amount = csvTotal || itemPrice + shippingFeeTotal;
           records.push({
@@ -6434,12 +6438,16 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       const qualifiedRaw = item["適格請求書発行事業者"];
       const invoiceRegistrationNumber = normalizeInvoiceRegistrationNumber(item["適格事業者番号"] || item["インボイス登録番号"] || item["登録番号"]);
       const anonRaw = item["匿名取引"];
-      const itemPrice = Number(item["商品本体価格"] ?? item["金額税込"] ?? 0);
+      const itemBasePrice = Number(item["商品本体価格"] ?? item["落札額"] ?? item["金額税込"] ?? 0);
+      const itemPriceTax = Number(item["商品本体消費税"] ?? item["落札額消費税"] ?? item["消費税"] ?? 0);
+      const itemPrice = itemBasePrice + itemPriceTax;
       const shippingFee = Number(item["\u9001\u6599"] ?? 0);
-      const purchaseFeeTax = Number(item["\u624b\u6570\u6599\u6d88\u8cbb\u7a0e"] ?? 0);
+      const purchaseFeeTaxRaw = Number(item["\u624b\u6570\u6599\u6d88\u8cbb\u7a0e"] ?? 0);
       const hasFeeBreakdown = Boolean(item["\u9001\u6599"] || item["\u624b\u6570\u6599"] || item["\u624b\u6570\u6599\u6d88\u8cbb\u7a0e"]);
-      const purchaseFee = Number(item["\u624b\u6570\u6599"] ?? (hasFeeBreakdown ? 0 : item["\u9001\u6599\u624b\u6570\u6599\u5408\u8a08"] ?? 0));
-      const shippingFeeTotal = Number(item["\u9001\u6599\u624b\u6570\u6599\u5408\u8a08"] ?? (shippingFee + purchaseFee + purchaseFeeTax));
+      const purchaseFeeBase = Number(item["\u624b\u6570\u6599"] ?? (hasFeeBreakdown ? 0 : item["\u9001\u6599\u624b\u6570\u6599\u5408\u8a08"] ?? 0));
+      const purchaseFee = purchaseFeeBase + purchaseFeeTaxRaw;
+      const purchaseFeeTax = 0;
+      const shippingFeeTotal = Number(item["\u9001\u6599\u624b\u6570\u6599\u5408\u8a08"] ?? (shippingFee + purchaseFee));
       const amount = Number(item["金額税込"] ?? (itemPrice + shippingFeeTotal));
       return {
         id: crypto.randomUUID(),
