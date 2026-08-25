@@ -1942,6 +1942,12 @@
                   </label>
                   <button id="applyReviewSupplierPreset" type="button">全行へ適用</button>
                 </div>
+                <div class="review-supplier-tools" aria-label="仕入日一括反映">
+                  <label>仕入日
+                    <input id="reviewDateBulk" type="date">
+                  </label>
+                  <button id="applyReviewDateBulk" type="button">仕入日を全行へ適用</button>
+                </div>
                 <div class="review-supplier-tools" aria-label="担当一括反映">
                   <label>担当
                     <select id="reviewStaffBulk"></select>
@@ -6602,6 +6608,22 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       }
     }
 
+    function applyDateToAllReviewItems() {
+      const date = $("reviewDateBulk").value;
+      if (!state.aiItems.length) {
+        $("extractStatus").textContent = "一括変更できる抽出行がありません";
+        return;
+      }
+      if (!date) {
+        $("extractStatus").textContent = "反映する仕入日を選択してください";
+        return;
+      }
+      state.aiItems.forEach((_, index) => updateReviewItem(index, "date", date));
+      renderReview();
+      $("reviewDateBulk").value = date;
+      $("extractStatus").textContent = `仕入日を${date}に全行へ反映しました`;
+    }
+
     function applyStaffToAllReviewItems() {
       const staff = $("reviewStaffBulk").value || META.staff[0] || "未設定";
       if (!state.aiItems.length) {
@@ -6745,6 +6767,14 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
         if (button) button.textContent = label;
       });
     }
+
+    function syncReviewBulkDefaults() {
+      const dateInput = $("reviewDateBulk");
+      if (dateInput && !dateInput.value && state.aiItems.length) {
+        dateInput.value = state.aiItems[0].date || today();
+      }
+    }
+
     function updateReviewSelectionControls() {
       const count = selectedReviewItems().length;
       const total = state.aiItems.length;
@@ -6778,6 +6808,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       const qualifiedOptions = [["no", "登録なし"], ["yes", "登録あり"], ["unknown", "不明"]];
       const anonOptions = [["anon", "匿名"], ["named", "本名判明"]];
       const evidenceLabelOptionsForReview = [["", "自動"], ...EVIDENCE_LABEL_OPTIONS.map((item) => [item, item])];
+      syncReviewBulkDefaults();
       $("reviewRows").innerHTML = state.aiItems.map((record, index) => {
         const result = reviewValidation(record);
         const rowClass = result.errors.length ? "review-row-error" : result.warnings.length ? "review-row-warning" : "";
@@ -8187,6 +8218,7 @@ decisionは写真だけで本物断定できる場合でも原則pendingまた�
       $("selectWarningReviewBtn").addEventListener("click", () => setReviewSelectionByValidation("warning"));
       $("reviewSupplierPreset").addEventListener("change", updateSupplierPresetInputs);
       $("applyReviewSupplierPreset").addEventListener("click", applySupplierToAllReviewItems);
+      $("applyReviewDateBulk").addEventListener("click", applyDateToAllReviewItems);
       $("applyReviewStaffBulk").addEventListener("click", applyStaffToAllReviewItems);
       $("assignReviewManagementNumbers").addEventListener("click", assignManagementNumbersToSelectedReviewItems);
       $("reviewRows").addEventListener("input", (event) => {
